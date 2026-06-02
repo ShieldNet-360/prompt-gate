@@ -13,7 +13,7 @@ UpgradeBehavior: install
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/ShieldNet-360/prompt-gate/releases/download/v1.0.0/Prompt.Gate.Setup.1.0.0.exe
-    InstallerSha256: 4B674E32F2CEFF6B2DEB7D6EA770377CDB643E69CFB099A8C724A959A4302080
+    InstallerSha256: C24F7BFABAFB21018F2D0BF9FF54F8EFBF744A3258E7E9C9A3F48D89798D0877
 ReleaseDate: 2026-05-31
 ManifestType: installer
 ManifestVersion: 1.6.0
