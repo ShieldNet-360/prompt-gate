@@ -1,5 +1,5 @@
 /**
- * Playwright-based extension integration smoke test (Phase 6 Task 24).
+ * Playwright-based extension integration smoke test.
  *
  * Not part of the default `npm test` run. See ./README.md for the
  * out-of-band install steps.

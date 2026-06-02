@@ -657,7 +657,7 @@ function AboutUsPage({ onBack }: { onBack: () => void }) {
         <p className="about-version">Version 0.1.0</p>
         <div className="about-section">
           <p>
-            Built by <strong>Uney GmbH</strong> — a small team passionate about
+            Built by <strong>ShieldNet 360</strong> — a small team passionate about
             privacy, security, and giving people control over their own data.
           </p>
           <p>
@@ -668,11 +668,11 @@ function AboutUsPage({ onBack }: { onBack: () => void }) {
         </div>
         <div className="about-section">
           <h3>Contact</h3>
-          <p>Email: <a href="mailto:hung.tn@qualgo.net" className="about-link">hung.tn@qualgo.net</a></p>
-          <p>GitHub: T.B.D</p>
+          <p>GitHub: <a href="https://github.com/ShieldNet-360/prompt-gate" className="about-link">github.com/ShieldNet-360/prompt-gate</a></p>
+          <p>Issues &amp; questions: <a href="https://github.com/ShieldNet-360/prompt-gate/issues" className="about-link">open an issue</a></p>
         </div>
         <div className="about-section">
-          <p className="about-copy">&copy; 2026 Uney GmbH. All rights reserved.</p>
+          <p className="about-copy">&copy; 2026 ShieldNet 360. All rights reserved.</p>
         </div>
       </div>
     </div>

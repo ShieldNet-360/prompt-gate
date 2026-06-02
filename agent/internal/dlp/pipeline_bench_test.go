@@ -88,7 +88,7 @@ func BenchmarkEntropy(b *testing.B) {
 
 // BenchmarkPipelineScanLargeConcurrentEval mirrors
 // BenchmarkPipelineScanLarge but uses a content size that crosses the
-// ConcurrentEvalThreshold, so the worker-pool evaluator (Phase 6 Task
+// ConcurrentEvalThreshold, so the worker-pool evaluator
 // 10) is exercised. Compare against BenchmarkPipelineScanLarge to see
 // the speed-up of concurrent regex revalidation.
 func BenchmarkPipelineScanLargeConcurrentEval(b *testing.B) {

@@ -1,4 +1,4 @@
-# Obfuscated synthetic secrets — MUST block (after A1 normalize).
+# Obfuscated synthetic secrets — MUST block (after normalize).
 # Tests homoglyph / zero-width / base64 paths.
 
 # Homoglyph: Cyrillic А (U+0410) in place of Latin A

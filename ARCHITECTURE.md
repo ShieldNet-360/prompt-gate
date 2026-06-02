@@ -172,9 +172,9 @@ The DLP scanner is the core accuracy component. Instead of running all regex pat
 content (O(n × p) for n content length and p patterns), it uses a multi-stage pipeline.
 
 On top of the deterministic core sit four accuracy layers —
-adversary-resistant normalisation (A1), a multi-piece
-session correlator (A2), a public-example bloom (C1), and a code-template
-placeholder router (C2) — plus two scoring-bias layers (F and F2)
+adversary-resistant normalisation, a multi-piece
+session correlator, a public-example bloom, and a code-template
+placeholder router — plus two scoring-bias layers
 that read the optional `SourceContext` the extension forwards on every
 scan, plus a per-user feedback allowlist (H) that lets a user say "never
 block this exact value again" via a salted SHA-256 hash. All layers are
@@ -186,13 +186,13 @@ path:
                             │
                             ▼
    ╔════════════════════════════════════════════════════════════╗
-   ║ A1 · Normalize                                             ║
+   ║ Normalize                                                  ║
    ║   zero-width strip · NFKC · homoglyph fold ·               ║
    ║   inline base64 decode                                     ║
    ╚════════════════════════╤═══════════════════════════════════╝
                             ▼
    ╔════════════════════════════════════════════════════════════╗
-   ║ A2 · Correlator (optional)                                 ║
+   ║ Correlator (optional)                                      ║
    ║   prepend prior paste tail when session_id supplied        ║
    ╚════════════════════════╤═══════════════════════════════════╝
                             ▼
@@ -214,18 +214,18 @@ path:
    └────────────────────────╤───────────────────────────────────┘
                             ▼
    ╔════════════════════════════════════════════════════════════╗
-   ║ C1 · Public-example bloom                                  ║
+   ║ Public-example bloom                                       ║
    ║   SHA-256 hash table — match.Value in set ⇒ auto-skip      ║
    ╚════════════════════════╤═══════════════════════════════════╝
                             ▼
    ╔════════════════════════════════════════════════════════════╗
-   ║ C2 · Placeholder-shape router                              ║
+   ║ Placeholder-shape router                                   ║
    ║   <YOUR_KEY> / {{var}} / ${VAR} / xxxxxx / your-here ⇒    ║
    ║   auto-skip                                                ║
    ╚════════════════════════╤═══════════════════════════════════╝
                             ▼
    ╠══════════════════════════════════════════════════════════════╣
-   ║ H · Feedback allowlist (optional)                            ║
+   ║ Feedback allowlist (optional)                                ║
    ║   SHA-256(per-install-salt ‖ normalize(match.Value))         ║
    ║   ∈ dlp_allowlist ⇒ auto-skip                                ║
    ╠══════════════════════════╤═══════════════════════════════════╣
@@ -236,7 +236,7 @@ path:
    └──────────────────────────╤───────────────────────────────────┘
                               ▼
    ╠══════════════════════════════════════════════════════════════╣
-   ║ F  · Destination context bias                                ║
+   ║ Destination context bias                                     ║
    ║   destination_kind ∈ {ai_chat, code_host, ai_code, …}        ║
    ║     code_host: −2 · network_body: +1                         ║
    ║   element_kind ∈ {paste_target, network_body, file_upload}   ║
@@ -245,10 +245,10 @@ path:
    ╠══════════════════════════╤═══════════════════════════════════╣
                               ▼
    ╠══════════════════════════════════════════════════════════════╣
-   ║ F2 · Path context bias                                       ║
+   ║ Path context bias                                            ║
    ║   path_hint matches *_test.* / fixtures/ / __tests__/ /      ║
    ║     mocks/ / spec/ AND destination_kind=code_host ⇒ −1       ║
-   ║   (stacks with F so committed test fixtures fall below       ║
+   ║   (stacks with it so committed test fixtures fall below      ║
    ║    threshold even at high pattern severity)                  ║
    ╠══════════════════════════╤═══════════════════════════════════╣
                               ▼
@@ -272,14 +272,14 @@ path:
 
 (Double-bordered ╔═╗ boxes are the accuracy layers. The
 later double-bordered ╠═╣ boxes are the source-context additions: the
-feedback allowlist inside the per-match loop, then F + F2 around scoring. The
+feedback allowlist inside the per-match loop, then the destination + path context bias around scoring. The
 inner single-bordered boxes are the deterministic
 core. The opt-in `block_events INSERT` lives at the Store layer —
 see §"Privacy Architecture" and `Store.InsertBlockEvent` — and is
 a silent no-op when consent is off.)
 
 Performance budget: <1 ms hard end-to-end. Typical wall-clock cost is
-~800 µs for the full accuracy-layer stack on a 4 KiB paste; F + F2 add
+~800 µs for the full accuracy-layer stack on a 4 KiB paste; the source-context bias adds
 ~13 µs at p50 for the source-context bias lookup. Snapshot of the
 1M-line real-source bench lives in [BENCHMARKS.md](./BENCHMARKS.md).
 
@@ -287,11 +287,11 @@ Performance budget: <1 ms hard end-to-end. Typical wall-clock cost is
 
 | Layer | Source file | Privacy posture |
 |---|---|---|
-| **F destination context** | `agent/internal/dlp/scorer_context.go` | `source.surrounding_hash` + `source.page_url_hash` are SHA-256 hashes; raw URL/content never crosses the wire. |
-| **F2 path context** | as above (`path_hint` field) | `source.path_hint` is a hash of the in-IDE path; never raw. |
-| **H feedback allowlist** | `agent/internal/dlp/allowlist.go`, `agent/internal/dlp/salt.go` | `dlp_allowlist.salted_hash = SHA-256(salt ‖ normalize(value))`; per-install salt at `~/.prompt-gate/allowlist-salt` (0600 perms) defeats cross-install lookup. |
+| **Destination context** | `agent/internal/dlp/scorer_context.go` | `source.surrounding_hash` + `source.page_url_hash` are SHA-256 hashes; raw URL/content never crosses the wire. |
+| **Path context** | as above (`path_hint` field) | `source.path_hint` is a hash of the in-IDE path; never raw. |
+| **Feedback allowlist** | `agent/internal/dlp/allowlist.go`, `agent/internal/dlp/salt.go` | `dlp_allowlist.salted_hash = SHA-256(salt ‖ normalize(value))`; per-install salt at `~/.prompt-gate/allowlist-salt` (0600 perms) defeats cross-install lookup. |
 
-#### Step 0a: A1 — Adversary-Resistant Normalisation
+#### Step 0a: Adversary-Resistant Normalisation
 
 `agent/internal/dlp/normalize.go`. Runs before any pattern matching so
 every downstream stage operates on a single canonical form:
@@ -307,7 +307,7 @@ Cache keys remain the *raw* content so callers get deterministic
 per-input results; the canonical form is local to one scan and freed
 when `Scan` returns.
 
-#### Step 0b: A2 — Multi-Piece Exfil Correlator (optional)
+#### Step 0b: Multi-Piece Exfil Correlator (optional)
 
 `agent/internal/dlp/correlator.go`. Enabled when `ScanSession(ctx,
 content, sessionID)` is called with a non-empty `sessionID` (the
@@ -360,7 +360,7 @@ Single-pass scan of content → candidate locations in O(n). Only candidates pro
 Full regex runs only on the candidate substrings identified by Aho-Corasick, not on the entire
 content. This reduces regex work by 80%+ for typical content.
 
-#### Step 3.5a: C1 — Public-Example Bloom
+#### Step 3.5a: Public-Example Bloom
 
 `agent/internal/dlp/bloom.go`. Before scoring, each match's `Value` is
 normalised (whitespace, dashes, underscores stripped; ASCII lowercased)
@@ -373,7 +373,7 @@ Privacy invariant: stored as SHA-256 hashes only; the literal example
 values do not ship in the binary. Each entry's trailing comment names
 the source value for auditability. Cost: ~5 µs per match.
 
-#### Step 3.5b: C2 — Placeholder-Shape Router
+#### Step 3.5b: Placeholder-Shape Router
 
 `agent/internal/dlp/codecontext.go`. Catches template/placeholder
 values that have plausible entropy and pattern shape but are never
@@ -444,16 +444,16 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
 
 | Step | Time Budget | Memory Budget |
 |------|------------|---------------|
-| A1 normalisation (zero-width + homoglyph + NFKC + base64 decode) | < 100 μs | per-scan only (canonical string) |
-| A2 session combine (when `session_id` supplied) | < 30 μs | 256 B/session × ≤ 4 096 sessions ≈ 1 MB worst case |
+| Normalisation (zero-width + homoglyph + NFKC + base64 decode) | < 100 μs | per-scan only (canonical string) |
+| Session combine (when `session_id` supplied) | < 30 μs | 256 B/session × ≤ 4 096 sessions ≈ 1 MB worst case |
 | Content classification | < 10 μs | 0 (stack only) |
 | Aho-Corasick scan | < 100 μs (typical paste) | ~100 KB (automaton, built once) |
 | Adaptive filter + Regex validation (candidates only) | < 500 μs | negligible |
-| C1 public-example bloom + C2 placeholder router | < 10 μs per match | ~3 KB (SHA-256 hash table) |
+| Public-example bloom + placeholder router | < 10 μs per match | ~3 KB (SHA-256 hash table) |
 | Scoring (hotwords + entropy + exclusions) | < 200 μs | ~100 KB (exclusion hash sets) |
 | **Total per scan** | **< 1 ms hard** (typical ≈ 800 μs) | **~200 KB shared + per-scan transient** |
 
-All scan content (raw input, A1 canonical form, A2 prior tail, scoring
+All scan content (raw input, canonical form, prior session tail, scoring
 state) is held in Go-managed memory only and released for GC
 immediately after the response is sent. No content reaches disk,
 SQLite, or any log.
@@ -846,7 +846,7 @@ accepts `chrome-extension://`, `moz-extension://`, and
   unavailable. Both paths share the same `dlp.Pipeline.Scan()` on the agent.
 - Every scan carries a per-tab `session_id` generated once at
   content-script load (`crypto.randomUUID()` with a `Math.random`
-  fallback). The agent's A2 correlator uses it to reassemble secrets
+  fallback). The agent's correlator uses it to reassemble secrets
   split across consecutive pastes from the same tab. The token is
   opaque, in-memory only, and never sent to any host other than the
   loopback agent — see [`extension/src/content/scan-client.ts`](./extension/src/content/scan-client.ts).
@@ -1125,13 +1125,13 @@ User           Browser Ext         Go Agent              DLP Pipeline       SQLi
  │                 │   scan           │                       │                │
  │                 │ {content,        │                       │                │
  │                 │  session_id}     │                       │                │
- │                 │ ────────────────►│  A1 normalize         │                │
+ │                 │ ────────────────►│  normalize            │                │
  │                 │                  │  (zero-width strip,   │                │
  │                 │                  │   homoglyph fold,     │                │
  │                 │                  │   NFKC,               │                │
  │                 │                  │   base64 decode)      │                │
  │                 │                  │                       │                │
- │                 │                  │  A2 prepend prior     │                │
+ │                 │                  │  prepend prior        │                │
  │                 │                  │  paste tail for       │                │
  │                 │                  │  session_id           │                │
  │                 │                  │ ─────────────────────►│                │
@@ -1140,9 +1140,9 @@ User           Browser Ext         Go Agent              DLP Pipeline       SQLi
  │                 │                  │                       │ AC prefix scan │
  │                 │                  │                       │ → candidates   │
  │                 │                  │                       │ Regex validate │
- │                 │                  │                       │ C1 bloom skip  │
+ │                 │                  │                       │ bloom skip     │
  │                 │                  │                       │   (none hit)   │
- │                 │                  │                       │ C2 placeholder │
+ │                 │                  │                       │ placeholder    │
  │                 │                  │                       │   skip (none)  │
  │                 │                  │                       │ Score:         │
  │                 │                  │                       │   hotword +    │
@@ -1156,7 +1156,7 @@ User           Browser Ext         Go Agent              DLP Pipeline       SQLi
  │                 │                  │  Access Key",        │                │
  │                 │                  │  score: 4}           │                │
  │                 │                  │                      │                 │
- │                 │                  │  raw content + A1   │                 │
+ │                 │                  │  raw content +      │                 │
  │                 │                  │  canonical form +   │                 │
  │                 │                  │  session tail       │                 │
  │                 │                  │  discarded (no      │                 │
@@ -1185,7 +1185,7 @@ User           Browser Ext         Go Agent              DLP Pipeline       SQLi
 | `PUT` | `/api/policies/:category` | Update policy action | Config only |
 | `GET` | `/api/stats` | Anonymous aggregate counters | Integers only, no domains/IPs |
 | `POST` | `/api/stats/reset` | Reset counters to zero | — |
-| `POST` | `/api/dlp/scan` | Scan `{content, session_id?, source?}` through the layered DLP pipeline. `session_id` engages the A2 correlator; `source` (the `SourceContext` — `destination_kind`, `destination_host`, `element_kind`, `in_code_fence`, `language_hint`, `path_hint`, `surrounding_hash`, `page_url_hash`) drives the F + F2 scoring bias. All content-derived `*_hash` fields are SHA-256 hashes; the raw URL/content/path never crosses the wire. | Content processed in-memory, never persisted; per-session tail held for 30 s in RAM. |
+| `POST` | `/api/dlp/scan` | Scan `{content, session_id?, source?}` through the layered DLP pipeline. `session_id` engages the correlator; `source` (the `SourceContext` — `destination_kind`, `destination_host`, `element_kind`, `in_code_fence`, `language_hint`, `path_hint`, `surrounding_hash`, `page_url_hash`) drives the source-context (destination + path) scoring bias. All content-derived `*_hash` fields are SHA-256 hashes; the raw URL/content/path never crosses the wire. | Content processed in-memory, never persisted; per-session tail held for 30 s in RAM. |
 | `GET` | `/api/dlp/config` | Get DLP scoring thresholds | Config only |
 | `PUT` | `/api/dlp/config` | Update DLP scoring thresholds | Config only |
 | `GET` | `/api/dlp/allowlist` | List feedback-allowlist entries (`{salted_hash, scope, pattern_name, expires_at, created_at, last_hit}` per row). Salted hashes only — no raw values. | Hashes + metadata only. |

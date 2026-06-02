@@ -1,4 +1,4 @@
-// Phase 8 Config H — handler tests for /api/dlp/allowlist.
+// Handler tests for /api/dlp/allowlist.
 
 package api
 
@@ -42,7 +42,7 @@ func newAllowlistForServer(t *testing.T) *dlp.Allowlist {
 	return a
 }
 
-func TestPhase8_Allowlist_503WhenNotConfigured(t *testing.T) {
+func TestAllowlist_503WhenNotConfigured(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetDLP(&fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())})
 	rec := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestPhase8_Allowlist_503WhenNotConfigured(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_AddListRemoveRoundTrip(t *testing.T) {
+func TestAllowlist_AddListRemoveRoundTrip(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetDLP(&fakeDLP{
 		thr:       dlp.NewThresholdEngine(dlp.DefaultThresholds()),
@@ -116,7 +116,7 @@ func TestPhase8_Allowlist_AddListRemoveRoundTrip(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_AddRejectsEmptyValue(t *testing.T) {
+func TestAllowlist_AddRejectsEmptyValue(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetDLP(&fakeDLP{
 		thr:       dlp.NewThresholdEngine(dlp.DefaultThresholds()),
@@ -131,7 +131,7 @@ func TestPhase8_Allowlist_AddRejectsEmptyValue(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_DeleteUnknownReturns404(t *testing.T) {
+func TestAllowlist_DeleteUnknownReturns404(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetDLP(&fakeDLP{
 		thr:       dlp.NewThresholdEngine(dlp.DefaultThresholds()),
@@ -145,7 +145,7 @@ func TestPhase8_Allowlist_DeleteUnknownReturns404(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_DeleteRequiresHash(t *testing.T) {
+func TestAllowlist_DeleteRequiresHash(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetDLP(&fakeDLP{
 		thr:       dlp.NewThresholdEngine(dlp.DefaultThresholds()),

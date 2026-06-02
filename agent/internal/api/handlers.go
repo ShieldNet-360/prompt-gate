@@ -34,7 +34,7 @@ const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
 // Both `uptime` (human-readable) and `uptime_seconds` (machine-readable)
 // are emitted so the Electron tray and the browser extension don't have
 // to parse the formatted string. The optional `runtime` and `rules`
-// sections were added in Phase 6 (Task 17). All embedded values are
+// All embedded values are
 // non-sensitive operational metadata — no scan content, domains, URLs,
 // IPs, or user identifiers ever appear here.
 type StatusResponse struct {
@@ -569,13 +569,13 @@ func (s *Server) handleStatsReset(w http.ResponseWriter, r *http.Request) {
 // dlpScanRequest is the body for POST /api/dlp/scan.
 //
 // SessionID is optional. When supplied (typically by the browser
-// extension as a per-tab opaque token), the A2 multi-piece correlator
+// extension as a per-tab opaque token), the multi-piece correlator
 // is engaged: secrets split across consecutive pastes in the same
 // session are reassembled and detected.
 //
-// Source is optional. When supplied (Phase 8 Config F), the agent's
+// Source is optional. When supplied, the agent's
 // scorer biases verdicts by destination + element + path context.
-// Missing or zero-valued Source preserves Config E behaviour exactly,
+// Missing or zero-valued Source preserves default scoring behaviour exactly,
 // so old extensions continue to work unchanged.
 type dlpScanRequest struct {
 	Content   string             `json:"content"`
@@ -638,7 +638,7 @@ func (s *Server) handleDLPScan(w http.ResponseWriter, r *http.Request) {
 	var result dlp.ScanResult
 	switch {
 	case req.Source != nil && !req.Source.IsZero():
-		// Phase 8 Config F: caller supplied destination/element/path
+		// Caller supplied destination/element/path
 		// context. ScanWithContext folds session + source into the
 		// existing pipeline.
 		result = s.DLP.ScanWithContext(r.Context(), req.Content, req.SessionID, source)
@@ -709,7 +709,7 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 // persisted in SQLite — without this, weight/threshold changes
 // would only take effect after an agent restart, silently
 // diverging from the values returned by GET /api/dlp/config and
-// GET /api/profile. A nil DLP pipeline (Phase 1, no DLP wired)
+// GET /api/profile. A nil DLP pipeline (no DLP wired)
 // short-circuits to a no-op.
 //
 // Threshold is set first and the weights setter is invoked last on
@@ -777,7 +777,7 @@ var _ = stats.Snapshot{}
 
 // handleRulesUpdate handles POST /api/rules/update. It triggers an
 // immediate manifest check and waits for the result before responding.
-// 503 is returned when no updater was wired (Phase 1 / Phase 2
+// 503 is returned when no updater was wired (older
 // deployments). The reply matches rules.Result so callers can decide
 // whether to flash a "rules updated" toast in the tray UI.
 func (s *Server) handleRulesUpdate(w http.ResponseWriter, r *http.Request) {
@@ -1182,7 +1182,7 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, staged)
 }
 
-// ── Phase 8 Config H — /api/dlp/allowlist endpoints ────────────────
+// ── Feedback allowlist — /api/dlp/allowlist endpoints ──────────────
 
 // dlpAllowlistAddRequest is the body for POST /api/dlp/allowlist.
 // Value is held only in this stack frame and dropped after the

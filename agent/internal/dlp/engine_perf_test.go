@@ -1,11 +1,11 @@
-// Phase 6 Tasks 7-10: engine performance tests.
+// Engine performance tests.
 //
-//   - Task 7: content-size adaptive scanning drops low/medium severity
+//   - content-size adaptive scanning drops low/medium severity
 //     patterns from very large payloads.
-//   - Task 8: pattern category grouping lets operators disable whole
+//   - pattern category grouping lets operators disable whole
 //     categories at runtime.
-//   - Task 9: a short-lived LRU cache short-circuits identical scans.
-//   - Task 10: per-pattern groups can be evaluated concurrently.
+//   - a short-lived LRU cache short-circuits identical scans.
+//   - per-pattern groups can be evaluated concurrently.
 
 package dlp
 
@@ -34,7 +34,7 @@ func enginePipeline(t *testing.T) *Pipeline {
 	return p
 }
 
-// TestAdaptiveScanning_SkipsLowSeverityOnLargeContent — Task 7. A
+// TestAdaptiveScanning_SkipsLowSeverityOnLargeContent. A
 // payload above the configured large-content threshold no longer
 // returns low/medium-severity matches; only critical/high patterns are
 // considered.
@@ -68,7 +68,7 @@ func TestAdaptiveScanning_SkipsLowSeverityOnLargeContent(t *testing.T) {
 	}
 }
 
-// TestCategoryFiltering_DisablesPatterns — Task 8. Disabling the "pii"
+// TestCategoryFiltering_DisablesPatterns. Disabling the "pii"
 // category drops any match from a pattern whose category is "pii"
 // without affecting other categories.
 func TestCategoryFiltering_DisablesPatterns(t *testing.T) {
@@ -100,7 +100,7 @@ func TestCategoryFiltering_DisablesPatterns(t *testing.T) {
 	}
 }
 
-// TestScanCache_HitsIdenticalContent — Task 9. Two scans of the same
+// TestScanCache_HitsIdenticalContent. Two scans of the same
 // content count as a single regex evaluation; the second returns from
 // the cache and increments the hit counter.
 func TestScanCache_HitsIdenticalContent(t *testing.T) {
@@ -125,7 +125,7 @@ func TestScanCache_HitsIdenticalContent(t *testing.T) {
 	}
 }
 
-// TestScanCache_ExpiryEvictsEntry — Task 9. Entries older than TTL are
+// TestScanCache_ExpiryEvictsEntry. Entries older than TTL are
 // invisible to Lookup and counted as a miss instead.
 func TestScanCache_ExpiryEvictsEntry(t *testing.T) {
 	c := NewScanCache(8, 50*time.Millisecond)
@@ -143,7 +143,7 @@ func TestScanCache_ExpiryEvictsEntry(t *testing.T) {
 	}
 }
 
-// TestScanCache_LRUEvictsOldest — Task 9. Once the cache exceeds its
+// TestScanCache_LRUEvictsOldest. Once the cache exceeds its
 // capacity the least-recently-used entry is evicted, freeing space for
 // the new entry.
 func TestScanCache_LRUEvictsOldest(t *testing.T) {
@@ -195,7 +195,7 @@ func TestScanCache_HashOnly(t *testing.T) {
 	}
 }
 
-// TestConcurrentEval_LargeContent — Task 10. For payloads above
+// TestConcurrentEval_LargeContent. For payloads above
 // ConcurrentEvalThreshold the pipeline switches to the worker-pool
 // evaluator. The result must be identical to the sequential evaluator
 // and stable under racy execution.

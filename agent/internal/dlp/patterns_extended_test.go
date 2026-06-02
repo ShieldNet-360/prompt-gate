@@ -61,7 +61,7 @@ func TestExtendedPatterns_TruePositives(t *testing.T) {
 p := realPipeline(t)
 
 cases := []extendedPositive{
-// -- Task 1: Java ecosystem ----------------------------------
+// -- Java ecosystem ----------------------------------
 {
 label: "Java JDBC PostgreSQL with embedded password",
 content: "spring.datasource.url=jdbc:postgresql://db.internal:5432/" +
@@ -97,7 +97,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Task 2: Rust --------------------------------------------
+// -- Rust --------------------------------------------
 {
 label: "Cargo registry token",
 content: "# .cargo/credentials.toml for crates.io publish\n" +
@@ -110,7 +110,7 @@ content: "# Rocket.toml\n[production]\nsecret_key = \"GtPWyTw7zb9hUEnzNoRSV3X1aX
 allowedPatterns: []string{"Rocket.toml Secret Key"},
 },
 
-// -- Task 3: React/Angular/Frontend --------------------------
+// -- React/Angular/Frontend --------------------------
 {
 label: "React App env secret",
 content: "// in .env for create-react-app\n" +
@@ -141,7 +141,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Task 4: Electron/Tauri ----------------------------------
+// -- Electron/Tauri ----------------------------------
 {
 label: "Tauri signing private key",
 content: "TAURI_SIGNING_PRIVATE_KEY=dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5VeryLongB64SignedBlob01234567890ABCDEFG",
@@ -154,7 +154,7 @@ content: "// CI env for electron-forge\n" +
 allowedPatterns: []string{"Electron Forge Publish Token"},
 },
 
-// -- Task 5: AI/ML platforms ---------------------------------
+// -- AI/ML platforms ---------------------------------
 {
 label: "OpenAI project key",
 content: "// openai sdk client init\n" +
@@ -188,7 +188,7 @@ content: "REPLICATE_API_TOKEN=" + "r8_" + "9Pq2XmL4cVnR7BkTjHgYfWZaSdEoUbI",
 allowedPatterns: []string{"Replicate API Token"},
 },
 
-// -- Task 6: iOS native --------------------------------------
+// -- iOS native --------------------------------------
 {
 label: "Apple APNs auth key filename",
 content: "// fastlane lane :push do\n" +
@@ -206,7 +206,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Task 7: Android native ----------------------------------
+// -- Android native ----------------------------------
 {
 label: "google-services.json current_key",
 content: "// firebase google-services.json client project_info\n" +
@@ -224,7 +224,7 @@ content: `android { signingConfigs { release { storeFile file('release.jks')` +
 allowedPatterns: []string{"Android Signing Store Password"},
 },
 
-// -- Task 8: Flutter / React Native --------------------------
+// -- Flutter / React Native --------------------------
 {
 label: "Expo access token",
 content: "// .env for EAS Build\n" +
@@ -238,7 +238,7 @@ content: "// .env for fastlane match\n" +
 allowedPatterns: []string{"Fastlane Match Password"},
 },
 
-// -- Task 9: Database connection strings ---------------------
+// -- Database connection strings ---------------------
 {
 label: "MongoDB Atlas SRV with credentials",
 content: "MONGODB_URI=mongodb+srv://service-user:Ub3rH4rdProdSecret42@" +
@@ -258,7 +258,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Task 10: Cloud infra ------------------------------------
+// -- Cloud infra ------------------------------------
 {
 label: "Cloudflare API token",
 content: "// wrangler.toml env\n" +
@@ -290,7 +290,7 @@ content: "// supabase service_role key\n" +
 allowedPatterns: []string{"Supabase Service Role Key"},
 },
 
-// -- Task 11: CI/CD ------------------------------------------
+// -- CI/CD ------------------------------------------
 {
 label: "GitLab pipeline trigger token",
 content: "# .gitlab-ci.yml pipeline trigger\n" +
@@ -304,7 +304,7 @@ content: "# bitbucket data center access token\n" +
 allowedPatterns: []string{"Bitbucket Server Token (BBDC)"},
 },
 
-// -- Task 12: Messaging --------------------------------------
+// -- Messaging --------------------------------------
 {
 label: "Discord bot token",
 content: "// discord bot token\n" +
@@ -319,7 +319,7 @@ content: "// telegram botfather bot token\n" +
 allowedPatterns: []string{"Telegram Bot Token"},
 },
 
-// -- Task 13: Payment ----------------------------------------
+// -- Payment ----------------------------------------
 {
 label: "Square access token",
 content: "// squareup merchant\n" +
@@ -339,7 +339,7 @@ content: "// plaid client_id and banking transactions\n" +
 allowedPatterns: []string{"Plaid Client Secret"},
 },
 
-// -- Task 14: Auth / Identity --------------------------------
+// -- Auth / Identity --------------------------------
 {
 label: "Auth0 client secret",
 content: "# auth0 tenant client_id\n" +
@@ -359,7 +359,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Task 15: Password-in-code -------------------------------
+// -- Password-in-code -------------------------------
 {
 label: "Java password literal",
 content: "package com.example;\nimport java.util.*;\npublic class Conf {\n" +
@@ -409,7 +409,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Phase 6 Task 1: Terraform provider credentials -----------
+// -- Terraform provider credentials -----------
 {
 label: "Terraform Cloud user token",
 content: "# .terraformrc credentials block for HCP Terraform\n" +
@@ -445,7 +445,7 @@ content: "# Scalr provider config\n" +
 allowedPatterns: []string{"Scalr API Token"},
 },
 
-// -- Phase 6 Task 2: Container registry credentials -----------
+// -- Container registry credentials -----------
 {
 label: "Harbor robot account secret",
 content: "# Harbor robot account for the platform project\n" +
@@ -488,7 +488,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Phase 6 Task 3: Secret-manager response pastes -----------
+// -- Secret-manager response pastes -----------
 {
 label: "AWS Secrets Manager GetSecretValue paste",
 content: "# aws secretsmanager get-secret-value output\n" +
@@ -516,7 +516,7 @@ content: "// gcloud secrets versions access response for projects/123/secrets/ap
 allowedPatterns: []string{"GCP Secret Manager Payload Paste"},
 },
 
-// -- Phase 6 Task 4: OAuth2 / OIDC tokens ---------------------
+// -- OAuth2 / OIDC tokens ---------------------
 {
 label: "OAuth2 refresh token",
 content: "// oauth2 token exchange response\n" +
@@ -565,7 +565,7 @@ allowedPatterns: []string{
 },
 },
 
-// -- Phase 6 Task 5: IaC hardcoded secrets --------------------
+// -- IaC hardcoded secrets --------------------
 {
 label: "Ansible vault block",
 content: "# group_vars/prod/secrets.yml ansible playbook\n" +
@@ -594,7 +594,7 @@ content: "# data_bag/credentials/prod.json chef encrypted_data\n" +
 allowedPatterns: []string{"Chef Encrypted Data Bag"},
 },
 
-// -- Phase 6 Task 6: Package manager tokens -------------------
+// -- Package manager tokens -------------------
 {
 label: "RubyGems API key",
 content: "# ~/.gem/credentials rubygems push\n" +
@@ -680,7 +680,7 @@ got.PatternName, got.Score, tc.allowedPatterns)
 // TestExtendedPatterns_FalsePositiveRegression asserts known benign
 // content does NOT trigger a block, even though it contains
 // pattern-like substrings. These cover the new exclusions added in
-// rules/dlp_exclusions.json (Task 16/17).
+// rules/dlp_exclusions.json.
 func TestExtendedPatterns_FalsePositiveRegression(t *testing.T) {
 p := realPipeline(t)
 

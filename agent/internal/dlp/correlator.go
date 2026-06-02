@@ -1,4 +1,4 @@
-// Multi-piece exfil correlator — A2 layer.
+// Multi-piece exfil correlator.
 //
 // Correlator carries a small tail (last N bytes) of each session's
 // most recent paste so that secrets split across multiple consecutive
@@ -8,8 +8,8 @@
 //   paste 1 (session=abc): "Hey debug — my key starts with AKIA1234"
 //   paste 2 (session=abc, +12s): "5678ABCDEF12345678 — thanks"
 //
-// Without A2, neither paste alone contains a complete AWS access key
-// pattern; with A2, the second scan sees a virtual buffer of
+// Without the correlator, neither paste alone contains a complete AWS access key
+// pattern; with it, the second scan sees a virtual buffer of
 // "...AKIA12345678ABCDEF12345678..." and the regex hits.
 //
 // Privacy invariant:
@@ -73,7 +73,7 @@ func NewCorrelator(ttl time.Duration, tailLen, maxSess int) *Correlator {
 // first paste in the session, returns (content, false). Otherwise
 // returns (priorTail + sep + content, true).
 //
-// sessionID == "" disables A2 — the function returns (content, false)
+// sessionID == "" disables correlation — the function returns (content, false)
 // and does not touch any state. Safe to call with empty session ID.
 //
 // Safe for concurrent use.

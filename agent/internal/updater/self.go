@@ -1,5 +1,5 @@
 // Package updater implements agent self-update against a manifest
-// hosted on GitHub Releases (Phase 6 Task 15).
+// hosted on GitHub Releases.
 //
 // The updater is intentionally minimal:
 //

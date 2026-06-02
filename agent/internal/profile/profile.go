@@ -150,7 +150,7 @@ func (h *Holder) Set(p *Profile) error {
 
 // Locked reports whether the active profile is locked. A nil Holder or
 // an unset profile is considered unlocked so a fresh install behaves
-// like a Phase 1-4 deployment.
+// like a minimal deployment.
 func (h *Holder) Locked() bool {
 	if h == nil {
 		return false

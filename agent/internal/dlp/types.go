@@ -62,27 +62,27 @@ type Pattern struct {
 	// still sees them.
 	Category string `json:"category,omitempty"`
 
-	// ContextBias is Phase 8 Config F. Per-pattern additive score
+	// ContextBias is the source-context score. Per-pattern additive score
 	// delta keyed by SourceContext.DestinationKind. Empty / missing
-	// = no bias (Config E behaviour). Example:
+	// = no bias (default scoring behaviour). Example:
 	//   "context_bias": { "code_host": -2, "paste_bin": +1 }
 	// Pattern-level entries override the global scorer rules in
-	// agent/internal/dlp/scorer.go (Slice 2; inert in Slice 1).
+	// agent/internal/dlp/scorer.go.
 	ContextBias map[string]int `json:"context_bias,omitempty"`
 
 	// Compiled is populated by LoadPatterns; nil until compiled.
 	Compiled *regexp.Regexp `json:"-"`
 }
 
-// SourceContext is Phase 8 Config F. It describes WHERE a scan
+// SourceContext describes WHERE a scan
 // request originates so the scorer can bias verdicts by destination
 // (e.g. the same AKIA-shaped value pasted to chat.openai.com is
 // exfil; the same value in a *_test.go on github.com is a fixture).
 //
 // Every field is optional. The browser extension fills what it can
-// per interceptor (see extension/src/content/scan-client.ts in Slice
-// 3); the agent uses what it gets. A zero-value SourceContext
-// behaves identically to the pre-F Scan path.
+// per interceptor (see extension/src/content/scan-client.ts); the
+// agent uses what it gets. A zero-value SourceContext
+// behaves identically to the plain Scan path.
 //
 // Privacy invariant: SurroundingHash and PageURLHash are SHA-256
 // truncated to 64 bits (16 hex chars). No raw URL, no surrounding
@@ -98,7 +98,7 @@ type SourceContext struct {
 	// class="language-…">` ancestor on the focused element.
 	LanguageHint string `json:"language_hint,omitempty"`
 
-	// PathHint is Phase 8 Config F2. A coarse classification of the
+	// PathHint is the path-hint axis. A coarse classification of the
 	// file path the user is interacting with on code-host
 	// destinations. Values: "test" / "fixture" / "spec" / "mock" /
 	// "docs" / "src" / "" (unknown). Derived by the extension from

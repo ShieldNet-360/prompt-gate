@@ -1,4 +1,4 @@
-// Phase 8 Config H — Allowlist storage + lookup tests.
+// Feedback-allowlist storage + lookup tests.
 
 package dlp
 
@@ -63,7 +63,7 @@ func testSalt() []byte {
 
 // ── salt ──────────────────────────────────────────────────────────
 
-func TestPhase8_LoadOrGenerateSalt_CreatesOnFirstRun(t *testing.T) {
+func TestLoadOrGenerateSalt_CreatesOnFirstRun(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "allowlist-salt")
 
@@ -92,7 +92,7 @@ func TestPhase8_LoadOrGenerateSalt_CreatesOnFirstRun(t *testing.T) {
 	}
 }
 
-func TestPhase8_LoadOrGenerateSalt_RejectsMalformed(t *testing.T) {
+func TestLoadOrGenerateSalt_RejectsMalformed(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "allowlist-salt")
 	if err := os.WriteFile(path, []byte("not-hex"), 0o600); err != nil {
@@ -105,7 +105,7 @@ func TestPhase8_LoadOrGenerateSalt_RejectsMalformed(t *testing.T) {
 
 // ── Allowlist round-trip ──────────────────────────────────────────
 
-func TestPhase8_Allowlist_AddLookupRemove(t *testing.T) {
+func TestAllowlist_AddLookupRemove(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 	a, err := NewAllowlist(ctx, db, testSalt(), nil)
@@ -140,13 +140,13 @@ func TestPhase8_Allowlist_AddLookupRemove(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_NormalisesValue(t *testing.T) {
+func TestAllowlist_NormalisesValue(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 	a, _ := NewAllowlist(ctx, db, testSalt(), nil)
 
 	// Allowlist the spaced form; both hyphenated and run-together
-	// forms must hit the same hash (mirrors C1 bloom normalisation).
+	// forms must hit the same hash (mirrors public-example bloom normalisation).
 	if _, err := a.Add(ctx, "4111 1111 1111 1111", "", "PCI test card", 0); err != nil {
 		t.Fatalf("add: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestPhase8_Allowlist_NormalisesValue(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_ScopeIsPerDestination(t *testing.T) {
+func TestAllowlist_ScopeIsPerDestination(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 	a, _ := NewAllowlist(ctx, db, testSalt(), nil)
@@ -179,7 +179,7 @@ func TestPhase8_Allowlist_ScopeIsPerDestination(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_TTLExpiry(t *testing.T) {
+func TestAllowlist_TTLExpiry(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 
@@ -213,7 +213,7 @@ func TestPhase8_Allowlist_TTLExpiry(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_RemoveUnknownReturnsFalse(t *testing.T) {
+func TestAllowlist_RemoveUnknownReturnsFalse(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 	a, _ := NewAllowlist(ctx, db, testSalt(), nil)
@@ -226,7 +226,7 @@ func TestPhase8_Allowlist_RemoveUnknownReturnsFalse(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_ReloadFromDB(t *testing.T) {
+func TestAllowlist_ReloadFromDB(t *testing.T) {
 	db := newAllowlistDB(t)
 	ctx := context.Background()
 	a1, _ := NewAllowlist(ctx, db, testSalt(), nil)
@@ -253,7 +253,7 @@ func TestPhase8_Allowlist_ReloadFromDB(t *testing.T) {
 	}
 }
 
-func TestPhase8_Allowlist_DifferentSaltDoesNotCollide(t *testing.T) {
+func TestAllowlist_DifferentSaltDoesNotCollide(t *testing.T) {
 	// Same value, different salt → different hash. Stolen DB
 	// without the salt cannot be reverse-looked-up.
 	db := newAllowlistDB(t)

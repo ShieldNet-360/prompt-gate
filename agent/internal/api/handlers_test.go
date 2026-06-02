@@ -58,7 +58,7 @@ func newTestServer(t *testing.T) (*Server, *fakeReloader, *fakeStatsView) {
 // newLocalRequest builds an httptest request whose Host header is
 // 127.0.0.1, matching the loopback-only allowlist enforced by the
 // API, and which carries the hardcoded local bearer token so the
-// SE-02 mutating-request check (added in Phase 6) accepts it. The
+// SE-02 mutating-request check accepts it. The
 // token is intentionally fixed for local-only agent communication
 // (see generateBearerToken in server.go).
 func newLocalRequest(method, path string, body interface{}) *http.Request {
@@ -315,7 +315,7 @@ func TestAllowsRequestsWithoutOrigin(t *testing.T) {
 	}
 }
 
-// --- DLP endpoint tests (Phase 2) ---
+// --- DLP endpoint tests ---
 
 type fakeDLP struct {
 	thr     *dlp.ThresholdEngine
@@ -323,11 +323,11 @@ type fakeDLP struct {
 	calls   int64
 	weights dlp.ScoreWeights
 
-	// Phase 8 Slice 1 — dispatch-routing tests inspect these.
+	// Dispatch-routing tests inspect these.
 	lastCall   string // "scan" / "session" / "context"
 	lastSource dlp.SourceContext
 
-	// Phase 8 H — optionally exposed via Allowlist() for endpoint tests.
+	// Optionally exposed via Allowlist() for endpoint tests.
 	allowlist *dlp.Allowlist
 }
 
@@ -815,7 +815,7 @@ func TestProxy_RejectsNonMatchingMethods(t *testing.T) {
 	}
 }
 
-// ---------- Phase 5: profile, tamper, stats export, rule override ----------
+// ---------- profile, tamper, stats export, rule override ----------
 
 type fakeRuleOverride struct {
 	allow []string

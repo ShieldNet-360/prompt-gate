@@ -28,7 +28,7 @@ const (
 )
 
 // DefaultAction is the action used when a domain is not found in any
-// rule file. Per the Phase 1 spec, unmatched domains are allowed.
+// rule file. By default, unmatched domains are allowed.
 const DefaultAction = Allow
 
 // Engine ties rule-file lookup to the per-category action map.

@@ -63,7 +63,7 @@ YAML / Terraform / JSON / Markdown / …). Same patterns
 (`rules/dlp_exclusions.json`, 143 rules) on every run. Three engine
 configurations are compared: the deterministic **core** (AC + regex +
 hotword + entropy + exclusion + scoring), **core + accuracy layers**
-(A1/A2/C1/C2), and **core + accuracy + source-context bias** (F/F2).
+(accuracy layers), and **core + accuracy + source-context bias**.
 
 Reproduce with the bench tool committed at
 [`agent/cmd/dlp-bench/main.go`](./agent/cmd/dlp-bench/main.go):
@@ -99,15 +99,15 @@ For the `core` column, build a stripped-down bench that only uses
 
 ### Headline — two columns for the context-bias engine, depending on destination mix
 
-The F+F2 layers bias the score based on the *destination* the
+The source-context layers bias the score based on the *destination* the
 paste is heading to. In the agent's production loop, `destination_kind`
 is set by the **extension** from the paste target — `chat.openai.com`
-becomes `ai_chat` (no F bias), `github.com` becomes `code_host`
+becomes `ai_chat` (no source-context bias), `github.com` becomes `code_host`
 (−2 bias). The bench reads content from disk and has to synthesise
 a destination per line; two synthesis strategies give two answers:
 
 - **`destination-mix=worst`** assigns `code_host` to every line.
-  This is the *worst case for recall* — F's −2 bias hits
+  This is the *worst case for recall* — the source-context −2 bias hits
   every match. Useful as a ceiling number ("even if every paste
   went to GitHub, the engine still blocks X").
 - **`destination-mix=realistic`** samples per line from a
@@ -142,10 +142,10 @@ inside any acceptance gate.
 
 - The 80 % reduction is real but **bench-conditioned**. About 75 %
   of it disappears under realistic destination sampling because
-  F's −2 only fires when destination_kind=code_host, and in
+  the source-context −2 only fires when destination_kind=code_host, and in
   production code_host is one destination out of many.
 - The **~22 % realistic reduction is the FP class genuinely
-  targeted by F + F2**: committed test fixtures, docs examples,
+  targeted by the source-context bias**: committed test fixtures, docs examples,
   and config samples that a developer view-sources on GitHub but
   doesn't paste into ChatGPT. It's smaller than the ceiling but
   it's the number that ships.
@@ -163,7 +163,7 @@ inside any acceptance gate.
   the heuristic-only 22 %. Future bench reruns can pipe
   `--dump-suppressed-tp` to extend the manual audit.
 - The interesting cross-configuration move: **core → +accuracy FP-likely
-  count goes UP (+4)**, not down. The A1 normalisation layer
+  count goes UP (+4)**, not down. The normalisation layer
   exposes a handful of base64- or homoglyph-hidden values that
   the core couldn't see; some of those land on docs paths. That's
   why the accuracy layers alone are a security win, not an FP-rate
@@ -174,13 +174,13 @@ inside any acceptance gate.
 | Layer                                                  | **core** | **+accuracy** | **+context** |
 |--------------------------------------------------------|:--------:|:-------------:|:------------:|
 | AC + regex + hotword + entropy + exclusion + scoring (deterministic core) |    ✓     |     ✓      |     ✓      |
-| A1 normalize (zw strip · homoglyph fold · NFKC · base64) |    ✗     |     ✓      |     ✓      |
-| A2 correlator (multi-paste reassembly)                  |    ✗     |     ✓      |     ✓      |
-| C1 public-example bloom                                 |    ✗     |     ✓      |     ✓      |
-| C2 placeholder-shape router                             |    ✗     |     ✓      |     ✓      |
-| F destination-context scoring bias                      |    ✗     |     ✗      |     ✓      |
-| F2 path-context scoring bias                            |    ✗     |     ✗      |     ✓      |
-| H per-user allowlist (off in this bench to isolate F+F2)|    ✗     |     ✗      |     ✗      |
+| Normalize (zw strip · homoglyph fold · NFKC · base64) |    ✗     |     ✓      |     ✓      |
+| Correlator (multi-paste reassembly)                     |    ✗     |     ✓      |     ✓      |
+| Public-example bloom                                    |    ✗     |     ✓      |     ✓      |
+| Placeholder-shape router                                |    ✗     |     ✓      |     ✓      |
+| Destination-context scoring bias                        |    ✗     |     ✗      |     ✓      |
+| Path-context scoring bias                               |    ✗     |     ✗      |     ✓      |
+| Per-user allowlist (off in this bench to isolate bias)  |    ✗     |     ✗      |     ✗      |
 
 ### Top patterns by block count
 
@@ -202,7 +202,7 @@ realistic mix.
 | Heroku API Key                |        4 |          4 |            **0** |                    3 |
 | Google API Key                |    (low) |      (low) |                3 |                    3 |
 
-Read this as: under realistic destination sampling, F + F2 trim
+Read this as: under realistic destination sampling, the source-context bias trims
 roughly 1 in 5 of the +accuracy blocks per pattern (the share whose
 destination happened to roll `code_host`), rather than wiping the
 pattern out entirely.
@@ -241,7 +241,7 @@ ChatGPT would still block with the context-bias engine.
 The realistic-mix column's "Real FPs" estimate (~132) inherits its
 shape from the worst-case manual review — the same dominant FP
 class (committed test fixtures, RFC 4122 doc UUIDs, Azure
-subscription IDs, etc.) is what F + F2 suppress on the ~30 % of
+subscription IDs, etc.) is what the source-context bias suppresses on the ~30 % of
 lines that roll `code_host`. A full manual review of the realistic-
 mix suppressed set is a TODO; the heuristic-only −22 % is what
 ships externally until then.
@@ -249,12 +249,12 @@ ships externally until then.
 ### Interpretation
 
 - **core → +accuracy** moves the count by only 5 blocks
-  *net*, but the AWS Access Key column goes from 59 to 70: A1's
+  *net*, but the AWS Access Key column goes from 59 to 70: normalisation's
   inline base64 decode + homoglyph fold **exposes 11 hidden
   secrets** that the core couldn't see. The accuracy layers are a security win,
   not an FP-rate win.
-- **+accuracy → +context worst-case** is the ceiling: F's `code_host: −2`
-  + F2's `path=test/fixture/spec/mock: −1` drop the score below
+- **+accuracy → +context worst-case** is the ceiling: the source-context `code_host: −2`
+  + the path-hint `path=test/fixture/spec/mock: −1` drop the score below
   threshold on the committed-fixture FP class. **≈ 83 % real FP
   reduction**, but only when the bench applies code_host to every
   line — which is not what production does.
@@ -262,12 +262,12 @@ ships externally until then.
   **≈ 22 % FP-class block reduction** when destinations are sampled
   from a production-shaped prior. About 75 % of the worst-case
   number was bench artefact; the remaining 22 % is the FP class
-  genuinely targeted by F + F2 (committed fixtures, RFC 4122 doc
+  genuinely targeted by the source-context bias (committed fixtures, RFC 4122 doc
   UUIDs, Azure subscription IDs viewed on GitHub but never pasted
   to ChatGPT).
 - **Recall** in realistic mode is preserved on the dominant exfil
   vector — a paste into `chat.openai.com` gets `destination_kind=
-  ai_chat`, no F bias, so the context-bias score equals the +accuracy score. The
+  ai_chat`, no source-context bias, so the context-bias score equals the +accuracy score. The
   one TP regression visible in the worst-case column disappears
   in realistic mode.
 

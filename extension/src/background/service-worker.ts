@@ -23,7 +23,7 @@ import { startDynamicHostUpdater } from "./dynamic-hosts.js";
 
 // Boot the dynamic Tier-2 host updater. Polls /api/rules/status and
 // registers content scripts for any custom hosts the agent's rule
-// file adds at runtime — no extension reload needed (Phase 6 Task 12).
+// file adds at runtime — no extension reload needed.
 try {
     startDynamicHostUpdater();
 } catch {
@@ -79,7 +79,7 @@ async function pingAgent(): Promise<PopupReply> {
  *  null on any failure so the content script can fall open. sessionID
  *  is the content-script's per-tab token (see scan-client SESSION_ID)
  *  and is forwarded unchanged to whichever transport the worker uses.
- *  source is the Phase 8 Config F destination/element/path context;
+ *  source is the destination/element/path context;
  *  forwarded to HTTP only (Native Messaging schema lives in
  *  agent/internal/api/nativemsg.go and is extended separately if /
  *  when the same source plumbing is needed there). */

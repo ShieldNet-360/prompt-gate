@@ -1,4 +1,4 @@
-// Dynamic Tier-2 host updates (Phase 6 Task 12).
+// Dynamic Tier-2 host updates.
 //
 // The companion extension ships with a static manifest match list for
 // the well-known AI tools, but enterprise users can add their own

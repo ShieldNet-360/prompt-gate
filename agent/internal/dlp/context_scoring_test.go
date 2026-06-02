@@ -1,7 +1,7 @@
-// Phase 8 Config F — Slice 2 scoring-bias tests.
+// Source-context scoring-bias tests.
 //
 // Asserts:
-//   1. ScoreBiasFromContext returns 0 for a zero source (Config E).
+//   1. ScoreBiasFromContext returns 0 for a zero source (default scoring).
 //   2. Each global bias axis fires independently with the documented
 //      delta:
 //        destination_kind = code_host        → -2
@@ -33,14 +33,14 @@ import (
 
 // ── unit tests for ScoreBiasFromContext ────────────────────────────
 
-func TestPhase8_ScoreBiasFromContext_EmptyReturnsZero(t *testing.T) {
+func TestScoreBiasFromContext_EmptyReturnsZero(t *testing.T) {
 	pat := Pattern{Severity: SeverityCritical}
 	if got := ScoreBiasFromContext(pat, SourceContext{}); got != 0 {
 		t.Errorf("zero source must yield bias=0, got %d", got)
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_GlobalAxes(t *testing.T) {
+func TestScoreBiasFromContext_GlobalAxes(t *testing.T) {
 	pat := Pattern{Severity: SeverityMedium}
 
 	cases := []struct {
@@ -71,7 +71,7 @@ func TestPhase8_ScoreBiasFromContext_GlobalAxes(t *testing.T) {
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_FenceDoesNotSoftenCritical(t *testing.T) {
+func TestScoreBiasFromContext_FenceDoesNotSoftenCritical(t *testing.T) {
 	for _, sev := range []Severity{SeverityCritical, SeverityHigh} {
 		pat := Pattern{Severity: sev}
 		got := ScoreBiasFromContext(pat, SourceContext{
@@ -84,7 +84,7 @@ func TestPhase8_ScoreBiasFromContext_FenceDoesNotSoftenCritical(t *testing.T) {
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_StacksAdditively(t *testing.T) {
+func TestScoreBiasFromContext_StacksAdditively(t *testing.T) {
 	// code_host (-2) + network_body (+1) + lang=test (-1) = -2
 	// (code_fence -1 also stacks for medium severity → final -3)
 	pat := Pattern{Severity: SeverityMedium}
@@ -100,7 +100,7 @@ func TestPhase8_ScoreBiasFromContext_StacksAdditively(t *testing.T) {
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_PerPatternOverridesGlobalDestination(t *testing.T) {
+func TestScoreBiasFromContext_PerPatternOverridesGlobalDestination(t *testing.T) {
 	// Pattern declares context_bias = {"code_host": -5}; that
 	// replaces the global -2 for code_host. Other destinations
 	// still use the global table.
@@ -120,7 +120,7 @@ func TestPhase8_ScoreBiasFromContext_PerPatternOverridesGlobalDestination(t *tes
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_PerPatternStacksWithOtherAxes(t *testing.T) {
+func TestScoreBiasFromContext_PerPatternStacksWithOtherAxes(t *testing.T) {
 	// Per-pattern destination delta (-3) + global element delta (+1)
 	// + global lang delta (-1) = -3.
 	pat := Pattern{
@@ -140,7 +140,7 @@ func TestPhase8_ScoreBiasFromContext_PerPatternStacksWithOtherAxes(t *testing.T)
 	}
 }
 
-func TestPhase8_ScoreBiasFromContext_PerPatternPositiveOverride(t *testing.T) {
+func TestScoreBiasFromContext_PerPatternPositiveOverride(t *testing.T) {
 	// Sanity: a per-pattern entry can also be positive (e.g. a low-
 	// signal pattern that should ESCALATE on paste_bin destinations).
 	pat := Pattern{
@@ -156,7 +156,7 @@ func TestPhase8_ScoreBiasFromContext_PerPatternPositiveOverride(t *testing.T) {
 
 // ── end-to-end via Pipeline.ScanWithContext ────────────────────────
 
-func TestPhase8_Pipeline_BiasFires_E2E(t *testing.T) {
+func TestPipeline_BiasFires_E2E(t *testing.T) {
 	// Pattern: AWS access key, critical severity. With hotwords nearby
 	// it scores score_weight(1) + hotword_boost(2) = 3.
 	// Threshold for critical = 1.
@@ -208,7 +208,7 @@ func TestPhase8_Pipeline_BiasFires_E2E(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_GlobalCodeHostBias_E2E(t *testing.T) {
+func TestPipeline_GlobalCodeHostBias_E2E(t *testing.T) {
 	// Verify the GLOBAL code_host -2 fires when no per-pattern
 	// override is set. With a high-severity pattern (threshold=2)
 	// and a baseline score of 3, code_host -2 drops to 1 < 2 →
@@ -248,9 +248,9 @@ func TestPhase8_Pipeline_GlobalCodeHostBias_E2E(t *testing.T) {
 	}
 }
 
-// ── Phase 8 Config F2 — path_hint axis ─────────────────────────────
+// ── path_hint axis ────────────────────────────────────────────────
 
-func TestPhase8_ScoreBiasFromContext_PathHintOnlyOnCodeHost(t *testing.T) {
+func TestScoreBiasFromContext_PathHintOnlyOnCodeHost(t *testing.T) {
 	pat := Pattern{Severity: SeverityCritical}
 
 	// path_hint applies only on code_host destinations.
@@ -286,7 +286,7 @@ func TestPhase8_ScoreBiasFromContext_PathHintOnlyOnCodeHost(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_PathHint_E2E(t *testing.T) {
+func TestPipeline_PathHint_E2E(t *testing.T) {
 	// AWS Access Key on code_host (-2) + path=test (-1) = -3 bias.
 	// score_weight 1 + hotword_boost 2 = 3 base. 3 + (-3) = 0 < critical=1.
 	patterns := []*Pattern{
@@ -329,11 +329,11 @@ func TestPhase8_Pipeline_PathHint_E2E(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_CacheRespectsSource(t *testing.T) {
-	// Regression: the Phase 6 scan-result cache keys only by content.
+func TestPipeline_CacheRespectsSource(t *testing.T) {
+	// Regression: the scan-result cache keys only by content.
 	// Without the source-aware bypass, two scans of the same content
 	// with DIFFERENT source contexts would return the same cached
-	// verdict — defeating Slice 2's bias entirely.
+	// verdict — defeating the scoring-stage bias entirely.
 	patterns := []*Pattern{
 		mustCompilePattern(t, &Pattern{
 			Name:          "AWS Access Key (test)",
@@ -374,9 +374,9 @@ func TestPhase8_Pipeline_CacheRespectsSource(t *testing.T) {
 	}
 }
 
-// ── Phase 8 Config H — allowlist suppresses in pipeline ───────────
+// ── allowlist suppresses in pipeline ──────────────────────────────
 
-func TestPhase8_Pipeline_AllowlistSuppresses_E2E(t *testing.T) {
+func TestPipeline_AllowlistSuppresses_E2E(t *testing.T) {
 	patterns := []*Pattern{
 		mustCompilePattern(t, &Pattern{
 			Name:          "AWS Access Key (H test)",
@@ -428,7 +428,7 @@ func TestPhase8_Pipeline_AllowlistSuppresses_E2E(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_AllowlistScopeIsHonoured_E2E(t *testing.T) {
+func TestPipeline_AllowlistScopeIsHonoured_E2E(t *testing.T) {
 	patterns := []*Pattern{
 		mustCompilePattern(t, &Pattern{
 			Name:          "AWS Access Key (H scope test)",
@@ -474,7 +474,7 @@ func TestPhase8_Pipeline_AllowlistScopeIsHonoured_E2E(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_NetworkBodyEscalates_E2E(t *testing.T) {
+func TestPipeline_NetworkBodyEscalates_E2E(t *testing.T) {
 	// A low-confidence medium-severity pattern with a baseline score
 	// of 2 sits below threshold(medium)=3, so it allows by default.
 	// element_kind=network_body adds +1 → score 3 → blocks.

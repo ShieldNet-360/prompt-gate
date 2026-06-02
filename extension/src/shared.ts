@@ -26,12 +26,12 @@ export type PopupReply =
     | { kind: "ok"; version: string; uptime_seconds: number }
     | { kind: "error"; message: string };
 
-/** SourceContext is Phase 8 Config F. Describes WHERE a scan is
+/** SourceContext captures the scan's origin. Describes WHERE a scan is
  *  happening so the agent's scorer can bias verdicts by destination,
  *  element kind, code-fence presence, and language hint. Mirrors
  *  agent/internal/dlp/types.go::SourceContext — every field is
- *  optional; a missing or zero-valued source preserves Config E
- *  behaviour exactly.
+ *  optional; a missing or zero-valued source preserves the default
+ *  scoring behaviour exactly.
  *
  *  Privacy invariant: surrounding_hash and page_url_hash are
  *  SHA-256 truncated to 64 bits (16 hex chars). No raw URL, no
@@ -44,7 +44,7 @@ export interface SourceContext {
     in_code_fence?: boolean;
     /** Code-block language tag, e.g. "yaml" / "javascript" / "go". */
     language_hint?: string;
-    /** Phase 8 Config F2. Coarse classification of the URL pathname
+    /** Path-hint axis. Coarse classification of the URL pathname
      *  for code-host destinations. Values: "test" / "fixture" /
      *  "spec" / "mock" / "docs" / "src" / "" (unknown). */
     path_hint?: string;
@@ -56,13 +56,13 @@ export interface SourceContext {
  *  background service worker. The worker tries Native Messaging first
  *  and falls back to HTTP fetch — both paths produce the same reply.
  *
- *  session_id is the per-tab opaque token the agent's A2 correlator
- *  uses to reassemble secrets split across consecutive pastes from the
- *  same tab. Optional — when absent, A2 is bypassed (each scan is
- *  treated as a fresh session).
+ *  session_id is the per-tab opaque token the agent's session
+ *  correlator uses to reassemble secrets split across consecutive
+ *  pastes from the same tab. Optional — when absent, correlation is
+ *  bypassed (each scan is treated as a fresh session).
  *
- *  source is the Phase 8 Config F destination/element/path context.
- *  Optional — when absent, the agent's Config E scoring path runs. */
+ *  source is the destination/element/path context.
+ *  Optional — when absent, the agent's default scoring path runs. */
 export type ScanRequest = {
     kind: "scan";
     content: string;

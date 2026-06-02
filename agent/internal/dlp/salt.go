@@ -1,4 +1,4 @@
-// Per-install salt for the Phase 8 Config H allowlist.
+// Per-install salt for the feedback allowlist.
 //
 // The salt is 32 random bytes generated once on first run and
 // persisted to ~/.prompt-gate/allowlist-salt with 0600 perms. Hash

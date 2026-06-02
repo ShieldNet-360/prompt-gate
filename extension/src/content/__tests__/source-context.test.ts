@@ -1,4 +1,4 @@
-// Phase 8 Config F — Slice 3 unit tests for the source-context
+// Unit tests for the source-context
 // builder used by every interceptor.
 
 import { test } from "node:test";
@@ -92,7 +92,7 @@ test("detectInCodeFence false when no editor ancestor", () => {
     assert.equal(detectInCodeFence(null), false);
 });
 
-// ── detectPathHint (Phase 8 F2) ────────────────────────────────────
+// ── detectPathHint ────────────────────────────────────────────────
 
 test("detectPathHint buckets test paths (Go / Python / RSpec / Jest)", () => {
     assert.equal(detectPathHint("/owner/repo/pkg/foo_test.go"), "test");
@@ -130,7 +130,7 @@ test("detectPathHint returns empty for src / readme / root", () => {
     assert.equal(detectPathHint(""), "");
 });
 
-// ── detectLanguageHint (Phase 8 F — now pure code-tag) ─────────────
+// ── detectLanguageHint (now pure code-tag) ────────────────────────
 
 test("detectLanguageHint reads code class on ancestor", () => {
     const codeEl = { className: "language-yaml hljs" };

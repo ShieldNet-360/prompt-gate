@@ -1,4 +1,4 @@
-// Code-context router — C2 layer in the DLP pipeline.
+// Code-context router — placeholder-shape layer in the DLP pipeline.
 //
 // IsPlaceholderShape returns true if a value looks like a template
 // placeholder rather than a real secret:

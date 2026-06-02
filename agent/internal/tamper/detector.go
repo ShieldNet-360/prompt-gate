@@ -58,7 +58,7 @@ type Options struct {
 
 	// ExpectedProxyAddr is the full host:port the OS should be
 	// using as its HTTP/HTTPS proxy. When empty the proxy check is
-	// skipped (Phase 1-3 deployments without the MITM proxy).
+	// skipped (deployments without the MITM proxy).
 	ExpectedProxyAddr string
 
 	// Interval defaults to DefaultInterval when zero.

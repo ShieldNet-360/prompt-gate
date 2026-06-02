@@ -1,8 +1,8 @@
-// Options page script (Phase 6 Task 13).
+// Options page script.
 //
 // Surfaces three things to the user:
 //   1. Toggle: verbose toast notifications (off by default).
-//   2. Toggle: clipboard monitor (off by default, Task 14).
+//   2. Toggle: clipboard monitor (off by default).
 //   3. Read-only: agent connection status + rule version.
 //
 // Settings persist in chrome.storage.local so the background service

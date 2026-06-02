@@ -251,7 +251,7 @@ linux: agent
           'Package: prompt-gate' \
           'Version: {{VERSION}}' \
           'Architecture: amd64' \
-          'Maintainer: PromptGate Team <admin@promptgate.dev>' \
+          'Maintainer: Prompt Gate maintainers <288552490+brianalle@users.noreply.github.com>' \
           'Description: Prompt Gate DNS + DLP agent with local MITM proxy' \
           ' DNS-level filtering, DLP scanning, and HTTPS inspection agent' \
           ' for enterprise AI-tool governance.' \

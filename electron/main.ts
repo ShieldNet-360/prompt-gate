@@ -120,7 +120,7 @@ function showView(view: View) {
 
 function buildMenu(): Menu {
   // Render a non-clickable status line for the proxy. "unknown" means
-  // the /api/proxy/status poll has not returned yet (Phase 1–3 agents
+  // the /api/proxy/status poll has not returned yet (older agents
   // return 503, in which case we display "unavailable").
   let proxyLabel = 'Proxy: …';
   if (proxyRunning === true) proxyLabel = 'Proxy: Active';
@@ -254,7 +254,7 @@ function pingProxy(): Promise<boolean> {
 }
 
 // pingTamper returns the tamper detector's running count, or null
-// when the endpoint is unavailable (Phase 1–4 agents return 503).
+// when the endpoint is unavailable (older agents return 503).
 function pingTamper(): Promise<number | null> {
   return new Promise((resolve) => {
     const req = http.request(

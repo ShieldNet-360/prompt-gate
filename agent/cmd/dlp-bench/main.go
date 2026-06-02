@@ -6,10 +6,10 @@
 //                 path is preserved so the bench can synthesise a
 //                 plausible SourceContext per line.
 //
-//   run           Read a corpus file and run the Phase 8 pipeline
+//   run           Read a corpus file and run the source-context pipeline
 //                 against every line in TWO modes back-to-back:
-//                   - phase7        (Pipeline.Scan; no source)
-//                   - phase8        (Pipeline.ScanWithContext;
+//                   - baseline        (Pipeline.Scan; no source)
+//                   - context        (Pipeline.ScanWithContext;
 //                                    source synthesised from path)
 //                 Reports per-mode FP count, p50/p99 latency, and
 //                 throughput. Without ground-truth labels we treat
@@ -79,7 +79,7 @@ COMMANDS:
                 __pycache__, and binary files.
 
   run           Read the corpus, run the DLP pipeline twice
-                (phase7 = no source; phase8 = source from path),
+                (baseline = no source; context = source from path),
                 and print a comparison table. Optional --out
                 writes a JSON report.
 
@@ -222,8 +222,8 @@ type corpusEntry struct {
 
 // blockRecord identifies a single blocked match. (path,lineNo,pattern)
 // is the deduplication key used for set-difference between modes —
-// if the same line/pattern blocks in BOTH phase7 and phase8 we treat
-// it as a stable detection; if phase8 dropped it we count it as a
+// if the same line/pattern blocks in BOTH baseline and context we treat
+// it as a stable detection; if context dropped it we count it as a
 // suppression. fpLikely is derived from path_hint at corpus-read
 // time (paths that classify as test/fixture/spec/mock/docs are
 // taken to be FP candidates).
@@ -328,11 +328,11 @@ func runBench(args []string) error {
 		"optional path — write the suppressed-TP-candidate records (in p7 but not p8, "+
 			"on non-test paths) so they can be manually reviewed for recall regressions")
 	mix := fs.String("destination-mix", "worst",
-		"how to synthesize the destination axis of the Phase 8 SourceContext: "+
-			"`worst` = code_host for every line (maximum F bias, useful for worst-case ceiling); "+
+		"how to synthesize the destination axis of the SourceContext: "+
+			"`worst` = code_host for every line (maximum source-context bias, useful for worst-case ceiling); "+
 			"`realistic` = sample per line from a production-shaped distribution "+
 			"(40% ai_chat, 30% code_host, 20% ai_code, 10% ai_chat+network_body) — "+
-			"answers the question 'how much of phase 8's block reduction is bench artifact?'")
+			"answers the question 'how much of the source-context block reduction is bench artifact?'")
 	seed := fs.Int64("seed", 1, "RNG seed for the realistic mix sampler (deterministic for reproducible runs)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -371,24 +371,24 @@ func runBench(args []string) error {
 
 	ctx := context.Background()
 
-	// Independent RNGs per mode so phase7 and phase8 see the SAME
-	// per-line destination sample. phase7 ignores the source anyway
-	// (Pipeline.Scan, no context), so this only affects phase8 — but
+	// Independent RNGs per mode so baseline and context see the SAME
+	// per-line destination sample. baseline ignores the source anyway
+	// (Pipeline.Scan, no context), so this only affects context — but
 	// keeping the seed paired makes the comparison reproducible.
 	rng7 := rand.New(rand.NewSource(*seed))
 	rng8 := rand.New(rand.NewSource(*seed))
 
-	phase7 := runMode(ctx, "phase7", p, corpus, false, *mix, rng7)
-	phase8 := runMode(ctx, "phase8", p, corpus, true, *mix, rng8)
+	baseline := runMode(ctx, "baseline", p, corpus, false, *mix, rng7)
+	context := runMode(ctx, "context", p, corpus, true, *mix, rng8)
 
-	printComparison(phase7, phase8, len(corpus))
+	printComparison(baseline, context, len(corpus))
 
 	if *dumpSuppressedTP != "" {
-		// Build the suppressed-TP set: in phase7's blocks, not in
-		// phase8's, AND on a non-test path. Dump full records so a
+		// Build the suppressed-TP set: in baseline's blocks, not in
+		// context's, AND on a non-test path. Dump full records so a
 		// human can decide what's a real recall regression vs an
 		// FP the heuristic missed.
-		suppressed := setDiff(phase7.records, phase8.records)
+		suppressed := setDiff(baseline.records, context.records)
 		f, err := os.Create(*dumpSuppressedTP)
 		if err != nil {
 			return fmt.Errorf("dump tp: %w", err)
@@ -433,8 +433,8 @@ func runBench(args []string) error {
 			DestinationMix: *mix,
 			Seed:           *seed,
 			Modes: map[string]modeReport{
-				"phase7": toReport(phase7),
-				"phase8": toReport(phase8),
+				"baseline": toReport(baseline),
+				"context": toReport(context),
 			},
 		}
 		out, err := os.Create(*outPath)
@@ -515,10 +515,10 @@ func runMode(ctx context.Context, name string, p *dlp.Pipeline,
 // `mix`:
 //
 //   - "worst"     : every line gets destination_kind=code_host, the
-//                   worst case for Phase 8 recall (maximum F bias).
+//                   worst case for source-context recall (maximum source-context bias).
 //                   This is the conservative ceiling — useful for
 //                   saying "even if every paste went to GitHub,
-//                   phase 8 still blocks X".
+//                   the source-context engine still blocks X".
 //
 //   - "realistic" : sample per line from a production-shaped
 //                   distribution. The agent's production
@@ -555,7 +555,7 @@ func synthSource(path string, mix string, rng *rand.Rand) dlp.SourceContext {
 	r := rng.Float64()
 	switch {
 	case r < 0.40:
-		// ai_chat — the dominant paste-into-LLM case. No F bias.
+		// ai_chat — the dominant paste-into-LLM case. No source-context bias.
 		host := aiChatHosts[rng.Intn(len(aiChatHosts))]
 		return dlp.SourceContext{
 			DestinationKind: dlp.DestinationKindAIChat,
@@ -564,8 +564,8 @@ func synthSource(path string, mix string, rng *rand.Rand) dlp.SourceContext {
 			PathHint:        pathHint,
 		}
 	case r < 0.70:
-		// code_host — F's −2 bias applies here, plus F2's −1 on
-		// fixture-shaped paths.
+		// code_host — the −2 destination bias applies here, plus the
+		// path-hint −1 on fixture-shaped paths.
 		host := codeHostHosts[rng.Intn(len(codeHostHosts))]
 		return dlp.SourceContext{
 			DestinationKind: dlp.DestinationKindCodeHost,
@@ -574,7 +574,7 @@ func synthSource(path string, mix string, rng *rand.Rand) dlp.SourceContext {
 			PathHint:        pathHint,
 		}
 	case r < 0.90:
-		// ai_code — no F bias today.
+		// ai_code — no source-context bias today.
 		host := aiCodeHosts[rng.Intn(len(aiCodeHosts))]
 		return dlp.SourceContext{
 			DestinationKind: dlp.DestinationKindAICode,
@@ -584,7 +584,7 @@ func synthSource(path string, mix string, rng *rand.Rand) dlp.SourceContext {
 		}
 	default:
 		// 10% programmatic exfil — element_kind=network_body
-		// triggers F's +1 bias on top of the ai_chat destination.
+		// triggers the +1 source-context bias on top of the ai_chat destination.
 		host := aiChatHosts[rng.Intn(len(aiChatHosts))]
 		return dlp.SourceContext{
 			DestinationKind: dlp.DestinationKindAIChat,
@@ -685,13 +685,13 @@ func printComparison(p7, p8 *modeStats, corpusLen int) {
 	fmt.Printf(" %-12s   %12s   %12s   %12s   %10s   %10s\n",
 		"mode", "blocks", "block rate", "lines/s", "p50 µs", "p99 µs")
 	fmt.Printf(" %-12s   %12d   %12s   %12s   %10.1f   %10.1f\n",
-		"phase7", r7.Blocks, fmt.Sprintf("%.4f%%", r7.FPRatePct),
+		"baseline", r7.Blocks, fmt.Sprintf("%.4f%%", r7.FPRatePct),
 		fmt.Sprintf("%.0f", r7.Throughput), r7.P50us, r7.P99us)
 	fmt.Printf(" %-12s   %12d   %12s   %12s   %10.1f   %10.1f\n",
-		"phase8", r8.Blocks, fmt.Sprintf("%.4f%%", r8.FPRatePct),
+		"context", r8.Blocks, fmt.Sprintf("%.4f%%", r8.FPRatePct),
 		fmt.Sprintf("%.0f", r8.Throughput), r8.P50us, r8.P99us)
 	fmt.Println("----------------------------------------------------------------")
-	fmt.Printf(" Δ total blocks: %d (%.1f%% vs phase7)\n", deltaBlocks, deltaPct)
+	fmt.Printf(" Δ total blocks: %d (%.1f%% vs baseline)\n", deltaBlocks, deltaPct)
 	fmt.Println("================================================================")
 
 	// ── FP-vs-TP segmentation ──────────────────────────────────────
@@ -720,9 +720,9 @@ func printComparison(p7, p8 *modeStats, corpusLen int) {
 	fmt.Printf(" %-12s   %14s   %14s   %14s\n",
 		"mode", "FP-likely", "TP-candidate", "total")
 	fmt.Printf(" %-12s   %14d   %14d   %14d\n",
-		"phase7", len(p7FP), len(p7TP), len(p7FP)+len(p7TP))
+		"baseline", len(p7FP), len(p7TP), len(p7FP)+len(p7TP))
 	fmt.Printf(" %-12s   %14d   %14d   %14d\n",
-		"phase8", len(p8FP), len(p8TP), len(p8FP)+len(p8TP))
+		"context", len(p8FP), len(p8TP), len(p8FP)+len(p8TP))
 	fmt.Println("----------------------------------------------------------------")
 
 	fpDropPct := 0.0
@@ -738,22 +738,22 @@ func printComparison(p7, p8 *modeStats, corpusLen int) {
 	fmt.Printf(" TP-candidate drop: %d → %d (%.1f%% — ideally near 0%%)\n",
 		len(p7TP), len(p8TP), tpDropPct)
 	fmt.Println()
-	fmt.Printf(" Suppressed by phase8 (in p7, not in p8): %d total\n", len(suppressed))
+	fmt.Printf(" Suppressed by context (in p7, not in p8): %d total\n", len(suppressed))
 	fmt.Printf("   ├─ on FP-likely paths:    %d\n", len(suppFP))
 	fmt.Printf("   └─ on TP-candidate paths: %d  ← recall risk if nonzero\n",
 		len(suppTP))
 	if len(exposed) > 0 {
-		fmt.Printf(" Newly exposed by phase8 (not in p7): %d total\n", len(exposed))
+		fmt.Printf(" Newly exposed by context (not in p7): %d total\n", len(exposed))
 		fmt.Printf("   ├─ FP-likely: %d\n", len(expFP))
 		fmt.Printf("   └─ TP-cand:   %d\n", len(expTP))
 	}
 	fmt.Println()
-	fmt.Println("Top patterns by block count (phase7):")
+	fmt.Println("Top patterns by block count (baseline):")
 	for _, pc := range r7.TopPattern {
 		fmt.Printf("  %-30s  %d\n", trunc(pc.Name, 30), pc.Count)
 	}
 	fmt.Println()
-	fmt.Println("Top patterns by block count (phase8):")
+	fmt.Println("Top patterns by block count (context):")
 	for _, pc := range r8.TopPattern {
 		fmt.Printf("  %-30s  %d\n", trunc(pc.Name, 30), pc.Count)
 	}

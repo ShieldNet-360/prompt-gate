@@ -112,7 +112,7 @@ for each match m:
 
 This is a deliberate **fail-closed** choice: if redaction can't prove
 where the secret sits in the exact bytes we're about to send, it blocks
-instead of guessing. Obfuscated secrets (the A1 normalization targets)
+instead of guessing. Obfuscated secrets (the normalization targets)
 are precisely the adversarial case where a sloppy splice would leak a
 prefix/suffix — so they hard-block, same as today.
 
@@ -127,7 +127,7 @@ not persist (see §6) and there is no cross-request vault in v1 (§7).
 
 ### Policy
 
-Reuse the Phase-5 `category_policies` map (today: `allow` /
+Reuse the `category_policies` map (today: `allow` /
 `deny`(block) / `allow_with_dlp`). Add **`redact`** as a fourth value.
 Per-category, so an org can block API keys but redact emails:
 

@@ -172,7 +172,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			pattern_name TEXT NOT NULL DEFAULT '',
 			action       TEXT NOT NULL DEFAULT 'blocked'
 		)`,
-		// Phase 8 Config H — per-user "never block this value
+		// Feedback allowlist — per-user "never block this value
 		// again" allowlist. Stores ONLY salted SHA-256 hashes
 		// (salt persisted per-install to ~/.prompt-gate/
 		// allowlist-salt — see agent/internal/dlp/salt.go) so a
@@ -190,7 +190,7 @@ func (s *Store) migrate(ctx context.Context) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS dlp_allowlist_expiry
 		 ON dlp_allowlist(expires_at)`,
-		// Phase 8.x — opt-in event log consent. The block_events
+		// Opt-in event log consent. The block_events
 		// table writes destination hostnames to disk, which is a
 		// privacy-invariant violation unless the user has
 		// explicitly consented. Default = 0 (disabled). The gate
@@ -213,7 +213,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 
 	// Additive migration: tamper_detections_total was introduced in
-	// Phase 5. Older installs don't have the column; ADD COLUMN is
+	// Older installs don't have the column; ADD COLUMN is
 	// idempotent enough via the SQLite error sniff below.
 	if _, err := s.db.ExecContext(ctx,
 		`ALTER TABLE aggregate_stats ADD COLUMN tamper_detections_total INTEGER NOT NULL DEFAULT 0`); err != nil {
@@ -248,7 +248,7 @@ func (s *Store) seedDefaults(ctx context.Context) error {
 		return fmt.Errorf("seed dlp_config: %w", err)
 	}
 
-	// Default Phase 1 category policies. These can be updated via the API.
+	// Default category policies. These can be updated via the API.
 	// The list must cover every category produced by categoryFromPath
 	// for a rule file shipped under rules/, otherwise the policy engine
 	// falls back to its default-Deny rule and silently blocks a whole
@@ -464,7 +464,7 @@ func (s *Store) AppendRuleVersion(ctx context.Context, version string) error {
 
 // AgentPreferences mirrors the singleton agent_preferences row. The
 // only field today is the opt-in flag for the block_events history,
-// which is the privacy-invariant carve-out introduced in Phase 8.x.
+// which is the privacy-invariant carve-out for the event log.
 // ConsentedAt is unix-seconds and is stamped on every transition to
 // enabled=true (it never auto-clears on disable, so the timestamp
 // records when the user most recently said yes).

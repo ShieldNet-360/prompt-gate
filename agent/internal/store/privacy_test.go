@@ -219,7 +219,7 @@ func TestPrivacy_DLPScanContentNotPersisted(t *testing.T) {
 // TestPrivacy_BlockEventsRespectConsentGate is the symmetric test:
 // when the user has explicitly opted into the block_events history,
 // the host IS persisted. This documents the carve-out — the
-// privacy invariant gains a second exception (alongside Config H's
+// privacy invariant gains a second exception (alongside the feedback allowlist's
 // salted allowlist) for user-opt-in destination logs, and this test
 // makes sure the gate is symmetric (off → silent, on → records).
 //

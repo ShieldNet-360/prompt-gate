@@ -1,7 +1,7 @@
-// Clipboard monitor content script (Phase 6 Task 14).
+// Clipboard monitor content script.
 //
 // Off by default. When the user opts in via the extension options
-// page (Task 13), we ask the browser for the current clipboard text
+// page, we ask the browser for the current clipboard text
 // whenever a Tier-2 AI tool tab gains focus and pre-scan it. If the
 // clipboard already contains a blocked secret we surface the toast
 // before the user has a chance to paste it.

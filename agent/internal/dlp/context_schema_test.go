@@ -1,4 +1,4 @@
-// Phase 8 Config F — schema tests (slices 1 + 2 invariants).
+// Source-context schema tests.
 //
 // Asserts:
 //   1. SourceContext{}.IsZero() correctly identifies an empty struct;
@@ -10,8 +10,8 @@
 //      patterns continue to load).
 //   4. Pattern JSON round-trips an explicit ContextBias map.
 //
-// Slice 2 behavioural changes (bias actually fires for non-empty
-// source) are covered separately in phase8_scoring_test.go.
+// Scoring-stage behavioural changes (bias actually fires for non-empty
+// source) are covered separately in context_scoring_test.go.
 
 package dlp
 
@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-func TestPhase8_SourceContext_IsZero(t *testing.T) {
+func TestSourceContext_IsZero(t *testing.T) {
 	if !(SourceContext{}).IsZero() {
 		t.Errorf("zero-value SourceContext must report IsZero()=true")
 	}
@@ -42,7 +42,7 @@ func TestPhase8_SourceContext_IsZero(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pipeline_ScanWithContext_EmptySource_MatchesScan(t *testing.T) {
+func TestPipeline_ScanWithContext_EmptySource_MatchesScan(t *testing.T) {
 	// Build a tiny pipeline with one AWS-shape pattern.
 	patterns := []*Pattern{
 		mustCompilePattern(t, &Pattern{
@@ -66,7 +66,7 @@ func TestPhase8_Pipeline_ScanWithContext_EmptySource_MatchesScan(t *testing.T) {
 	wantSession := p.ScanSession(ctx, content, "")
 	gotContextEmpty := p.ScanWithContext(ctx, content, "", SourceContext{})
 
-	// Slice 1: bias rules not yet wired, so all three must agree.
+	// Without bias rules wired, all three must agree.
 	if wantScan != gotContextEmpty {
 		t.Errorf("ScanWithContext(empty source) = %+v, want Scan() = %+v",
 			gotContextEmpty, wantScan)
@@ -77,7 +77,7 @@ func TestPhase8_Pipeline_ScanWithContext_EmptySource_MatchesScan(t *testing.T) {
 	}
 }
 
-func TestPhase8_Pattern_ContextBias_JSONRoundTrip(t *testing.T) {
+func TestPattern_ContextBias_JSONRoundTrip(t *testing.T) {
 	// Missing context_bias is tolerated (old rule files load fine).
 	withoutBias := `{
 		"name": "Test",
@@ -143,7 +143,7 @@ func TestPhase8_Pattern_ContextBias_JSONRoundTrip(t *testing.T) {
 
 // mustCompilePattern compiles the regex on a Pattern literal and
 // returns the same pointer with .Compiled populated. Shared by the
-// Phase 8 tests that need a one-pattern Pipeline without going
+// Tests that need a one-pattern Pipeline without going
 // through file I/O.
 func mustCompilePattern(t *testing.T, p *Pattern) *Pattern {
 	t.Helper()

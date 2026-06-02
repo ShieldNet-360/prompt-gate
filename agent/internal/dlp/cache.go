@@ -1,4 +1,4 @@
-// Short-lived scan-result cache (Phase 6 Task 9).
+// Short-lived scan-result cache.
 //
 // The cache lives entirely in-memory and is keyed on a SHA-256 of the
 // scanned content. The hash is the only thing we keep — the original

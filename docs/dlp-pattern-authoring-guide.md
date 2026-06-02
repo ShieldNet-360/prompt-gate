@@ -13,12 +13,12 @@ The DLP pipeline runs eleven steps per scan. Four accuracy layers wrap
 the original seven — you do **not** need
 to handle anything they already cover in your pattern's regex.
 
-1. **A1 normalise** — strips zero-width characters, folds
+1. **Normalise** — strips zero-width characters, folds
    ~50 Cyrillic/Greek homoglyphs to Latin ASCII, applies NFKC, and
    appends the decoded plaintext of any inline base64 blocks. **Your
    regex sees the canonical form** — don't pre-emptively widen it for
-   obfuscation, because A1 has already handled the common tricks.
-2. **A2 correlate** *(optional)* — when the caller supplies a
+   obfuscation, because normalisation has already handled the common tricks.
+2. **Correlate** *(optional)* — when the caller supplies a
    `session_id`, the prior paste's tail is prepended so secrets split
    across consecutive pastes line up under your pattern. No pattern
    work required.
@@ -26,18 +26,18 @@ to handle anything they already cover in your pattern's regex.
 4. **Aho-Corasick** — single-pass O(n) scan for all pattern prefixes.
 5. **Regex revalidation** — runs the pattern's regex on a window around each
    AC hit; eliminates AC's false positives.
-6. **C1 public-example bloom** — auto-suppresses matches
+6. **Public-example bloom** — auto-suppresses matches
    whose value is in the curated SHA-256 hash table of well-known docs
    examples (AWS canonical, Stripe test keys, RFC 4122 documentation
    UUIDs, PCI test card numbers, the jwt.io canonical token). **Do
    not add `EXAMPLE` placeholders to your exclusion list** if they're
    already in `agent/internal/dlp/bloom.go` — add them there instead.
-7. **C2 placeholder shape** — auto-suppresses
+7. **Placeholder shape** — auto-suppresses
    `<YOUR_KEY>`, `{{var}}`, `${VAR}`, common marker substrings
    (`your-`, `_here`, `placeholder`, `todo_`, `fixme`, `dummy_`,
    `redacted`, …), and repeated mask characters (`xxxxx`, `*****`,
    `●●●●●`). **Skip the `placeholder` / `your-` words in your
-   exclusion dictionary** — C2 already handles them globally.
+   exclusion dictionary** — the placeholder router already handles them globally.
 8. **Hotword proximity** — checks whether any of the pattern's `hotwords`
    appear within `hotword_window` bytes of the match.
 9. **Entropy** — computes the Shannon entropy of `match.Value`. Values
@@ -261,11 +261,11 @@ A labelled corpus lives under
 
 | File | Expectation |
 | --- | --- |
-| `public_examples_must_not_trigger.txt` | Auto-handled by C1 — if your pattern's well-known doc value isn't here, add the hash to `agent/internal/dlp/bloom.go` (not to this file). |
-| `placeholders_must_not_trigger.txt` | Auto-handled by C2 — extend C2 only when a new placeholder shape appears that the marker list doesn't catch. |
+| `public_examples_must_not_trigger.txt` | Auto-handled by the public-example bloom — if your pattern's well-known doc value isn't here, add the hash to `agent/internal/dlp/bloom.go` (not to this file). |
+| `placeholders_must_not_trigger.txt` | Auto-handled by the placeholder router — extend it only when a new placeholder shape appears that the marker list doesn't catch. |
 | `benign_must_not_trigger.txt` | The classic FP source — prose, code with `import` / `package`, markdown links, etc. |
 | `clear_secrets_must_trigger.txt` | High-signal real-looking secrets — your TPs land here. |
-| `obfuscated_must_trigger.txt` | Same secrets after homoglyph swap, zero-width injection, or base64 wrap — A1 should reassemble them and your pattern should still hit. |
+| `obfuscated_must_trigger.txt` | Same secrets after homoglyph swap, zero-width injection, or base64 wrap — normalisation should reassemble them and your pattern should still hit. |
 
 Run the benchmark from `agent/`:
 
@@ -284,7 +284,7 @@ FP rate   :   0.00 % (FP / FP+TN)
 
 CI gates at `precision ≥ 90 %` and `recall ≥ 60 %`. If your new
 pattern moves either past those floors, either tighten the regex,
-add a hotword requirement, or extend the C1/C2 layers — do not
+add a hotword requirement, or extend the public-example/placeholder layers — do not
 weaken the floors.
 
 ### 8b. Adding well-known public examples

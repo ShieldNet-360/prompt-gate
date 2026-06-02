@@ -1,4 +1,4 @@
-// Adversary-resistant content normalization — A1 layer.
+// Adversary-resistant content normalization.
 //
 // NormalizeContent canonicalises content to defeat common obfuscation
 // tricks that allow real secrets to slip past pattern-based DLP:
