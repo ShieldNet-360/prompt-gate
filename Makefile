@@ -229,9 +229,34 @@ linux: agent
 	@# -- binary
 	@mkdir -p $(LINUX_STG)/usr/bin
 	cp $(BIN)/prompt-gate-agent $(LINUX_STG)/usr/bin/
-	@# -- config
+	@# -- config (absolute paths for systemd — CWD is /)
 	@mkdir -p $(LINUX_STG)/etc/prompt-gate/rules
-	$(call write_config,$(LINUX_STG)/etc/prompt-gate)
+	@printf '%s\n' \
+	  '# Prompt Gate agent configuration (installed by .deb)' \
+	  '' \
+	  'upstream_dns: "8.8.8.8:53"' \
+	  'dns_listen: "127.0.0.1:15353"' \
+	  'api_listen: "127.0.0.1:9191"' \
+	  'proxy_listen: "127.0.0.1:8443"' \
+	  '' \
+	  'db_path: "/var/lib/prompt-gate/prompt-gate.db"' \
+	  '' \
+	  'rule_paths:' \
+	  '  - /etc/prompt-gate/rules/ai_chat_blocked.txt' \
+	  '  - /etc/prompt-gate/rules/ai_code_blocked.txt' \
+	  '  - /etc/prompt-gate/rules/ai_chat_dlp.txt' \
+	  '  - /etc/prompt-gate/rules/ai_allowed.txt' \
+	  '  - /etc/prompt-gate/rules/phishing.txt' \
+	  '  - /etc/prompt-gate/rules/social.txt' \
+	  '' \
+	  'dlp_patterns: /etc/prompt-gate/rules/dlp_patterns.json' \
+	  'dlp_exclusions: /etc/prompt-gate/rules/dlp_exclusions.json' \
+	  '' \
+	  'proxy_enabled: false' \
+	  'heartbeat_interval: 1h' \
+	  'stats_flush_interval: 60s' \
+	  'rule_update_interval: 6h' \
+	  > $(LINUX_STG)/etc/prompt-gate/config.yaml
 	cp rules/*.txt rules/*.json $(LINUX_STG)/etc/prompt-gate/rules/
 	@# -- helper scripts
 	@mkdir -p $(LINUX_STG)/usr/share/prompt-gate
@@ -257,6 +282,8 @@ linux: agent
 		  > $(LINUX_STG)/DEBIAN/control; \
 		cp scripts/linux/postinstall.sh $(LINUX_STG)/DEBIAN/postinst; \
 		chmod 0755 $(LINUX_STG)/DEBIAN/postinst; \
+		cp scripts/linux/preremove.sh $(LINUX_STG)/DEBIAN/prerm; \
+		chmod 0755 $(LINUX_STG)/DEBIAN/prerm; \
 		dpkg-deb --build --root-owner-group $(LINUX_STG) $(DIST)/$(DEB_NAME); \
 		echo ""; \
 		echo "==> $(DIST)/$(DEB_NAME) ready!"; \
