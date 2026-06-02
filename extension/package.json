@@ -12,10 +12,10 @@
     "clean": "rm -rf dist dist-firefox dist-safari dist-safari-xcode"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.270",
-    "@types/node": "^20.11.0",
-    "esbuild": "^0.24.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.5"
+    "@types/chrome": "^0.1.42",
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }
