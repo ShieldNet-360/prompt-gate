@@ -27,7 +27,7 @@ const SCAN_TIMEOUT_MS = 1500;
 export const MAX_SCAN_BYTES = 1 * 1024 * 1024; // 1 MiB
 
 /** Per-tab session ID generated once at content-script load. Sent with
- *  every scan request so the agent's A2 correlator can reassemble
+ *  every scan request so the agent's correlator can reassemble
  *  secrets split across consecutive pastes from the same tab.
  *
  *  Each content script (paste/form/network/drag/clipboard) loads once
@@ -46,15 +46,15 @@ function generateSessionID(): string {
         // crypto unavailable — fall through.
     }
     // Fallback for environments without crypto.randomUUID. Not
-    // cryptographically strong, but A2 only needs uniqueness per tab.
+    // cryptographically strong, but the correlator only needs uniqueness per tab.
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 /** Scan `content` through the local agent's DLP pipeline.
  *  Returns null on any transport failure (fall-open).
  *
- *  source is the Phase 8 Config F destination/element/path context.
- *  Optional — when absent, the agent runs the Config E scoring path
+ *  source is the destination/element/path context.
+ *  Optional — when absent, the agent runs the default scoring path
  *  unchanged. Each interceptor builds its own via
  *  buildSourceContext() in ./source-context.ts. */
 export async function scanContent(

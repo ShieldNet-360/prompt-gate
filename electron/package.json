@@ -9,8 +9,9 @@
     "url": "https://github.com/ShieldNet-360/prompt-gate.git"
   },
   "author": {
-    "name": "Ken Nguyen",
-    "email": "ken@promptgate.dev"
+    "name": "ShieldNet 360",
+    "email": "288552490+brianalle@users.noreply.github.com",
+    "url": "https://github.com/ShieldNet-360/prompt-gate"
   },
   "main": "dist/main.js",
   "scripts": {

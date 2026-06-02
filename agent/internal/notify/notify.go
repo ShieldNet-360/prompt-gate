@@ -16,9 +16,8 @@ import (
 
 // faqURL is the FAQ a blocked user is pointed at — it explains best
 // practice (e.g. replace a key in a troubleshooting question with
-// [PLACEHOLDER]) rather than auto-redacting. MKT (Bích) chose to host it
-// in-repo until a landing page exists; swap this constant when the repo
-// migrates to github.com/shieldnet360/prompt-gate.
+// [PLACEHOLDER]) rather than auto-redacting. Hosted in-repo for now;
+// swap this constant if a dedicated landing page is added later.
 const faqURL = "https://github.com/ShieldNet-360/prompt-gate/blob/develop/FAQ.md"
 
 // Event is a single notification event pushed to SSE subscribers.

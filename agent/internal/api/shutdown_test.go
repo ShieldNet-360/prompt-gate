@@ -48,7 +48,7 @@ func (s *slowDLP) Allowlist() *dlp.Allowlist       { return nil }
 // TestGracefulShutdown_WaitsForInFlightScan starts a real *http.Server
 // against the API handler, fires a long-running scan, then calls
 // Shutdown() with a generous timeout. The shutdown must not return
-// until the scan finishes — Phase 6 Task 16's "in-flight scans finish
+// until the scan finishes — the "in-flight scans finish
 // before exit" guarantee. A failure here manifests as the response
 // arriving truncated or never at all.
 func TestGracefulShutdown_WaitsForInFlightScan(t *testing.T) {

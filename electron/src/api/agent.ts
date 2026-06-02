@@ -214,7 +214,7 @@ export const agent = {
     });
   },
 
-  // Phase 5: DLP scoring threshold tuning.
+  // DLP scoring threshold tuning.
   async getDLPConfig(): Promise<DLPConfig> {
     return http<DLPConfig>('/api/dlp/config');
   },
@@ -225,12 +225,12 @@ export const agent = {
     });
   },
 
-  // Phase 5: tamper detection.
+  // Tamper detection.
   async getTamperStatus(): Promise<TamperStatus> {
     return http<TamperStatus>('/api/tamper/status');
   },
 
-  // Phase 5: enterprise profile.
+  // Enterprise profile.
   async getProfile(): Promise<AgentProfile | null> {
     try {
       return await http<AgentProfile>('/api/profile');
@@ -242,7 +242,7 @@ export const agent = {
     }
   },
 
-  // Phase 5: admin allow/block override list.
+  // Admin allow/block override list.
   async listOverrides(): Promise<RuleOverrideLists> {
     return http<RuleOverrideLists>('/api/rules/override');
   },
@@ -288,7 +288,7 @@ export const agent = {
     });
   },
 
-  // Phase 6: read-only rules viewer for the Electron Rules page.
+  // Read-only rules viewer for the Electron Rules page.
   async getRulesStatus(): Promise<RulesStatus | null> {
     try {
       return await http<RulesStatus>('/api/rules/status');

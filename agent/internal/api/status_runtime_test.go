@@ -13,8 +13,8 @@ import (
 	"testing"
 )
 
-// TestStatus_IncludesRuntimeAndPatternsAndRules verifies that Phase 6
-// Task 17's enrichment of /api/status renders the runtime stats block,
+// TestStatus_IncludesRuntimeAndPatternsAndRules verifies that the
+// the enrichment of /api/status renders the runtime stats block,
 // the pattern count when a DLP scanner is wired, and the rule file
 // section when rule files are configured.
 func TestStatus_IncludesRuntimeAndPatternsAndRules(t *testing.T) {

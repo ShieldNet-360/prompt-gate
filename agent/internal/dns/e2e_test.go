@@ -23,7 +23,7 @@ import (
 //   - the block path increments the stats counter exposed to
 //     /api/stats consumers.
 //
-// This is the agent/internal/dns/e2e_test.go file from Phase 6 Task 23.
+// End-to-end tests for the DNS resolver.
 func TestResolver_EndToEnd_BlockedReturnsNXDOMAIN(t *testing.T) {
 	addr, r, _, st := startE2EResolver(t, map[string]policy.Action{
 		"blocked.example.com": policy.Deny,

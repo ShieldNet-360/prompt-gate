@@ -1,4 +1,4 @@
-// Source-context builder — Phase 8 Config F slice 3.
+// Source-context builder.
 //
 // Each interceptor calls buildSourceContext(opts) to produce the
 // SourceContext that ride along with every /api/dlp/scan request.
@@ -30,7 +30,7 @@ export type ElementKindValue = (typeof ElementKind)[keyof typeof ElementKind];
 // ── destination_kind buckets ───────────────────────────────────────
 // Small built-in classification so the agent doesn't have to round-
 // trip every host through its rule files. The agent re-derives this
-// authoritatively from its own rule files when needed (Phase 9 may
+// authoritatively from its own rule files when needed (a future release may
 // move the canonical map into a shared signed pack).
 const AI_CHAT_HOSTS = new Set<string>([
     "chat.openai.com", "chatgpt.com",
@@ -116,7 +116,7 @@ export function detectInCodeFence(target: EventTarget | null | undefined): boole
 
 // ── language-hint detection ────────────────────────────────────────
 
-// Phase 8 Config F2 — match test-suite-flavoured paths to classify
+// Path-hint axis — match test-suite-flavoured paths to classify
 // pathnames as test / fixture / spec / mock / docs / src / "".
 // Two alternations per category:
 //   * Directory-style: a path segment named tests/specs/fixtures/
@@ -134,7 +134,7 @@ const SPEC_PATH_PATTERN = /(?:\/specs?(?:\/|$)|_spec\.|\.spec\.)/i;
 const MOCK_PATH_PATTERN = /(?:\/mocks?(?:\/|$)|\/__mocks__(?:\/|$)|\.mock\.)/i;
 const DOCS_PATH_PATTERN = /\/(?:docs?|documentation|examples?|samples?)(?:\/|$)/i;
 
-/** Phase 8 Config F2 helper. Classify a URL pathname into a coarse
+/** Path-hint helper. Classify a URL pathname into a coarse
  *  bucket the agent's scorer consumes. Order matters: test wins
  *  over docs when both match, because committed test files are the
  *  dominant FP class. */

@@ -22,7 +22,7 @@ import (
 // with: empty strings, control characters, partial UTF-8, very long
 // runs of the same character, and almost-valid token prefixes.
 //
-// This is the agent/internal/dlp/fuzz_test.go file from Phase 6 Task
+// Fuzz tests for the DLP pipeline.
 // 25. Run with: go test -run=NONE -fuzz=FuzzPipelineScan -fuzztime=30s ./internal/dlp/
 func FuzzPipelineScan(f *testing.F) {
 	seeds := []string{

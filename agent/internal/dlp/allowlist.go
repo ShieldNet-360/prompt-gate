@@ -1,11 +1,11 @@
-// Per-user feedback allowlist — Phase 8 Config H.
+// Per-user feedback allowlist.
 //
 // Allowlist stores user-blessed "never block this exact value again"
 // decisions. The wire shape between the toast button and the agent
 // is a raw value (the user just clicked "allow this specific paste");
 // the agent normalises + salt-hashes that value and persists only
 // the hash. The pipeline consults the allowlist immediately after
-// the C1/C2 short-circuits and BEFORE scoring, so an allowlisted
+// the public-example/placeholder short-circuits and BEFORE scoring, so an allowlisted
 // match drops out before any source-context bias even runs.
 //
 // Scope semantics:
@@ -97,7 +97,7 @@ func NewAllowlist(ctx context.Context, db *sql.DB, salt []byte, now func() time.
 
 // Allows reports whether value is on the allowlist for the given
 // destination kind. The match key is SHA-256(salt || normalize(value))
-// where normalize mirrors the C1 bloom helper (whitespace, dashes,
+// where normalize mirrors the public-example bloom helper (whitespace, dashes,
 // underscores stripped; ASCII-lowercased). Scope semantics: "*" wins
 // on any destination, otherwise the scope string must equal the
 // destination kind exactly. Expired entries (expires_at > 0 AND

@@ -1,4 +1,4 @@
-// Drag-and-drop interceptor unit tests (Phase 6 Task 11).
+// Drag-and-drop interceptor unit tests.
 //
 // Mocks globalThis.fetch so the scan-client takes the HTTP path
 // (no chrome.runtime in the node test process).

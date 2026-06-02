@@ -104,7 +104,7 @@ func (p *Pipeline) Redact(ctx context.Context, content, sessionID string, source
 // ORIGINAL coordinates. Returns ok=false (fail closed) if any secret
 // cannot be located verbatim in the original. Over-redaction is safe;
 // under-redaction is not, so benign-but-matched values are still
-// removed (C1/C2 public-example/placeholder hits are skipped because
+// removed (public-example/placeholder hits are skipped because
 // they are provably not secrets).
 func (p *Pipeline) locateSecrets(original string) ([]span, bool) {
 	p.mu.RLock()
@@ -124,7 +124,7 @@ func (p *Pipeline) locateSecrets(original string) ([]span, bool) {
 	candidates = filterCandidates(candidates, len(canonical), largeThreshold, disabledCats)
 	matches := ValidateCandidates(canonical, candidates)
 
-	// Collect distinct secret values (skip provably-benign C1/C2 hits),
+	// Collect distinct secret values (skip provably-benign public-example hits),
 	// then redact EVERY occurrence of each in the original. Locating
 	// every occurrence — not just the first — is what makes a repeated
 	// secret fully removed; a single strings.Index would leave later

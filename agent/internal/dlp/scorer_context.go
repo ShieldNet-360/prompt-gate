@@ -1,4 +1,4 @@
-// Source-context score-bias rules — Phase 8 Config F slice 2.
+// Source-context score-bias rules.
 //
 // ScoreBiasFromContext returns an additive delta applied to the
 // per-pattern top score BEFORE the threshold check.
@@ -25,7 +25,7 @@
 //   * Language-hint axis — language_hint ∈ {test, fixture, spec}
 //     (case-insensitive, whitespace-stripped) → -1.
 //
-// Returns 0 when source is the zero value (Config E behaviour
+// Returns 0 when source is the zero value (default scoring behaviour
 // unchanged).
 //
 // Privacy invariant: this function is pure — string in / int out,
@@ -144,7 +144,7 @@ func isTestLanguageHint(hint string) bool {
 	return false
 }
 
-// Phase 8 Config F2 — path-hint axis.
+// Path-hint axis.
 //
 // pathHintDelta returns -1 only when the destination is a code host
 // AND the extension classified the URL pathname as test / fixture /

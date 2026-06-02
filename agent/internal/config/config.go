@@ -190,7 +190,7 @@ func Load(path string) (Config, error) {
 	// folds an omitted field and an explicit `0` into the same Go
 	// zero value on an `int`, so merge() cannot tell them apart on
 	// the regular Config view alone.
-	var overlay phase6IntOverlay
+	var overlay dlpIntOverlay
 	if err := yaml.Unmarshal(data, &overlay); err != nil {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
@@ -203,14 +203,14 @@ func Load(path string) (Config, error) {
 	return merged, nil
 }
 
-// phase6IntOverlay re-decodes the four DLP int fields whose
+// dlpIntOverlay re-decodes the four DLP int fields whose
 // documented behaviour distinguishes "omitted" from "explicit 0".
 // A pointer field lets the YAML decoder give us a nil value when
 // the key is absent and a `*int` pointing at zero when the operator
 // wrote `: 0` explicitly. This is the only way to recover that
 // distinction without changing the public Config struct's field
 // types and rippling through every consumer.
-type phase6IntOverlay struct {
+type dlpIntOverlay struct {
 	LargeContentThreshold *int `yaml:"large_content_threshold"`
 	DLPCacheTTLSeconds    *int `yaml:"dlp_cache_ttl_seconds"`
 	DLPCacheCapacity      *int `yaml:"dlp_cache_capacity"`
@@ -220,7 +220,7 @@ type phase6IntOverlay struct {
 // apply copies any explicitly-set overlay values onto cfg. nil
 // pointers (omitted keys) are skipped so the default seeded by
 // merge() survives.
-func (o phase6IntOverlay) apply(cfg *Config) {
+func (o dlpIntOverlay) apply(cfg *Config) {
 	if o.LargeContentThreshold != nil {
 		cfg.LargeContentThreshold = *o.LargeContentThreshold
 	}
@@ -301,7 +301,7 @@ func merge(defaults, override Config) Config {
 		out.LocalRulesDir = override.LocalRulesDir
 	}
 	// The four DLP int fields with "zero disables" semantics are
-	// handled by phase6IntOverlay.apply() after merge() runs, so
+	// handled by dlpIntOverlay.apply() after merge() runs, so
 	// they are intentionally not copied here — a `!= 0` guard would
 	// silently drop the operator's explicit `0`.
 	if len(override.DLPDisabledCategories) > 0 {

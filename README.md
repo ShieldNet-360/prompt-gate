@@ -75,22 +75,22 @@ On 1,000,000 lines of source code sampled from a real `~/Developer`
 directory (5,676 files across Go / Python / TS / Java / YAML /
 Terraform / JSON / Markdown), the layered scoring delivers
 measurable FP reduction over a regex-only baseline. We report two
-numbers, because F's `code_host: −2` bias depends on where the
-content is going:
+numbers, because the source-context `code_host: −2` bias depends on
+where the content is going:
 
-| Generation | Total blocks | Δ vs phase7 | p50 latency |
+| Generation | Total blocks | Δ vs prev | p50 latency |
 |---|--:|--:|--:|
-| main (pre-A1/A2/C1/C2)             | 211 | — | 23 µs |
-| phase7 (E layers + extension)      | 206 | — | 23 µs |
-| phase8 (E + F + F2), **realistic destination mix** | **161** | **−22 %** | **37 µs** |
-| phase8 (E + F + F2), worst-case (every line `code_host`) | **41** | **−80 %** | 36 µs |
+| regex baseline                     | 211 | — | 23 µs |
+| + accuracy layers                  | 206 | — | 23 µs |
+| + source-context bias, **realistic destination mix** | **161** | **−22 %** | **37 µs** |
+| + source-context bias, worst-case (every line `code_host`) | **41** | **−80 %** | 36 µs |
 
 The **realistic-mix** number is what production actually feels:
 destinations sampled 40 % `ai_chat`, 30 % `code_host`, 20 %
 `ai_code`, 10 % programmatic exfil. The **worst-case** number is
 the ceiling under the assumption that every paste goes to GitHub.
-About 75 % of the worst-case 80 % was bench artifact — the F bias
-only fires when the paste target is a code host, and in real
+About 75 % of the worst-case 80 % was bench artifact — the
+source-context bias only fires when the paste target is a code host, and in real
 production that's one destination among several.
 
 Reproduce with `agent/cmd/dlp-bench --destination-mix=realistic`;
@@ -111,10 +111,10 @@ and **logs nothing** about user access — only running aggregate
 counters.
 
 The DLP pipeline pairs an Aho-Corasick + regex deterministic core
-with four accuracy layers — adversary-resistant normalisation (A1),
-a per-tab multi-piece correlator (A2), a public-example bloom (C1),
-and a placeholder-shape router (C2) — and source-context bias layers
-(destination bias F, path bias F2, and an opt-in feedback allowlist H).
+with four accuracy layers — adversary-resistant normalisation,
+a per-tab multi-piece correlator, a public-example bloom,
+and a placeholder-shape router — and source-context bias layers
+(destination bias, path bias, and an opt-in feedback allowlist).
 The launch-day benchmark over the
 in-repo FP corpus is **precision 100 % / recall 73 % / FP rate 0 %**
 at under 1 ms per scan with no ML dependency.
@@ -258,8 +258,8 @@ prompt-gate/
 │   │   ├── api/                      # HTTP API server + handlers + ratelimit.go (token bucket)
 │   │   ├── config/                   # YAML configuration loader
 │   │   ├── dlp/                      # Layered DLP pipeline + cache.go (LRU)
-│   │   │                             #   + normalize.go (A1) / correlator.go (A2)
-│   │   │                             #   / bloom.go (C1) / codecontext.go (C2)
+│   │   │                             #   + normalize.go / correlator.go
+│   │   │                             #   / bloom.go / codecontext.go
 │   │   │                             #   + testdata/fp_corpus/ + fp_corpus_test.go
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
 │   │   ├── heartbeat/                # Optional outbound heartbeat
@@ -342,7 +342,7 @@ Local HTTP API on `127.0.0.1:9191` (configurable):
 | PUT    | `/api/policies/:category`  | Update an action; triggers policy reload |
 | GET    | `/api/stats`               | Aggregate counters (integers only) |
 | POST   | `/api/stats/reset`         | Reset all counters to zero |
-| POST   | `/api/dlp/scan`            | Scan `{content, session_id?}` through the DLP pipeline; returns `{blocked, pattern_name, score}`. When `session_id` is supplied (the browser extension generates a per-tab opaque UUID), the A2 correlator reassembles secrets split across consecutive pastes in the same tab. Content is processed in memory and never persisted. |
+| POST   | `/api/dlp/scan`            | Scan `{content, session_id?}` through the DLP pipeline; returns `{blocked, pattern_name, score}`. When `session_id` is supplied (the browser extension generates a per-tab opaque UUID), the correlator reassembles secrets split across consecutive pastes in the same tab. Content is processed in memory and never persisted. |
 | GET    | `/api/dlp/config`          | Current DLP scoring weights and per-severity thresholds |
 | PUT    | `/api/dlp/config`          | Update DLP scoring weights and thresholds |
 | POST   | `/api/rules/update`        | Trigger an immediate rule-manifest check; returns `{updated, version, files_downloaded}` |
@@ -443,8 +443,8 @@ merging without corrupting bundled rules. Performance benchmarks
 for the DLP pipeline, DNS resolver, and stats counter live in
 `*_bench_test.go` files — see [BENCHMARKS.md](./BENCHMARKS.md).
 
-The accuracy layers add `bloom_test.go` (C1), `codecontext_test.go` (C2),
-`normalize_test.go` (A1), `correlator_test.go` (A2), and
+The accuracy layers add `bloom_test.go`, `codecontext_test.go`,
+`normalize_test.go`, `correlator_test.go`, and
 `fp_corpus_test.go` (precision / recall / F1 / FP rate against the
 labelled corpus under `agent/internal/dlp/testdata/fp_corpus/`). The
 FP-corpus test gates CI at `precision ≥ 90 %` and `recall ≥ 60 %`;

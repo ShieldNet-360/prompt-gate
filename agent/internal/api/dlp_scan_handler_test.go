@@ -1,8 +1,8 @@
-// Phase 8 Config F — Slice 1 schema tests for POST /api/dlp/scan.
+// Schema tests for POST /api/dlp/scan.
 //
 // Asserts:
 //   1. Request body without a `source` field continues to dispatch
-//      to Scan / ScanSession (Config E behaviour unchanged).
+//      to Scan / ScanSession (default scoring behaviour unchanged).
 //   2. Request body with a non-zero `source` dispatches to
 //      ScanWithContext and forwards the struct unchanged.
 //   3. Request body with `"source": {}` (zero-valued struct)
@@ -29,7 +29,7 @@ import (
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
 )
 
-func TestPhase8_DLPScan_NoSource_DispatchesToScan(t *testing.T) {
+func TestDLPScan_NoSource_DispatchesToScan(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	f := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
 	srv.SetDLP(f)
@@ -45,7 +45,7 @@ func TestPhase8_DLPScan_NoSource_DispatchesToScan(t *testing.T) {
 	}
 }
 
-func TestPhase8_DLPScan_SessionOnly_DispatchesToSession(t *testing.T) {
+func TestDLPScan_SessionOnly_DispatchesToSession(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	f := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
 	srv.SetDLP(f)
@@ -61,7 +61,7 @@ func TestPhase8_DLPScan_SessionOnly_DispatchesToSession(t *testing.T) {
 	}
 }
 
-func TestPhase8_DLPScan_EmptySource_DispatchesToScan(t *testing.T) {
+func TestDLPScan_EmptySource_DispatchesToScan(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	f := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
 	srv.SetDLP(f)
@@ -77,7 +77,7 @@ func TestPhase8_DLPScan_EmptySource_DispatchesToScan(t *testing.T) {
 	}
 }
 
-func TestPhase8_DLPScan_NonEmptySource_DispatchesToContext(t *testing.T) {
+func TestDLPScan_NonEmptySource_DispatchesToContext(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	f := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
 	srv.SetDLP(f)
@@ -121,7 +121,7 @@ func TestPhase8_DLPScan_NonEmptySource_DispatchesToContext(t *testing.T) {
 	}
 }
 
-func TestPhase8_DLPScan_SessionAndSource_PrefersContext(t *testing.T) {
+func TestDLPScan_SessionAndSource_PrefersContext(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	f := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
 	srv.SetDLP(f)
@@ -142,7 +142,7 @@ func TestPhase8_DLPScan_SessionAndSource_PrefersContext(t *testing.T) {
 	}
 }
 
-func TestPhase8_DLPScan_ResponseShapeUnchanged(t *testing.T) {
+func TestDLPScan_ResponseShapeUnchanged(t *testing.T) {
 	// Regression: response stays {blocked, pattern_name, score}
 	// regardless of which dispatch path was taken.
 	srv, _, _ := newTestServer(t)

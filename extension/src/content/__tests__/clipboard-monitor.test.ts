@@ -1,4 +1,4 @@
-// Clipboard monitor unit tests (Phase 6 Task 14).
+// Clipboard monitor unit tests.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

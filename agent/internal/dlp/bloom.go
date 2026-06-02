@@ -1,4 +1,4 @@
-// Public-example bloom — C1 layer in the DLP pipeline.
+// Public-example bloom layer in the DLP pipeline.
 //
 // IsPublicExample returns true if a candidate value matches a curated
 // set of well-known public examples — AWS docs canonical key, Stripe

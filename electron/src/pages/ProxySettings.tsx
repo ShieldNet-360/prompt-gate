@@ -28,7 +28,7 @@ export function ProxySettings() {
         setStatus(null);
         setFeedback({
           kind: 'error',
-          message: 'Proxy is not configured on this agent (Phase 4 build required).',
+          message: 'Proxy is not configured on this agent.',
         });
       } else {
         setFeedback({ kind: 'error', message: msg });

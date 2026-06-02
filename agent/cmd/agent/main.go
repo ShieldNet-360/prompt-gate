@@ -1,4 +1,4 @@
-// Command agent runs the Prompt Gate Phase 1 agent: DNS resolver +
+// Command agent runs the Prompt Gate agent: DNS resolver +
 // policy engine + SQLite-backed config/stats + local HTTP API.
 package main
 
@@ -162,7 +162,7 @@ func runNativeMessaging(configPath string) error {
 	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
 }
 
-// applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
+// applyDLPRuntimeConfig copies the runtime tunables from the
 // loaded YAML config into the pipeline. Called from both daemon and
 // native-messaging paths so each transport observes the same defaults.
 //
@@ -189,14 +189,14 @@ func applyDLPRuntimeConfig(p *dlp.Pipeline, cfg config.Config) {
 	}
 	// cfg.DLPCacheTTLSeconds == 0 → leave the pipeline cacheless.
 
-	// A2: enable the multi-piece correlator. The browser companion
+	// Enable the multi-piece correlator. The browser companion
 	// supplies session_id (per-tab opaque token); the agent uses it
 	// to reassemble secrets split across consecutive pastes.
 	// Defaults: 30s session TTL, 256-byte tail, 4096 max sessions.
 	p.EnableCorrelator(dlp.NewCorrelator(0, 0, 0))
 }
 
-// enableAllowlist wires up Phase 8 Config H — per-user "never block
+// enableAllowlist wires up the feedback allowlist — per-user "never block
 // this value again". Salt is persisted alongside the bearer token in
 // ~/.prompt-gate/allowlist-salt; first run creates it. Failure is
 // logged but non-fatal — the engine just runs without H.
@@ -289,7 +289,7 @@ func run(configPath string) error {
 		}
 	}
 
-	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).
+	// Apply configured /api/dlp/scan rate limit.
 	// Explicit 0 disables the limiter entirely so operators can opt
 	// out for synthetic load tests; the config loader already
 	// rejects negative values.
@@ -299,12 +299,12 @@ func run(configPath string) error {
 		apiServer.SetScanRateLimit(0, 1)
 	}
 
-	// Expose rule-file mtimes through /api/status (Phase 6 Task 17).
+	// Expose rule-file mtimes through /api/status.
 	// Missing files are tolerated by collectRuleFileInfo on the server
 	// side, so we can pass the configured paths unfiltered.
 	apiServer.SetRuleFiles(ruleFilesForStatus(cfg))
 
-	// Optional self-updater (Phase 6 Task 15). Builds without a
+	// Optional self-updater. Builds without a
 	// manifest URL or a valid Ed25519 public key omit the updater
 	// entirely, and /api/agent/update* return 503.
 	if cfg.AgentUpdateManifestURL != "" && cfg.AgentUpdatePublicKey != "" {
@@ -322,7 +322,7 @@ func run(configPath string) error {
 	}
 
 	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
-	// is configured. Phase 1 deployments leave both DLP paths blank and
+	// is configured. Minimal deployments leave both DLP paths blank and
 	// the /api/dlp/* endpoints return 503 service-unavailable. The
 	// pipeline is hoisted to function scope so the startup profile
 	// loader (below) can push its merged DLP thresholds and weights
@@ -488,7 +488,7 @@ func run(configPath string) error {
 		}
 	}
 
-	// Phase 5: admin rule override store. An empty
+	// Admin rule override store. An empty
 	// local_rules_dir disables overrides; otherwise the store always
 	// exposes both override files (empty placeholders are created
 	// on first run), and we register them with the policy engine
@@ -506,7 +506,7 @@ func run(configPath string) error {
 		}
 	}
 
-	// Phase 5: enterprise profile holder. Profiles arrive
+	// Enterprise profile holder. Profiles arrive
 	// via /api/profile/import or are loaded eagerly from
 	// cfg.ProfilePath / cfg.ProfileURL on startup.
 	holder := profile.NewHolder(nil)
@@ -516,7 +516,7 @@ func run(configPath string) error {
 		log.Errorf("profile load failed: %v", err)
 	}
 
-	// Phase 5: tamper detector goroutine.
+	// Tamper detector goroutine.
 	if cfg.DNSListen != "" {
 		expectedDNS, _ := splitHostPort(cfg.DNSListen)
 		// Only assert the system proxy is wired through us when the MITM
@@ -537,7 +537,7 @@ func run(configPath string) error {
 		go detector.Start(ctx)
 	}
 
-	// Phase 5: optional heartbeat. URL=="" disables it.
+	// Optional heartbeat. URL=="" disables it.
 	hb, err := heartbeat.New(heartbeat.Options{
 		URL:          cfg.HeartbeatURL,
 		AgentVersion: version,
@@ -773,7 +773,7 @@ func (p *proxyAdapter) Status() api.ProxyStatus {
 	}
 }
 
-// allowlistSaltPath returns the path where the per-install Config H
+// allowlistSaltPath returns the path where the per-install feedback-allowlist
 // salt is written (~/.prompt-gate/allowlist-salt). Returns an error
 // when HOME cannot be determined.
 func allowlistSaltPath() (string, error) {

@@ -59,13 +59,13 @@ type Pipeline struct {
 	cache *ScanCache
 
 	// correlator carries a short tail of the most recent paste per
-	// session, enabling A2 multi-piece exfil detection. Optional;
-	// nil disables A2 (default).
+	// session, enabling multi-piece exfil detection. Optional;
+	// nil disables correlation (default).
 	correlator *Correlator
 
-	// allowlist is the Phase 8 Config H per-user feedback store.
+	// allowlist is the per-user feedback store.
 	// When set, every match value is checked against it after the
-	// C1/C2 short-circuits and BEFORE scoring; a hit drops the
+	// public-example/placeholder short-circuits and BEFORE scoring; a hit drops the
 	// match silently. Nil disables H (default).
 	allowlist *Allowlist
 }
@@ -234,7 +234,7 @@ func (p *Pipeline) Patterns() []*Pattern {
 	return out
 }
 
-// EnableCorrelator turns on A2 multi-piece detection. Pass nil to
+// EnableCorrelator turns on multi-piece detection. Pass nil to
 // disable. Safe to call concurrently with Scan.
 func (p *Pipeline) EnableCorrelator(c *Correlator) {
 	p.mu.Lock()
@@ -242,7 +242,7 @@ func (p *Pipeline) EnableCorrelator(c *Correlator) {
 	p.mu.Unlock()
 }
 
-// Correlator returns the active multi-piece correlator, or nil if A2
+// Correlator returns the active multi-piece correlator, or nil if correlation
 // is disabled.
 func (p *Pipeline) Correlator() *Correlator {
 	p.mu.RLock()
@@ -250,7 +250,7 @@ func (p *Pipeline) Correlator() *Correlator {
 	return p.correlator
 }
 
-// EnableAllowlist turns on Config H per-user feedback suppression.
+// EnableAllowlist turns on per-user feedback suppression.
 // Pass nil to disable. Safe to call concurrently with Scan.
 func (p *Pipeline) EnableAllowlist(a *Allowlist) {
 	p.mu.Lock()
@@ -278,19 +278,19 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 
 // ScanSession is the session-aware variant of Scan. When sessionID is
 // non-empty and a correlator is enabled (see EnableCorrelator), content
-// is combined with the session's prior paste tail (A2 layer) so that
+// is combined with the session's prior paste tail so that
 // secrets split across consecutive pastes can be detected. Pass an
 // empty sessionID to behave identically to Scan.
 func (p *Pipeline) ScanSession(ctx context.Context, content, sessionID string) ScanResult {
 	return p.scanImpl(ctx, content, sessionID, SourceContext{})
 }
 
-// ScanWithContext is the Phase 8 Config F entrypoint. It accepts the
+// ScanWithContext is the source-context entrypoint. It accepts the
 // SourceContext the caller (typically the browser extension)
 // collected about WHERE the scan is happening — destination host /
 // kind, DOM element type, code-fence flag, language hint, and
 // content-derived hashes. The scorer biases verdicts by this
-// context (Slice 2; Slice 1 wires source through but does not yet
+// context (the scoring stage wires source through but the
 // consult it). Pass an empty SourceContext{} to behave identically
 // to ScanSession.
 func (p *Pipeline) ScanWithContext(
@@ -323,8 +323,8 @@ func (p *Pipeline) scanImpl(
 	p.mu.RUnlock()
 
 	// Cache only valid for stateless / context-free scans — same
-	// content in different sessions (A2), different source contexts
-	// (Config F), or with an allowlist present (Config H: scope
+	// content in different sessions, different source contexts
+	// (source context), or with an allowlist present (scope
 	// matching is destination-aware so we cannot dedupe by content
 	// alone) may produce different verdicts. The cache key is
 	// `content` only, so any caller-supplied state must bypass the
@@ -343,13 +343,13 @@ func (p *Pipeline) scanImpl(
 		largeThreshold = LargeContentThreshold
 	}
 
-	// A1: normalize content (strip zero-width, fold homoglyphs,
+	// Normalize content (strip zero-width, fold homoglyphs,
 	// NFKC, append base64-decoded blocks). Downstream stages
 	// operate on the canonical form; cache keys remain the raw
 	// input so callers get deterministic per-input results.
 	canonical := NormalizeContent(content)
 
-	// A2: if correlator is enabled and a session_id is supplied,
+	// If the correlator is enabled and a session_id is supplied,
 	// prepend the session's prior paste tail so split-across-pastes
 	// secrets can be reassembled. No-op when correlator is nil or
 	// sessionID is empty.
@@ -410,12 +410,12 @@ func (p *Pipeline) scanImpl(
 // single pattern group. Pure function with no shared state — safe to
 // invoke from worker goroutines in the concurrent path.
 //
-// Phase 8 slice 2: source is consulted once topScore is computed,
+// Source is consulted once topScore is computed,
 // via ScoreBiasFromContext, to apply the per-destination /
 // per-element / per-fence / per-language bias rules.
 //
-// Phase 8 Config H: allowlist (if non-nil) is consulted per-match
-// after the C1/C2 short-circuits and BEFORE scoring. A hit drops
+// The allowlist (if non-nil) is consulted per-match
+// after the public-example/placeholder short-circuits and BEFORE scoring. A hit drops
 // the match silently — same effect as the user clicking "never
 // block this" on the toast.
 func evaluatePattern(
@@ -439,10 +439,10 @@ func evaluatePattern(
 	)
 	for _, m := range ms {
 		if IsPublicExample(m.Value) {
-			continue // C1: known public example, never block
+			continue // known public example, never block
 		}
 		if IsPlaceholderShape(m.Value) {
-			continue // C2: template placeholder, never block
+			continue // template placeholder, never block
 		}
 		if allowlist.Allows(m.Value, source.DestinationKind) {
 			continue // H: user-blessed, never block
@@ -477,9 +477,9 @@ func evaluatePattern(
 		return ScanResult{}
 	}
 
-	// Phase 8 slice 2: apply source-context bias before the
+	// Apply source-context bias before the
 	// threshold check. ScoreBiasFromContext returns 0 when source
-	// is zero-valued so the pre-F path is bit-identical.
+	// is zero-valued so the no-source path is bit-identical.
 	biasedScore := topScore + ScoreBiasFromContext(*pat, source)
 
 	if !threshold.ShouldBlock(biasedScore, string(pat.Severity)) {

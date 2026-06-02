@@ -1,4 +1,4 @@
-// Drag-and-drop interceptor content script (Phase 6 Task 11).
+// Drag-and-drop interceptor content script.
 //
 // Some AI tools accept drag-and-drop of text payloads (snippets, log
 // files, transcripts) straight into the prompt textarea. Drops bypass

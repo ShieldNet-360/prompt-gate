@@ -103,7 +103,7 @@
 The targets remain WCAG 2.1 AA. Re-run this checklist any time the
 renderer styles change.
 
-### Dark-mode verification (Task 19)
+### Dark-mode verification
 
 The `prefers-color-scheme: dark` block in `styles.css` now overrides
 `--accent`, `--success`, and `--error` so all status colours have
@@ -117,7 +117,7 @@ sufficient contrast against the dark `--bg` / `--card` surfaces.
    - The active tab background is distinct from inactive tabs.
    - Focus-visible outline is visible on every interactive element.
 
-### Rules page (Task 20)
+### Rules page
 
 1. With the agent running, open the Rules tab.
 2. Confirm the page surfaces:
@@ -127,7 +127,7 @@ sufficient contrast against the dark `--bg` / `--card` surfaces.
    - The rule file paths with size + last-modified timestamps.
 3. Confirm pattern bodies are **not** displayed anywhere on the page.
 
-### Setup wizard (Task 21)
+### Setup wizard
 
 1. Clear the `secureEdge.setup.completed` key from localStorage.
 2. Re-open the renderer — the wizard should appear.
@@ -135,7 +135,7 @@ sufficient contrast against the dark `--bg` / `--card` surfaces.
 4. Click "Finish setup" on step 3 — the regular tab view should
    render and persist after reload.
 
-### Recent blocks (Task 22)
+### Recent blocks
 
 1. With the agent reachable, trigger a few DLP blocks (paste a token
    into an inspected page).

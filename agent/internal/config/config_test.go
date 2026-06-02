@@ -89,7 +89,7 @@ func TestLoad_InvalidValue(t *testing.T) {
 	}
 }
 
-// TestLoad_DLPIntFields_ExplicitZeroDisables locks in the Phase 6
+// TestLoad_DLPIntFields_ExplicitZeroDisables locks in the DLP int-field
 // "zero disables" semantics for the four DLP int fields. Writing an
 // explicit `0` in YAML must override the built-in default — a previous
 // implementation used `!= 0` merge guards that silently dropped the
@@ -130,7 +130,7 @@ dlp_rate_limit_per_sec: 0
 func TestLoad_DLPIntFields_OmittedKeepsDefault(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "omit.yaml")
-	// No Phase 6 keys at all.
+	// No DLP int keys at all.
 	content := "upstream_dns: \"1.1.1.1:53\"\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
@@ -192,7 +192,7 @@ func TestLoad_DLPIntFields_PartialOverride(t *testing.T) {
 }
 
 // TestLoad_DLPIntFields_NegativeRejected confirms validation rejects
-// negative values for the Phase 6 ints. They have no useful meaning
+// negative values for the DLP ints. They have no useful meaning
 // — the consumer code branches on positive vs zero only — so a
 // negative reaches no production code path.
 func TestLoad_DLPIntFields_NegativeRejected(t *testing.T) {

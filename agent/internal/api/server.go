@@ -114,7 +114,7 @@ type DLPScanner interface {
 	Threshold() *dlp.ThresholdEngine
 	SetWeights(w dlp.ScoreWeights)
 	Patterns() []*dlp.Pattern
-	// Allowlist returns the active Phase 8 Config H allowlist, or
+	// Allowlist returns the active feedback allowlist, or
 	// nil when H is disabled (no salt configured / pipeline never
 	// wired). The /api/dlp/allowlist handlers return 503 in that
 	// case so callers can detect deployments without H.
@@ -275,15 +275,15 @@ func (s *Server) SetRuleFiles(paths []string) {
 }
 
 // SetDLP wires a DLP scanner into the server after construction.
-// Phase 1 callers don't have to provide one; Phase 2 callers do.
+// Callers may omit one for backward compatibility.
 func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
 
-// SetRuleUpdater wires the rule updater into the server. Phase 3 only;
+// SetRuleUpdater wires the rule updater into the server. Optional;
 // when nil the /api/rules/* endpoints return 503.
 func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
 
 // SetProxyController wires the MITM proxy controller into the server.
-// Phase 4 only; when nil the /api/proxy/* endpoints return 503.
+// Optional; when nil the /api/proxy/* endpoints return 503.
 func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
 
 // SetProfile wires a profile holder into the server. When the
@@ -302,7 +302,7 @@ func (s *Server) SetTamperReporter(t TamperReporter) { s.Tamper = t }
 // the server.
 func (s *Server) SetRuleOverride(o RuleOverride) { s.Rules = o }
 
-// SetAgentUpdater wires the agent self-updater (Phase 6 Task 15) into
+// SetAgentUpdater wires the agent self-updater into
 // the server. When nil, /api/agent/update-check and /api/agent/update
 // return 503 so the Electron UI can hide the "Check for updates"
 // button on builds without a release channel.

@@ -76,7 +76,7 @@ type ReplyFn = (msg: ScanResponseMessage) => void;
 /** Handle a single bridge message. Exported for unit tests so we can
  *  exercise the relay without standing up a real `window`.
  *
- *  Phase 8 Config F: the relay always tags scans from here with
+ *  Source context: the relay always tags scans from here with
  *  element_kind=network_body so the agent's scorer can apply the
  *  +1 "programmatic exfil intent" bias (see
  *  agent/internal/dlp/scorer_context.go). */

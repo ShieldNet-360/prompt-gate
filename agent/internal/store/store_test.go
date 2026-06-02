@@ -39,11 +39,11 @@ func TestOpen_SchemaAndSeeds(t *testing.T) {
 	}
 	sort.Strings(names)
 	want := []string{
-		"agent_preferences", // Phase 8.x — opt-in event log consent
+		"agent_preferences", // opt-in event log consent
 		"aggregate_stats",
 		"block_events",
 		"category_policies",
-		"dlp_allowlist", // Phase 8 Config H
+		"dlp_allowlist", // feedback allowlist
 		"dlp_config",
 		"rule_versions",
 		"rulesets",

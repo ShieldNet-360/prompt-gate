@@ -1,4 +1,4 @@
-// Dynamic Tier-2 host updater unit tests (Phase 6 Task 12).
+// Dynamic Tier-2 host updater unit tests.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
