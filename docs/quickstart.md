@@ -5,8 +5,8 @@ Get Prompt Gate running locally in under five minutes.
 ## Prerequisites
 
 - macOS, Linux, or Windows
-- Go 1.21+ (for build-from-source today; signed installers ship at v1.0)
-- Node.js 18+ for the tray app and browser extension
+- Go 1.25+ (to build from source; or grab a signed installer from Releases)
+- Node.js 22+ for the tray app and browser extension
 
 ## Build and run
 
@@ -32,7 +32,7 @@ npm install && npm run build && npm start
 ```yaml
 upstream_dns: "8.8.8.8:53"
 dns_listen:   "127.0.0.1:15353"
-api_listen:   "127.0.0.1:8080"
+api_listen:   "127.0.0.1:9191"
 db_path:      "prompt-gate.db"
 rule_paths:
   - rules/ai_chat_blocked.txt
