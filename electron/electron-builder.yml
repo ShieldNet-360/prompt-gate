@@ -51,6 +51,7 @@ linux:
 win:
   target:
     - nsis
+    - zip
   icon: resources/icon.png
 nsis:
   oneClick: false

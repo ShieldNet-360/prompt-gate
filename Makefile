@@ -5,6 +5,7 @@
 #   make              # build everything into dist/bin
 #   make macos        # macOS .dmg (drag-to-Applications)
 #   make win          # Windows NSIS installer (.exe)
+#   make portable-win # portable ZIP for Windows (agent + rules + config)
 #   make linux        # self-contained installer in dist/linux/
 #   make agent        # Go agent binary (release, default)
 #   make agent-debug  # Go agent binary (debug — logs to edge_<date>.log)
@@ -158,9 +159,11 @@ macos: electron-deps
 	@echo "==> [3/3] Packaging macOS DMG..."
 	cd electron && npx electron-builder --mac --publish never
 	@touch electron/release/.metadata_never_index
+	@mkdir -p $(DIST)
+	@cp electron/release/*.dmg $(DIST)/ 2>/dev/null || true
 	@echo ""
-	@echo "==> Done! DMG:"
-	@ls -lh electron/release/*.dmg 2>/dev/null || echo "    (no .dmg found — check output above)"
+	@echo "==> Done! Output in $(DIST)/:"
+	@ls -lh $(DIST)/*.dmg 2>/dev/null || echo "    (no .dmg found — check output above)"
 
 # ──────────────── make win / make windows ────────────────
 # Build an NSIS installer for Windows. Works natively on Windows
@@ -181,10 +184,37 @@ endif
 	@echo "==> [2/3] Building Electron renderer + main..."
 	cd electron && npm run build
 	@echo "==> [3/3] Packaging Windows installer..."
-	cd electron && npx electron-builder --win --publish never
+	cd electron && npx electron-builder --win --x64 --publish never
+	@mkdir -p $(DIST)
+	@cp electron/release/*.exe $(DIST)/ 2>/dev/null || true
+	@cp electron/release/*.zip $(DIST)/ 2>/dev/null || true
 	@echo ""
-	@echo "==> Done! Installer:"
-	@ls -lh electron/release/*.exe 2>/dev/null || echo "    (no .exe found — check output above)"
+	@echo "==> Done! Output in $(DIST)/:"
+	@ls -lh $(DIST)/*.exe $(DIST)/*.zip 2>/dev/null || echo "    (no artifacts found — check output above)"
+
+# ──────────────── make portable-win ────────────────
+# Build a portable ZIP for Windows (full Electron UI + bundled agent
+# + rules). No installer — just unzip and double-click "Secure Edge.exe".
+# Cross-compiles from macOS / Linux.
+.PHONY: portable-win
+portable-win: electron-deps
+	@echo "==> [1/3] Cross-compiling Go agent for Windows amd64..."
+	@mkdir -p $(RES_BIN) $(RES_RULES)
+ifeq ($(PLATFORM),windows)
+	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/secure-edge-agent.exe ./cmd/agent
+else
+	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/secure-edge-agent.exe ./cmd/agent
+endif
+	@cp rules/*.txt rules/*.json $(RES_RULES)/ 2>/dev/null || true
+	@echo "==> [2/3] Building Electron renderer + main..."
+	cd electron && npm run build
+	@echo "==> [3/3] Packaging portable ZIP (electron-builder --win zip)..."
+	cd electron && npx electron-builder --win zip --x64 --publish never
+	@mkdir -p $(DIST)
+	@cp electron/release/*.zip $(DIST)/ 2>/dev/null || true
+	@echo ""
+	@echo "==> Done! Output in $(DIST)/:"
+	@ls -lh $(DIST)/*.zip 2>/dev/null || echo "    (no .zip found — check output above)"
 
 # ──────────────── make linux ────────────────
 # Produces a .deb on Linux (dpkg-deb) or a .tar.gz fallback on macOS.

@@ -3,6 +3,7 @@ package sysconf
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 func applyProxyWithCA(host string, port int, caPath string) error {
@@ -81,18 +82,53 @@ func restoreDNS() error {
 	return nil
 }
 
+// runElevated executes a command with UAC elevation on Windows.
+// It uses PowerShell's Start-Process -Verb RunAs to trigger the
+// standard Windows elevation dialog — the equivalent of macOS's
+// runWithAdmin (osascript "with administrator privileges").
+func runElevated(exe string, args ...string) error {
+	// Build a single-quoted, comma-separated ArgumentList for PowerShell.
+	escaped := make([]string, len(args))
+	for i, a := range args {
+		escaped[i] = "'" + strings.ReplaceAll(a, "'", "''") + "'"
+	}
+	argList := strings.Join(escaped, ",")
+	psScript := fmt.Sprintf(
+		`Start-Process -FilePath '%s' -ArgumentList %s -Verb RunAs -Wait`,
+		exe, argList,
+	)
+	return exec.Command("powershell", "-Command", psScript).Run()
+}
+
 func installCA(caPath string) error {
+	// Fast path: already running elevated (e.g. admin terminal).
 	out, err := exec.Command("certutil", "-addstore", "Root", caPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sysconf: certutil -addstore: %s (%w)", string(out), err)
+	if err == nil {
+		return nil
+	}
+
+	// Slow path: trigger a UAC prompt so the user can approve elevation.
+	if e := runElevated("certutil", "-addstore", "Root", caPath); e != nil {
+		return fmt.Errorf("sysconf: certutil -addstore (elevated): %s (%w)", strings.TrimSpace(string(out)), e)
+	}
+
+	// Verify the cert was actually installed.
+	if !caTrusted(caPath) {
+		return fmt.Errorf("sysconf: CA certificate not trusted after elevated install (UAC may have been cancelled)")
 	}
 	return nil
 }
 
 func removeCA(caPath string) error {
+	// Fast path: already running elevated.
 	out, err := exec.Command("certutil", "-delstore", "Root", caPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sysconf: certutil -delstore: %s (%w)", string(out), err)
+	if err == nil {
+		return nil
+	}
+
+	// Slow path: trigger UAC prompt.
+	if e := runElevated("certutil", "-delstore", "Root", caPath); e != nil {
+		return fmt.Errorf("sysconf: certutil -delstore (elevated): %s (%w)", strings.TrimSpace(string(out)), e)
 	}
 	return nil
 }
