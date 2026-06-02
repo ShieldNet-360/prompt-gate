@@ -434,7 +434,7 @@ func runBench(args []string) error {
 			Seed:           *seed,
 			Modes: map[string]modeReport{
 				"baseline": toReport(baseline),
-				"context": toReport(context),
+				"context":  toReport(context),
 			},
 		}
 		out, err := os.Create(*outPath)
@@ -515,32 +515,32 @@ func runMode(ctx context.Context, name string, p *dlp.Pipeline,
 // `mix`:
 //
 //   - "worst"     : every line gets destination_kind=code_host, the
-//                   worst case for source-context recall (maximum source-context bias).
-//                   This is the conservative ceiling — useful for
-//                   saying "even if every paste went to GitHub,
-//                   the source-context engine still blocks X".
+//     worst case for source-context recall (maximum source-context bias).
+//     This is the conservative ceiling — useful for
+//     saying "even if every paste went to GitHub,
+//     the source-context engine still blocks X".
 //
 //   - "realistic" : sample per line from a production-shaped
-//                   distribution. The agent's production
-//                   destination_kind is set by the EXTENSION based
-//                   on the paste TARGET, not the content's file
-//                   origin — so a corpus drawn from disk and then
-//                   replayed needs an external prior on where those
-//                   pastes would go. The shipped distribution is:
+//     distribution. The agent's production
+//     destination_kind is set by the EXTENSION based
+//     on the paste TARGET, not the content's file
+//     origin — so a corpus drawn from disk and then
+//     replayed needs an external prior on where those
+//     pastes would go. The shipped distribution is:
 //
-//                       40%  ai_chat        (chat.openai.com, claude.ai, …)
-//                       30%  code_host      (github.com, gitlab.com, …)
-//                       20%  ai_code        (copilot.microsoft.com, cursor.com)
-//                       10%  ai_chat + element_kind=network_body
-//                            (programmatic exfil into an AI chat session)
+//     40%  ai_chat        (chat.openai.com, claude.ai, …)
+//     30%  code_host      (github.com, gitlab.com, …)
+//     20%  ai_code        (copilot.microsoft.com, cursor.com)
+//     10%  ai_chat + element_kind=network_body
+//     (programmatic exfil into an AI chat session)
 //
-//                   These weights are an educated estimate of where
-//                   a real engineering team's "paste this content
-//                   somewhere" actions land — they should be tuned
-//                   against telemetry once the agent has any. Until
-//                   then the realistic mix's headline number is
-//                   "an FP-reduction reality check," not a precise
-//                   production simulation.
+//     These weights are an educated estimate of where
+//     a real engineering team's "paste this content
+//     somewhere" actions land — they should be tuned
+//     against telemetry once the agent has any. Until
+//     then the realistic mix's headline number is
+//     "an FP-reduction reality check," not a precise
+//     production simulation.
 func synthSource(path string, mix string, rng *rand.Rand) dlp.SourceContext {
 	pathHint := classifyPath(path)
 	if mix == "worst" {

@@ -3,14 +3,14 @@
 //
 // The updater is intentionally minimal:
 //
-//   1. CheckLatest() fetches a JSON manifest at ManifestURL and
-//      returns (latest version string, download URL, expected SHA256,
-//      expected Ed25519 signature) for the running platform.
-//   2. DownloadAndStage(latest) downloads the binary into Dir, verifies
-//      the SHA256 and Ed25519 signature against PublicKey, and stages
-//      the new binary alongside the current one. The actual swap is
-//      left to a thin platform-specific bootstrapper invoked at
-//      restart — the updater never modifies a running binary.
+//  1. CheckLatest() fetches a JSON manifest at ManifestURL and
+//     returns (latest version string, download URL, expected SHA256,
+//     expected Ed25519 signature) for the running platform.
+//  2. DownloadAndStage(latest) downloads the binary into Dir, verifies
+//     the SHA256 and Ed25519 signature against PublicKey, and stages
+//     the new binary alongside the current one. The actual swap is
+//     left to a thin platform-specific bootstrapper invoked at
+//     restart — the updater never modifies a running binary.
 //
 // Privacy invariant: the updater speaks only to the configured
 // ManifestURL host (default github.com / api.github.com). No telemetry
@@ -36,10 +36,10 @@ import (
 
 // CheckResult is the outcome of a manifest poll.
 type CheckResult struct {
-	Latest        string `json:"latest"`
-	Current       string `json:"current"`
-	UpdateAvailable bool `json:"update_available"`
-	DownloadURL   string `json:"download_url,omitempty"`
+	Latest          string `json:"latest"`
+	Current         string `json:"current"`
+	UpdateAvailable bool   `json:"update_available"`
+	DownloadURL     string `json:"download_url,omitempty"`
 }
 
 // StageResult is the outcome of a download+verify cycle.

@@ -14,7 +14,8 @@ import (
 // full Pipeline and reports precision / recall / F1 / FP rate.
 //
 // Run with -v to see the breakdown:
-//   go test ./internal/dlp -run TestFPCorpus -v
+//
+//	go test ./internal/dlp -run TestFPCorpus -v
 //
 // CI-gate this test (and tighten the thresholds) once the launch-day
 // pattern set is frozen. For now the failure criteria are conservative

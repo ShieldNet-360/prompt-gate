@@ -45,4 +45,3 @@ func proxyCheckEnv(expected string) bool {
 	}
 	return false
 }
-

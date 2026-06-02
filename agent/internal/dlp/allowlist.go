@@ -267,8 +267,8 @@ func (a *Allowlist) reload(ctx context.Context) error {
 	fresh := make(map[string]allowlistRow)
 	for rows.Next() {
 		var (
-			key    string
-			r      allowlistRow
+			key string
+			r   allowlistRow
 		)
 		if err := rows.Scan(&key, &r.scope, &r.patternName, &r.expiresAt, &r.createdAt); err != nil {
 			return err

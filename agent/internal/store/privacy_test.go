@@ -125,11 +125,11 @@ func TestPrivacy_DLPScanContentNotPersisted(t *testing.T) {
 		blocked bool
 	}
 	scans := []scan{
-		{"AKIA9P2QRMZNL5CVXBT4", true}, // AWS access key (TP)
-		{"ghp_9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e", true},          // GitHub PAT
-		{"sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", true},      // OpenAI key
-		{"sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123", true},        // Anthropic
-		{"AIzaSyD9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3D", true},          // Google API
+		{"AKIA9P2QRMZNL5CVXBT4", true},                         // AWS access key (TP)
+		{"ghp_9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e", true},     // GitHub PAT
+		{"sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", true}, // OpenAI key
+		{"sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123", true},  // Anthropic
+		{"AIzaSyD9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3D", true},    // Google API
 		{"mongodb+srv://svc:Ub3rH4rdProdSecret42@cluster0.mongodb.net", true},
 		{"benign string with no secrets", false},
 		{"package com.example; // import statement", false},

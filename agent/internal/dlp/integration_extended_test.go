@@ -15,8 +15,8 @@ import (
 )
 
 type embeddedSecret struct {
-	label   string
-	secret  string
+	label  string
+	secret string
 	// allowedPatterns is the set of pattern names that may match
 	// secret. Overlapping detectors (e.g. "Password Assignment" and
 	// "Go Password Literal") both legitimately fire on the same
