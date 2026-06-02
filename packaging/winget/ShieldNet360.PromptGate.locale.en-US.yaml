@@ -1,0 +1,25 @@
+PackageIdentifier: ShieldNet360.PromptGate
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: ShieldNet 360
+PublisherUrl: https://github.com/ShieldNet-360
+PublisherSupportUrl: https://github.com/ShieldNet-360/prompt-gate/issues
+PackageName: Prompt Gate
+PackageUrl: https://github.com/ShieldNet-360/prompt-gate
+License: MIT
+LicenseUrl: https://github.com/ShieldNet-360/prompt-gate/blob/main/LICENSE
+ShortDescription: Privacy-first, open-source AI Data Leakage Prevention agent for desktop.
+Description: >-
+  Prompt Gate is a privacy-first, open-source AI Data Leakage Prevention agent.
+  It blocks unauthorized AI tools at DNS, inspects content sent to approved ones,
+  and persists nothing about user activity — only aggregate counters. Includes a
+  Go agent, a browser companion, and an Electron tray.
+Moniker: prompt-gate
+Tags:
+  - dlp
+  - data-loss-prevention
+  - security
+  - privacy
+  - ai-security
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

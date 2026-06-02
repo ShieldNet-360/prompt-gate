@@ -1,0 +1,99 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Gate DLP Companion",
+  "version": "0.1.0",
+  "description": "Intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local Prompt Gate DLP pipeline.",
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "nativeMessaging",
+    "clipboardRead",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "http://127.0.0.1:9191/*",
+    "http://localhost:9191/*"
+  ],
+
+  "background": {
+    "service_worker": "dist/background/service-worker.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "Prompt Gate",
+    "default_popup": "src/popup/popup.html"
+  },
+
+  "options_page": "src/options/options.html",
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/paste-interceptor.js",
+        "dist/content/form-interceptor.js",
+        "dist/content/drag-interceptor.js",
+        "dist/content/clipboard-monitor.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/network-interceptor.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/main-world-network.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ]
+}

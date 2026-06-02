@@ -1,0 +1,104 @@
+site_name: Prompt Gate
+site_description: Open-source, privacy-first AI Data Loss Prevention for desktop.
+site_url: https://shieldnet-360.github.io/prompt-gate/
+repo_url: https://github.com/ShieldNet-360/prompt-gate
+repo_name: ShieldNet-360/prompt-gate
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.path
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+    - header.autohide
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: -apple-system, BlinkMacSystemFont, Inter, Segoe UI, system-ui, sans-serif
+    code: SF Mono, Menlo, JetBrains Mono, monospace
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ShieldNet-360/prompt-gate
+  generator: false
+
+extra_css:
+  - stylesheets/custom.css
+
+nav:
+  - Home: index.md
+  - Get Started:
+    - Installation: installation.md
+    - Quick Start: quickstart.md
+    - Install Guide: admin-guide.md
+  - User Guide: user-guide.md
+  - Authoring:
+    - DLP Patterns: dlp-pattern-authoring-guide.md
+    - Rule Contributions: rule-contribution-guide.md
+  - Foundations:
+    - Whitepaper & Math: whitepaper.md
+    - Reproducible Builds: reproducible-builds.md
+  - Engineering Reports:
+    - Test & QA: reports/qa.md
+    - Performance & Stress: reports/performance.md
+    - Security: reports/security.md
+  - Releases:
+    - Verifying Releases: verifying-releases.md
+    - Release Process: release-process.md
+  - Project:
+    - Roadmap: https://github.com/ShieldNet-360/prompt-gate/blob/main/ROADMAP.md
+    - Governance: https://github.com/ShieldNet-360/prompt-gate/blob/main/GOVERNANCE.md
+    - Support: https://github.com/ShieldNet-360/prompt-gate/blob/main/SUPPORT.md
+    - Contributing: https://github.com/ShieldNet-360/prompt-gate/blob/main/CONTRIBUTING.md
+  - Accessibility: accessibility.md

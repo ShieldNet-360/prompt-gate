@@ -1,0 +1,8 @@
+# AI tools requiring DLP inspection (Tier 2).
+# In Phase 1 these are forwarded; DLP inspection lands in Phase 2.
+.chat.openai.com
+.chatgpt.com
+.api.openai.com
+.claude.ai
+.gemini.google.com
+.copilot.microsoft.com

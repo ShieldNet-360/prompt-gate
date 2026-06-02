@@ -1,0 +1,37 @@
+# Common
+build/
+dist/
+
+# Go agent build artefacts
+agent/prompt-gate-agent
+agent/dlp-bench
+agent/prompt-gate
+agent/prompt-gate.db
+agent/prompt-gate.db-shm
+agent/prompt-gate.db-wal
+agent/coverage.out
+agent/cmd/agent/agent
+agent/rules
+
+# Runtime-managed admin override files (populated by the agent's
+# OverrideStore; not for source control).
+rules/local/
+
+# Electron build artefacts
+electron/dist/
+electron/node_modules/
+electron/release/
+
+# Browser extension build artefacts
+extension/dist/
+extension/node_modules/
+extension/dist-firefox/
+extension/dist-safari/
+prompt-gate.db
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+landing/screenshots/upload-server.py

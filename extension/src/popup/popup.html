@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Prompt Gate</title>
+    <style>
+        body { font: 13px/1.4 system-ui, sans-serif; padding: 12px 14px; min-width: 240px; }
+        h1 { font-size: 14px; margin: 0 0 8px 0; }
+        .row { display: flex; justify-content: space-between; margin: 4px 0; }
+        .ok { color: #15803d; }
+        .bad { color: #b91c1c; }
+        small { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <h1>Prompt Gate</h1>
+    <div class="row">
+        <span>Agent</span>
+        <span id="agent-status" class="bad">checking…</span>
+    </div>
+    <div class="row">
+        <span>Version</span>
+        <span id="agent-version">—</span>
+    </div>
+    <div class="row">
+        <span>Uptime</span>
+        <span id="agent-uptime">—</span>
+    </div>
+    <small>Pastes into approved AI tools are scanned by the local agent (127.0.0.1).</small>
+    <script type="module" src="../../dist/popup/popup.js"></script>
+</body>
+</html>

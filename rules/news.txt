@@ -1,0 +1,33 @@
+# Popular news domains. Default action: "allow". Flip to "deny" in
+# Settings to block news at the DNS level.
+# Leading "." matches the apex domain and all subdomains.
+.cnn.com
+.bbc.co.uk
+.bbc.com
+.reuters.com
+.nytimes.com
+.theguardian.com
+.washingtonpost.com
+.wsj.com
+.bloomberg.com
+.ft.com
+.apnews.com
+.npr.org
+.aljazeera.com
+.foxnews.com
+.cnbc.com
+.cbsnews.com
+.nbcnews.com
+.abcnews.go.com
+.usatoday.com
+.economist.com
+.huffpost.com
+.politico.com
+.axios.com
+.vox.com
+.theatlantic.com
+.newyorker.com
+.dw.com
+.france24.com
+.scmp.com
+.thehindu.com

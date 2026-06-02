@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Prompt Gate — Options</title>
+<style>
+    body { font-family: system-ui, sans-serif; margin: 20px; max-width: 480px; color: #111; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    .muted { color: #555; font-size: 12px; margin-bottom: 16px; }
+    .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid #eee; }
+    .row:first-of-type { border-top: 0; }
+    .row label { flex: 1; margin-right: 12px; }
+    .row .desc { font-size: 12px; color: #555; }
+    .status { font-family: monospace; font-size: 12px; padding-top: 4px; }
+    .status.ok { color: #0a0; }
+    .status.bad { color: #b00; }
+</style>
+</head>
+<body>
+<h1>Prompt Gate — Options</h1>
+<div class="muted">All scans stay on this machine. Settings are stored locally and never sent anywhere.</div>
+
+<section>
+    <div class="row">
+        <div>
+            <label for="opt-verbose">Verbose toast notifications</label>
+            <div class="desc">Show an info toast whenever a paste is allowed (default: off).</div>
+        </div>
+        <input id="opt-verbose" type="checkbox" />
+    </div>
+    <div class="row">
+        <div>
+            <label for="opt-clipboard">Clipboard monitor</label>
+            <div class="desc">Pre-scan clipboard contents when an AI tool tab gains focus.
+            Requires the browser's clipboard read permission (default: off).</div>
+        </div>
+        <input id="opt-clipboard" type="checkbox" />
+    </div>
+</section>
+
+<h2 style="font-size:14px;margin-top:18px;">Connection</h2>
+<div class="status" id="conn-status">checking…</div>
+<div class="status muted" id="conn-version">version: —</div>
+<div class="status muted" id="conn-rules">rules: —</div>
+
+<script type="module" src="options.js"></script>
+</body>
+</html>

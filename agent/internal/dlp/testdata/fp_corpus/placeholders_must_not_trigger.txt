@@ -1,0 +1,45 @@
+# Template placeholders — MUST NOT block.
+
+# Bracket templates
+<YOUR_API_KEY>
+<YOUR_AWS_KEY>
+<INSERT_HERE>
+<your-secret>
+<API_KEY>
+<TOKEN>
+
+# Interpolation syntax
+${API_KEY}
+${AWS_SECRET}
+{{api_key}}
+{{user_token}}
+
+# "your-X-here" / marker phrases
+your-secret-key-here
+YOUR_API_KEY_HERE
+insert-your-token-here
+REPLACE_ME_BEFORE_DEPLOY
+example-aws-key-here
+sample_aws_secret
+PLACEHOLDER_TOKEN
+
+# Code-block placeholders (typical README examples)
+const AWS_KEY = "<YOUR_AWS_KEY>"
+const STRIPE_KEY = "sk_test_xxxxxxxxxxxxxxxxxxxxxxxx"
+password = "your-secret-here"
+api_key = "INSERT_YOUR_KEY"
+api_key = "REPLACE_WITH_YOUR_KEY"
+LINEAR_API_KEY=lin_api_REPLACE_WITH_YOUR_LINEAR_API_KEY
+Authorization: Bearer lin_oauth_REPLACE_WITH_YOUR_LINEAR_OAUTH_TOKEN
+
+# Mask characters
+xxxxxxxxxxxxxxxxxxxx
+XXXXXXXXXXXXXXXXXXXX
+**********
+####################
+
+# TODO / FIXME markers
+TODO_replace_with_real_key
+fixme_set_aws_secret
+REDACTED
+[REDACTED]

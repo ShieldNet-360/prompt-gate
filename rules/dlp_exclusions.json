@@ -1,0 +1,1245 @@
+{
+  "exclusions": [
+    {
+      "applies_to": "*",
+      "type": "dictionary",
+      "words": [
+        "placeholder",
+        "example",
+        "test",
+        "dummy",
+        "sample",
+        "xxx",
+        "your-",
+        "your_",
+        "fake",
+        "redacted",
+        "<redacted>",
+        "CHANGEME",
+        "TODO",
+        "documentation",
+        "tutorial",
+        "mock"
+      ],
+      "window": 50,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "AWS Access Key",
+      "type": "dictionary",
+      "words": [
+        "AKIAIOSFODNN7EXAMPLE",
+        "AKIA1234567890123456"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "AWS Secret Access Key",
+      "type": "regex",
+      "pattern": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "suppress": true
+    },
+    {
+      "applies_to": "AWS Session Token",
+      "type": "dictionary",
+      "words": [
+        "EXAMPLE",
+        "FAKE",
+        "PLACEHOLDER"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "AWS ARN",
+      "type": "regex",
+      "pattern": "arn:aws:[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:(000000000000|111111111111|123456789012|999999999999):"
+    },
+    {
+      "applies_to": "Azure Storage Account Key",
+      "type": "dictionary",
+      "words": [
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+        "EXAMPLE_ACCOUNT_KEY_BASE64_PADDED_TO_88_CHARS_FOR_LOCAL_TESTING_PURPOSES_ONLY_AAAA=="
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Azure Connection String",
+      "type": "regex",
+      "pattern": "AccountName=(devstoreaccount1|examplestorage|teststorage)"
+    },
+    {
+      "applies_to": "Azure SAS Token",
+      "type": "dictionary",
+      "words": [
+        "EXAMPLE_SAS_SIGNATURE",
+        "documentation",
+        "tutorial"
+      ],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Azure Subscription ID",
+      "type": "dictionary",
+      "words": [
+        "00000000-0000-0000-0000-000000000000",
+        "11111111-1111-1111-1111-111111111111",
+        "12345678-1234-1234-1234-123456789012",
+        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "GCP Service Account Key",
+      "type": "dictionary",
+      "words": [
+        "example",
+        "demo-project",
+        "test-project"
+      ],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "GCP OAuth Client Secret",
+      "type": "dictionary",
+      "words": [
+        "GOCSPX-EXAMPLEEXAMPLEEXAMPLEEX"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Firebase Cloud Messaging Server Key",
+      "type": "dictionary",
+      "words": [
+        "AAAAEXAMPLE",
+        "documentation"
+      ],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "GitHub Personal Access Token",
+      "type": "dictionary",
+      "words": [
+        "ghp_000000000000000000000000000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Stripe Live Secret Key",
+      "type": "regex",
+      "pattern": "sk_live_(4242424242424242|0000000000000000|EXAMPLE)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Stripe Restricted Key",
+      "type": "regex",
+      "pattern": "rk_live_(0000000000000000|EXAMPLE)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Twilio Account SID",
+      "type": "regex",
+      "pattern": "AC(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    },
+    {
+      "applies_to": "Twilio API Key",
+      "type": "regex",
+      "pattern": "SK(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    },
+    {
+      "applies_to": "SendGrid API Key",
+      "type": "regex",
+      "pattern": "SG\\.(EXAMPLE|TEST|DEMO|TUTORIAL)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Mailchimp API Key",
+      "type": "regex",
+      "pattern": "(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)-us[0-9]{1,2}"
+    },
+    {
+      "applies_to": "npm Token",
+      "type": "regex",
+      "pattern": "npm_(0{36}|EXAMPLE[A-Za-z0-9]*)",
+      "suppress": true
+    },
+    {
+      "applies_to": "PyPI API Token",
+      "type": "regex",
+      "pattern": "pypi-(EXAMPLE|AgEIcHlwaS5vcmcCJDI[A-Za-z0-9_\\-]*)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Heroku API Key",
+      "type": "dictionary",
+      "words": [
+        "00000000-0000-0000-0000-000000000000",
+        "11111111-1111-1111-1111-111111111111",
+        "12345678-1234-1234-1234-123456789012"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "JWT Token",
+      "type": "regex",
+      "pattern": "eyJhbGciOiJub25lIg|eyJ0eXAiOiJKV1Q[A-Za-z0-9_\\-]*\\.eyJzdWIiOiIxMjM0NTY3ODkwIg"
+    },
+    {
+      "applies_to": "Database Connection String",
+      "type": "regex",
+      "pattern": "(?i)://[^/@\\s]*@?(localhost|127\\.0\\.0\\.1|::1|0\\.0\\.0\\.0|example\\.com|example\\.org|example\\.net)"
+    },
+    {
+      "applies_to": "Password Assignment",
+      "type": "dictionary",
+      "words": [
+        "example",
+        "test",
+        "placeholder",
+        "your-password",
+        "your_password",
+        "CHANGEME"
+      ],
+      "window": 50,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "HashiCorp Vault Token",
+      "type": "dictionary",
+      "words": [
+        "hvs.EXAMPLE",
+        "hvb.EXAMPLE"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Datadog API Key",
+      "type": "regex",
+      "pattern": "(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    },
+    {
+      "applies_to": "Email Addresses (bulk)",
+      "type": "regex",
+      "pattern": "@(example\\.com|example\\.org|example\\.net|test\\.com|localhost|mailinator\\.com|invalid)"
+    },
+    {
+      "applies_to": "US Social Security Number",
+      "type": "dictionary",
+      "words": [
+        "000-00-0000",
+        "123-45-6789",
+        "111-11-1111",
+        "999-99-9999"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Credit Card Number",
+      "type": "dictionary",
+      "words": [
+        "4111111111111111",
+        "4242424242424242",
+        "5555555555554444",
+        "378282246310005"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Phone Numbers (bulk, US)",
+      "type": "regex",
+      "pattern": "555-?01[0-9]{2}"
+    },
+    {
+      "applies_to": "*",
+      "type": "dictionary",
+      "words": [
+        "your-api-key-here",
+        "your_api_key_here",
+        "INSERT_TOKEN_HERE",
+        "INSERT_KEY_HERE",
+        "REPLACE_ME",
+        "FIXME",
+        "TBD",
+        "lorem",
+        "ipsum",
+        "password123",
+        "letmein",
+        "admin",
+        "root",
+        "stub_",
+        "fake_",
+        "dummy_",
+        "mock_",
+        "test_",
+        "demo_",
+        "example_",
+        "your-org",
+        "your-project",
+        "your-tenant",
+        "AcmeCorp",
+        "ExampleCorp",
+        "ExampleApp",
+        "00000000",
+        "11111111",
+        "deadbeef",
+        "cafebabe",
+        "secret-placeholder",
+        "REDACTED"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "*",
+      "type": "regex",
+      "pattern": "(?i)\\b(?:example|test|invalid|localhost|local)\\.(?:com|net|org|local|test)\\b"
+    },
+    {
+      "applies_to": "JDBC PostgreSQL URL with Password",
+      "type": "regex",
+      "pattern": "(?i)://[^/@\\s]*@?(?:localhost|127\\.0\\.0\\.1|::1|example\\.com|test\\.com)"
+    },
+    {
+      "applies_to": "JDBC MySQL URL with Password",
+      "type": "regex",
+      "pattern": "(?i)://[^/@\\s]*@?(?:localhost|127\\.0\\.0\\.1|::1|example\\.com|test\\.com)"
+    },
+    {
+      "applies_to": "JDBC Oracle URL with Password",
+      "type": "regex",
+      "pattern": "(?i)@(?:localhost|127\\.0\\.0\\.1|test|example)"
+    },
+    {
+      "applies_to": "JDBC SQL Server URL with Password",
+      "type": "regex",
+      "pattern": "(?i)://(?:localhost|127\\.0\\.0\\.1|::1|example\\.com)"
+    },
+    {
+      "applies_to": "Spring Datasource Password",
+      "type": "dictionary",
+      "words": [
+        "secret",
+        "changeme",
+        "password",
+        "your-password",
+        "${DB_PASSWORD}",
+        "${DATABASE_PASSWORD}",
+        "${SPRING_DATASOURCE_PASSWORD}"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Spring OAuth2 Client Secret",
+      "type": "dictionary",
+      "words": [
+        "${OAUTH_CLIENT_SECRET}",
+        "${CLIENT_SECRET}",
+        "changeme",
+        "secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Java Keystore Password",
+      "type": "dictionary",
+      "words": [
+        "changeit",
+        "changeme",
+        "password"
+      ],
+      "match_type": "proximity",
+      "window": 50
+    },
+    {
+      "applies_to": "AWS Java SDK BasicAWSCredentials",
+      "type": "regex",
+      "pattern": "BasicAWSCredentials\\s*\\(\\s*['\\\"]AKIAIOSFODNN7EXAMPLE",
+      "suppress": true
+    },
+    {
+      "applies_to": "Maven Settings Password",
+      "type": "regex",
+      "pattern": "<password>(?:CHANGEME|changeit|password|your_password|\\$\\{[^}]+\\})</password>"
+    },
+    {
+      "applies_to": "Gradle Repository Credentials",
+      "type": "dictionary",
+      "words": [
+        "mavenLocal",
+        "// example",
+        "// TODO",
+        "your_password"
+      ],
+      "match_type": "proximity",
+      "window": 200
+    },
+    {
+      "applies_to": "Cargo Registry Token",
+      "type": "dictionary",
+      "words": [
+        "00000000000000000000000000000000",
+        "REDACTED",
+        "your-token-here",
+        "<your-token>"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Rocket.toml Secret Key",
+      "type": "dictionary",
+      "words": [
+        "hPRYyVRiMyxpw5sBB1XeCMN1kFsDCqKvBi2QJxBVHQk=",
+        "00000000000000000000000000000000000000000000",
+        "test_secret_key"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Firebase Web Config apiKey",
+      "type": "regex",
+      "pattern": "AIza[A-Za-z0-9_\\-]*(?:EXAMPL|XXX|TEST|DEMO|DummyKey|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "React App Environment Secret",
+      "type": "dictionary",
+      "words": [
+        "dotenv",
+        "// .env.example",
+        ".env.example",
+        "your-api-key"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Next.js Public Environment Secret",
+      "type": "dictionary",
+      "words": [
+        ".env.example",
+        "your-api-key",
+        "<INSERT KEY>"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Vite Environment Secret",
+      "type": "dictionary",
+      "words": [
+        ".env.example",
+        "your-api-key",
+        "VITE_API_KEY=your"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Angular Environment Secret",
+      "type": "dictionary",
+      "words": [
+        "environment.example.ts",
+        "your-key",
+        "TODO"
+      ],
+      "match_type": "proximity",
+      "window": 200
+    },
+    {
+      "applies_to": "Webpack DefinePlugin Secret",
+      "type": "dictionary",
+      "words": [
+        "JSON.stringify(process.env.",
+        "// example"
+      ],
+      "match_type": "proximity",
+      "window": 200
+    },
+    {
+      "applies_to": "Tauri Signing Private Key",
+      "type": "dictionary",
+      "words": [
+        "<your tauri signing private key>",
+        "EXAMPLE",
+        "REDACTED",
+        "${TAURI_SIGNING_PRIVATE_KEY}"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Electron Forge Publish Token",
+      "type": "dictionary",
+      "words": [
+        "${GITHUB_TOKEN}",
+        "${SNAPCRAFT_TOKEN}",
+        "your-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Electron Builder Publish Credentials",
+      "type": "dictionary",
+      "words": [
+        "${GH_TOKEN}",
+        "${BT_TOKEN}",
+        "${KEYGEN_TOKEN}",
+        "your-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "OpenAI Project API Key",
+      "type": "regex",
+      "pattern": "sk-proj-(?:EXAMPLE|TEST|XXX|YYY|DEMO|TUTORIAL|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "OpenAI Service Account Key",
+      "type": "regex",
+      "pattern": "sk-svcacct-(?:EXAMPLE|TEST|XXX|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "OpenAI User API Key",
+      "type": "regex",
+      "pattern": "sk-(?:EXAMPLE[A-Za-z0-9]*T3BlbkFJ|0{20,}T3BlbkFJ0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Anthropic API Key",
+      "type": "regex",
+      "pattern": "sk-ant-api03-(?:EXAMPLE|TEST|XXX|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "HuggingFace Access Token",
+      "type": "regex",
+      "pattern": "hf_(?:EXAMPLE|TEST|XXX|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Cohere API Key",
+      "type": "dictionary",
+      "words": [
+        "EXAMPLE",
+        "your-cohere-key",
+        "demo"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Replicate API Token",
+      "type": "regex",
+      "pattern": "r8_(?:EXAMPLE|TEST|XXX|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Pinecone API Key",
+      "type": "dictionary",
+      "words": [
+        "00000000-0000-0000-0000-000000000000",
+        "your-pinecone-key"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Mistral API Key",
+      "type": "dictionary",
+      "words": [
+        "EXAMPLE",
+        "your-mistral-key"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Weights and Biases API Key",
+      "type": "dictionary",
+      "words": [
+        "0000000000000000000000000000000000000000",
+        "abcdef0123456789abcdef0123456789abcdef01"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "LangSmith API Key",
+      "type": "regex",
+      "pattern": "lsv2_(?:pt|sk)_EXAMPLE[A-Za-z0-9_]*",
+      "suppress": true
+    },
+    {
+      "applies_to": "Together AI API Key",
+      "type": "dictionary",
+      "words": [
+        "EXAMPLE",
+        "your-together-key"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Groq API Key",
+      "type": "regex",
+      "pattern": "gsk_(?:EXAMPLE|TEST|XXX|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Apple App Store Connect API Key ID",
+      "type": "regex",
+      "pattern": "key_id\\s*[:=]\\s*['\\\"]?(?:EXAMPLEXXX|XXXXXXXXXX|0{10}|ABCDEFGHIJ)['\\\"]?",
+      "suppress": true
+    },
+    {
+      "applies_to": "Apple Developer Team ID",
+      "type": "regex",
+      "pattern": "['\\\"]?(?:0{10}|XXXXXXXXXX|ABCDEFGHIJ|EXAMPLETEAM)['\\\"]?",
+      "suppress": true
+    },
+    {
+      "applies_to": "Cocoapods Trunk Token",
+      "type": "dictionary",
+      "words": [
+        "${COCOAPODS_TRUNK_TOKEN}",
+        "your-token",
+        "EXAMPLE"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Xcode Cloud Secret",
+      "type": "dictionary",
+      "words": [
+        "${XCODE_CLOUD_SECRET}",
+        "your-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Apple APNs Auth Key Filename",
+      "type": "regex",
+      "pattern": "AuthKey_(?:EXAMPLE12|XXXXXXXXXX|0{10})\\.p8",
+      "suppress": true
+    },
+    {
+      "applies_to": "Google Services JSON API Key",
+      "type": "regex",
+      "pattern": "\\\"current_key\\\"\\s*:\\s*\\\"AIza(?:EXAMPLE|0{30,}|SyA[A-Z]{34}EXAMPLE)\\\"",
+      "suppress": true
+    },
+    {
+      "applies_to": "Android Signing Store Password",
+      "type": "dictionary",
+      "words": [
+        "yourStorePassword",
+        "changeit",
+        "android",
+        "your_keystore_password"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Play Console Service Account JSON",
+      "type": "dictionary",
+      "words": [
+        "demo-project",
+        "example-project",
+        "test-project"
+      ],
+      "match_type": "proximity",
+      "window": 300
+    },
+    {
+      "applies_to": "Firebase App Distribution Token",
+      "type": "dictionary",
+      "words": [
+        "${FIREBASE_TOKEN}",
+        "your-firebase-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Android Maps API Key in local.properties",
+      "type": "regex",
+      "pattern": "MAPS_API_KEY\\s*=\\s*['\\\"]?AIza(?:EXAMPLE|0{30,}|SyA[A-Z]{34}EXAMPLE)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Expo Access Token",
+      "type": "dictionary",
+      "words": [
+        "${EXPO_TOKEN}",
+        "your-expo-token",
+        "EXAMPLE"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "React Native CodePush Deployment Key",
+      "type": "dictionary",
+      "words": [
+        "YOUR_DEPLOYMENT_KEY_HERE",
+        "0000000000000000000000000000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Fastlane Match Password",
+      "type": "dictionary",
+      "words": [
+        "${MATCH_PASSWORD}",
+        "your-match-password"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "EAS Build Secret",
+      "type": "dictionary",
+      "words": [
+        "${EAS_SECRET}",
+        "your-eas-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Flutter Dart Environment Secret",
+      "type": "dictionary",
+      "words": [
+        "YOUR_API_KEY",
+        "your_api_key",
+        "EXAMPLE"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "MongoDB Atlas SRV Connection",
+      "type": "regex",
+      "pattern": "mongodb\\+srv://(?:user|admin|root|<username>|YOUR_USERNAME):(?:password|<password>|YOUR_PASSWORD)@"
+    },
+    {
+      "applies_to": "MSSQL Connection String with Password",
+      "type": "regex",
+      "pattern": "(?i)(?:Data Source|Server)=(?:localhost|\\(local\\)|\\.|127\\.0\\.0\\.1|example)"
+    },
+    {
+      "applies_to": "Redis URL with Password",
+      "type": "regex",
+      "pattern": "rediss?://(?:user|default|:password|<password>):.*@(?:localhost|127\\.0\\.0\\.1|example)"
+    },
+    {
+      "applies_to": "SQLite PRAGMA Encryption Key",
+      "type": "dictionary",
+      "words": [
+        "your-key",
+        "test_key",
+        "example_key"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Cassandra Auth Provider Credentials",
+      "type": "dictionary",
+      "words": [
+        "cassandra",
+        "username",
+        "your_password"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "Elasticsearch URL with Credentials",
+      "type": "regex",
+      "pattern": "https?://(?:user|elastic|admin):(?:password|<password>|changeme)@(?:localhost|127\\.0\\.0\\.1|example)"
+    },
+    {
+      "applies_to": "Terraform State Sensitive Value",
+      "type": "dictionary",
+      "words": [
+        "example",
+        "demo",
+        "documentation"
+      ],
+      "match_type": "proximity",
+      "window": 300
+    },
+    {
+      "applies_to": "Kubernetes Secret YAML",
+      "type": "dictionary",
+      "words": [
+        "# example",
+        "# documentation",
+        "stringData: # example",
+        "data: # example"
+      ],
+      "match_type": "proximity",
+      "window": 400
+    },
+    {
+      "applies_to": "Docker Registry Auth",
+      "type": "regex",
+      "pattern": "\\\"auth\\\"\\s*:\\s*\\\"(?:EXAMPLE|dXNlcjpwYXNz|dGVzdDp0ZXN0)",
+      "suppress": true
+    },
+    {
+      "applies_to": "Helm Values Password",
+      "type": "dictionary",
+      "words": [
+        "changeme",
+        "yourpassword",
+        "example",
+        "documentation"
+      ],
+      "match_type": "proximity",
+      "window": 200
+    },
+    {
+      "applies_to": "Pulumi Stack Config Secret",
+      "type": "regex",
+      "pattern": "secure:v1:(?:EXAMPLE|TEST|REDACTED|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Cloudflare API Token",
+      "type": "dictionary",
+      "words": [
+        "${CLOUDFLARE_API_TOKEN}",
+        "your-token",
+        "EXAMPLE"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "DigitalOcean Personal Access Token",
+      "type": "regex",
+      "pattern": "dop_v1_(?:0{60,}|[df]{60,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "DigitalOcean OAuth Token",
+      "type": "regex",
+      "pattern": "doo_v1_(?:0{60,}|[df]{60,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Vercel Token",
+      "type": "dictionary",
+      "words": [
+        "${VERCEL_TOKEN}",
+        "your-vercel-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Netlify Personal Access Token",
+      "type": "regex",
+      "pattern": "nfp_(?:EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Supabase Service Role Key",
+      "type": "regex",
+      "pattern": "sbp_(?:EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "CircleCI Personal Token",
+      "type": "regex",
+      "pattern": "['\\\"]?(?:0{40}|[a-f]{40})['\\\"]?"
+    },
+    {
+      "applies_to": "Travis CI Token",
+      "type": "dictionary",
+      "words": [
+        "${TRAVIS_API_TOKEN}",
+        "your-travis-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Bitbucket App Password",
+      "type": "dictionary",
+      "words": [
+        "${BITBUCKET_APP_PASSWORD}",
+        "your-bitbucket-app-password"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Bitbucket Server Token (BBDC)",
+      "type": "regex",
+      "pattern": "BBDC-(?:EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Jenkins API Token",
+      "type": "dictionary",
+      "words": [
+        "${JENKINS_TOKEN}",
+        "your-jenkins-token"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "GitLab CI Pipeline Trigger Token",
+      "type": "regex",
+      "pattern": "glptt-(?:EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "*",
+      "type": "regex",
+      "pattern": "\\$\\{\\{\\s*secrets\\.[A-Z0-9_]+\\s*\\}\\}",
+      "suppress": true
+    },
+    {
+      "applies_to": "Discord Bot Token",
+      "type": "regex",
+      "pattern": "[MN][A-Za-z\\d]{23,28}\\.[A-Za-z\\d_\\-]{6,7}\\.(?:EXAMPLE|XXX|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Discord Webhook URL",
+      "type": "regex",
+      "pattern": "https://discord\\.com/api/webhooks/0+/(?:EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Telegram Bot Token",
+      "type": "regex",
+      "pattern": "\\b(?:1234567890|0{10}):(?:AAEXAMPLE|EXAMPLE|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Vonage Nexmo API Secret",
+      "type": "dictionary",
+      "words": [
+        "${VONAGE_API_SECRET}",
+        "your-vonage-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "PayPal Client Secret",
+      "type": "dictionary",
+      "words": [
+        "${PAYPAL_CLIENT_SECRET}",
+        "your-paypal-secret",
+        "EExampleClientSecret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Square Access Token",
+      "type": "regex",
+      "pattern": "sq0atp-(?:EXAMPLE|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Square OAuth Secret",
+      "type": "regex",
+      "pattern": "sq0csp-(?:EXAMPLE|0{40,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Braintree Access Token",
+      "type": "regex",
+      "pattern": "access_token\\$production\\$(?:examplemerchant|0{16})\\$"
+    },
+    {
+      "applies_to": "Adyen API Key",
+      "type": "regex",
+      "pattern": "AQE(?:EXAMPLE|0{60,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Plaid Client Secret",
+      "type": "dictionary",
+      "words": [
+        "${PLAID_SECRET}",
+        "your-plaid-secret",
+        "0000000000000000000000000000ab"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Coinbase Commerce API Key",
+      "type": "dictionary",
+      "words": [
+        "${COINBASE_COMMERCE_API_KEY}",
+        "00000000-0000-0000-0000-000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Auth0 Client Secret",
+      "type": "dictionary",
+      "words": [
+        "${AUTH0_CLIENT_SECRET}",
+        "your-auth0-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Okta API Token",
+      "type": "regex",
+      "pattern": "00(?:EXAMPLE[A-Za-z0-9_\\-]*|0{36}|[a-f0-9]{36})",
+      "suppress": true
+    },
+    {
+      "applies_to": "OneLogin API Credentials",
+      "type": "dictionary",
+      "words": [
+        "${ONELOGIN_CLIENT_SECRET}",
+        "your-onelogin-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Keycloak Client Secret",
+      "type": "dictionary",
+      "words": [
+        "${KEYCLOAK_CLIENT_SECRET}",
+        "00000000-0000-0000-0000-000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Firebase Admin SDK Private Key",
+      "type": "dictionary",
+      "words": [
+        "demo-project",
+        "example-project",
+        "test-project"
+      ],
+      "match_type": "proximity",
+      "window": 500
+    },
+    {
+      "applies_to": "Supabase JWT Secret",
+      "type": "dictionary",
+      "words": [
+        "${SUPABASE_JWT_SECRET}",
+        "your-supabase-jwt-secret"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Clerk Secret Key",
+      "type": "regex",
+      "pattern": "sk_(?:live|test)_(?:EXAMPLE|XXX|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Clerk Publishable Key",
+      "type": "regex",
+      "pattern": "pk_(?:live|test)_(?:EXAMPLE|XXX|0{30,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Java Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Rust Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Go Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Swift Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Kotlin Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Dart Password Literal",
+      "type": "dictionary",
+      "words": [
+        "your-password",
+        "your_password",
+        "<password>",
+        "// example only",
+        "/* example only",
+        "EXAMPLE_PASSWORD",
+        "PLACEHOLDER_PASSWORD"
+      ],
+      "match_type": "proximity",
+      "window": 80
+    },
+    {
+      "applies_to": "Python Secret Key Literal",
+      "type": "dictionary",
+      "words": [
+        "django-insecure-",
+        "your-secret-key-here",
+        "your_secret_key_here",
+        "settings.example",
+        "# example",
+        "# changeme"
+      ],
+      "match_type": "proximity",
+      "window": 100
+    },
+    {
+      "applies_to": "*",
+      "type": "regex",
+      "pattern": "^\\s*(?:import|from|require|use\\s+|using\\s+)[^=\\n]+$"
+    },
+    {
+      "applies_to": "*",
+      "type": "regex",
+      "pattern": "^\\s*#\\s*(?:example|placeholder|todo|docs)"
+    },
+    {
+      "applies_to": "Google API Key",
+      "type": "dictionary",
+      "words": [
+        "com.google.android.geo.API_KEY",
+        "manifest"
+      ],
+      "match_type": "proximity",
+      "window": 120
+    },
+    {
+      "applies_to": "Google API Key",
+      "type": "regex",
+      "pattern": "AIza[A-Za-z0-9_\\-]*(?:EXAMPL|XXX|TEST|DEMO|TUTORIAL|FAKE|DummyKey|0{20,})",
+      "suppress": true
+    },
+    {
+      "applies_to": "Terraform Cloud API Token",
+      "type": "dictionary",
+      "words": [
+        "yourtokenhere.atlasv1.example",
+        "EXAMPLE.atlasv1.EXAMPLE"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Spacelift API Key",
+      "type": "dictionary",
+      "words": [
+        "your-spacelift-secret",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "env0 API Key",
+      "type": "dictionary",
+      "words": [
+        "your-env0-secret",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Scalr API Token",
+      "type": "dictionary",
+      "words": [
+        "your-scalr-token",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Harbor Robot Token",
+      "type": "dictionary",
+      "words": [
+        "robot$example",
+        "robot$placeholder"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "RubyGems API Key",
+      "type": "dictionary",
+      "words": [
+        "rubygems_0000000000000000000000000000000000000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "NuGet API Key",
+      "type": "dictionary",
+      "words": [
+        "oy2example",
+        "oy2placeholder"
+      ],
+      "window": 80,
+      "match_type": "proximity"
+    }
+  ]
+}

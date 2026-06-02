@@ -1,0 +1,9 @@
+# Sample social media domains.
+# Default action is "allow"; flip to "deny" in Settings to block.
+.facebook.com
+.instagram.com
+.tiktok.com
+.twitter.com
+.x.com
+.snapchat.com
+.reddit.com

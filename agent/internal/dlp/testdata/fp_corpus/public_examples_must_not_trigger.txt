@@ -1,0 +1,38 @@
+# Public-example entries — MUST NOT block.
+# Comments and blank lines ignored. One entry per line.
+
+# AWS docs canonical examples
+AKIAIOSFODNN7EXAMPLE
+wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+Use AKIAIOSFODNN7EXAMPLE as the AWS docs example access key
+my AWS docs secret is wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+# Stripe test mode
+sk_test_4eC39HqLyjWDarjtT1zdp7dc
+pk_test_TYooMQauvdEDq54NiTphI7jx
+The Stripe test secret is sk_test_4eC39HqLyjWDarjtT1zdp7dc
+Use pk_test_TYooMQauvdEDq54NiTphI7jx for the Stripe test public key
+
+# PCI test card numbers (industry standard)
+4111-1111-1111-1111
+4242 4242 4242 4242
+5555 5555 5555 4444
+378282246310005
+6011111111111117
+test card 4111-1111-1111-1111 (Visa)
+Use 4242 4242 4242 4242 for Stripe testing
+
+# SSN-shape placeholders
+000-00-0000
+123-45-6789
+SSN format 123-45-6789
+SSN format 000-00-0000 (test)
+
+# RFC 4122 documentation UUIDs
+00000000-0000-0000-0000-000000000000
+550e8400-e29b-41d4-a716-446655440000
+The nil UUID is 00000000-0000-0000-0000-000000000000
+Example UUID 550e8400-e29b-41d4-a716-446655440000
+
+# jwt.io canonical example
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c

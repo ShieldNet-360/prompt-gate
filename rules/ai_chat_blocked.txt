@@ -1,0 +1,10 @@
+# Blocked AI chatbot domains (Tier 3).
+# Lines starting with "." match the apex domain and all subdomains.
+.deepseek.com
+.poe.com
+.perplexity.ai
+.you.com
+.phind.com
+.character.ai
+.pi.ai
+.bard.google.com

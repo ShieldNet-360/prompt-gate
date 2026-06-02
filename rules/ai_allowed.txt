@@ -1,0 +1,2 @@
+# Enterprise-approved AI endpoints (Tier 1, pass-through).
+.azure.openai.com

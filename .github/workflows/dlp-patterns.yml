@@ -1,0 +1,56 @@
+name: DLP corpus gate
+
+# Contribution flywheel: any PR that touches DLP patterns, the engine, or the
+# labelled corpus must keep the precision-first invariant — 0 false positives
+# on the *_must_not_trigger corpus, and precision/recall above the floors.
+# This is a focused, fast, clearly-named check so pattern contributors get an
+# obvious green/red signal without reading the full CI log.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rules/dlp_patterns.json'
+      - 'rules/dlp_exclusions.json'
+      - 'agent/internal/dlp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus:
+    name: Precision-first corpus gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Run FP + accuracy corpus
+        working-directory: agent
+        run: |
+          set -o pipefail
+          go test ./internal/dlp/ -run 'TestFPCorpus|TestDLPAccuracyCorpus' -v \
+            | tee /tmp/corpus.log
+
+      - name: Summarise into the job summary
+        if: always()
+        run: |
+          {
+            echo '## DLP corpus gate'
+            echo '```'
+            grep -E 'Precision|Recall|F1|FP rate|Totals|FP \[' /tmp/corpus.log || true
+            echo '```'
+            echo '_The must-not-trigger corpus must stay at 0 false positives. '
+            echo 'Add positive samples to `*_must_trigger.txt` and any safe-looking '
+            echo 'forms to `*_must_not_trigger.txt` when contributing a pattern._'
+          } >> "$GITHUB_STEP_SUMMARY"

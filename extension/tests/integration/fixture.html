@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Prompt Gate integration fixture</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 24px; }
+    textarea { width: 100%; height: 200px; padding: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Mock AI tool</h1>
+  <p>This fixture stands in for the production Tier-2 AI tool host
+  during integration tests. Paste content into the textarea below;
+  the Prompt Gate content script intercepts the paste and routes it
+  through the local agent.</p>
+  <form id="chat">
+    <textarea name="prompt" placeholder="Paste a prompt"></textarea>
+    <button type="submit">Send</button>
+  </form>
+</body>
+</html>

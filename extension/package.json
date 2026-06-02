@@ -1,0 +1,21 @@
+{
+  "name": "prompt-gate-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome Manifest V3 companion extension for Prompt Gate — intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local DLP pipeline.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle-main-world.mjs",
+    "build:firefox": "npm run build && node scripts/build-firefox.mjs",
+    "build:safari": "npm run build && node scripts/build-safari.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --test --import tsx $(find src -path '*/__tests__/*.test.ts' | sort)",
+    "clean": "rm -rf dist dist-firefox dist-safari dist-safari-xcode"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.5"
+  }
+}

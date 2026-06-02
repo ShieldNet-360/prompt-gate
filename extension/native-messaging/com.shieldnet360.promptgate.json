@@ -1,0 +1,9 @@
+{
+  "name": "com.shieldnet360.promptgate",
+  "description": "Prompt Gate DLP companion native messaging host",
+  "path": "/usr/local/bin/prompt-gate-agent",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__REPLACE_WITH_EXTENSION_ID__/"
+  ]
+}

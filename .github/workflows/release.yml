@@ -1,0 +1,374 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-agent:
+    name: Agent (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: windows, goarch: amd64, ext: .exe }
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Build agent
+        working-directory: agent
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist
+          out="dist/prompt-gate-agent-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          # Reproducible build: -trimpath strips local paths, -buildvcs=false
+          # drops the embedded VCS stamp so the binary is a pure function of
+          # (source content + toolchain + GOOS/GOARCH). Anyone can reproduce
+          # it bit-for-bit with scripts/reproduce-agent.sh. The commit is still
+          # bound to the artifact via SLSA provenance (attest-build-provenance).
+          go build -trimpath -buildvcs=false \
+            -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o "$out" ./cmd/agent
+          echo "Built $out"
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: agent/dist/prompt-gate-agent-*
+          if-no-files-found: error
+
+  # Independently rebuilds every agent binary in a clean runner and asserts
+  # the SHA-256 matches what build-agent produced. A green check here is
+  # machine-checkable proof that the published binaries are reproducible from
+  # source alone — the link that lets anyone tie the audited source (and its
+  # passing privacy test) to the exact bytes they run. See docs/reproducible-builds.md.
+  verify-reproducible-agent:
+    name: Verify reproducible agent build
+    runs-on: ubuntu-latest
+    needs: [build-agent]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Download build-agent artefacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.1.8
+        with:
+          pattern: agent-*
+          path: published
+          merge-multiple: true
+
+      - name: Rebuild and compare
+        working-directory: agent
+        run: |
+          set -euo pipefail
+          rc=0
+          rebuild() {
+            local goos="$1" goarch="$2" ext="${3:-}"
+            local name="prompt-gate-agent-${goos}-${goarch}${ext}"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -trimpath -buildvcs=false \
+              -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+              -o "/tmp/${name}" ./cmd/agent
+            local want have
+            want=$(sha256sum "../published/${name}" | awk '{print $1}')
+            have=$(sha256sum "/tmp/${name}"        | awk '{print $1}')
+            if [ "$want" = "$have" ]; then
+              echo "OK   ${name}  ${have}"
+            else
+              echo "DIFF ${name}  published=${want}  rebuilt=${have}"; rc=1
+            fi
+          }
+          rebuild linux   amd64
+          rebuild linux   arm64
+          rebuild darwin  amd64
+          rebuild darwin  arm64
+          rebuild windows amd64 .exe
+          exit $rc
+
+  build-electron:
+    name: Electron (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: electron/package-lock.json
+
+      - name: npm ci
+        working-directory: electron
+        run: npm ci
+
+      - name: build renderer + main
+        working-directory: electron
+        run: npm run build
+
+      # Bundle the agent binary + rules INTO the app so the tray can
+      # auto-start the agent — the user never runs a separate process.
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+
+      - name: Bundle agent + helper + rules into the app
+        shell: bash
+        run: |
+          mkdir -p electron/resources/bin
+          agent_out="electron/resources/bin/prompt-gate-agent"
+          helper_out="electron/resources/bin/prompt-gate-proxy-helper"
+          [ "${{ runner.os }}" = "Windows" ] && agent_out="${agent_out}.exe"
+          [ "${{ runner.os }}" = "Windows" ] && helper_out="${helper_out}.exe"
+          (cd agent && go build -trimpath -ldflags "-s -w" -o "../${agent_out}" ./cmd/agent)
+          # proxy-helper is macOS-only; skip on other platforms
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            (cd agent && go build -trimpath -ldflags "-s -w" -o "../${helper_out}" ./cmd/proxy-helper)
+          fi
+          rm -rf electron/resources/rules
+          cp -R rules electron/resources/rules
+
+      - name: electron-builder
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: electron-${{ matrix.os }}
+          path: |
+            electron/release/*.dmg
+            electron/release/*.AppImage
+            electron/release/*.deb
+            electron/release/*.exe
+            electron/release/*.zip
+            electron/release/*.yml
+            electron/release/*.blockmap
+          if-no-files-found: warn
+
+  build-extension:
+    name: Browser extension (Chrome + Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: install
+        working-directory: extension
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      - name: build chrome
+        working-directory: extension
+        run: npm run build
+
+      - name: build firefox
+        working-directory: extension
+        run: npm run build:firefox
+
+      - name: package
+        working-directory: extension
+        run: |
+          mkdir -p artefacts
+          # Chrome: zip the dist/ tree alongside the manifest and assets.
+          (cd dist && zip -r "../artefacts/prompt-gate-chrome-${GITHUB_REF_NAME}.zip" .)
+          # Firefox: same idea but as an .xpi (still a zip under the hood).
+          (cd dist-firefox && zip -r "../artefacts/prompt-gate-firefox-${GITHUB_REF_NAME}.xpi" .)
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: extension
+          path: extension/artefacts/*
+          if-no-files-found: error
+
+  build-extension-safari:
+    name: Browser extension (Safari)
+    # xcrun safari-web-extension-converter ships with Xcode, so the
+    # Safari Web Extension wrapper can only be produced on a macOS
+    # runner. The dist-safari/ payload itself is cross-platform; only
+    # the Xcode project (.app bundle) requires darwin.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: install
+        working-directory: extension
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      - name: build safari
+        working-directory: extension
+        run: npm run build:safari
+
+      - name: package
+        working-directory: extension
+        run: |
+          mkdir -p artefacts
+          # Raw extension payload — usable for sideloading via Safari's
+          # Develop menu and for the converter on any other macOS host.
+          (cd dist-safari && zip -r "../artefacts/prompt-gate-safari-${GITHUB_REF_NAME}.zip" .)
+          # Xcode wrapper project, in case downstream packaging wants
+          # to build the .app outside the release pipeline.
+          if [ -d dist-safari-xcode ]; then
+            (cd dist-safari-xcode && zip -r "../artefacts/prompt-gate-safari-xcode-${GITHUB_REF_NAME}.zip" .)
+          fi
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: extension-safari
+          path: extension/artefacts/*
+          if-no-files-found: warn
+
+  build-installers:
+    name: Installer (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: [build-agent]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: macos, os: macos-latest }
+          - { target: linux, os: ubuntu-latest }
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: matrix.target == 'macos'
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install Electron deps
+        if: matrix.target == 'macos'
+        working-directory: electron
+        run: npm ci
+
+      - name: make ${{ matrix.target }}
+        run: make ${{ matrix.target }} VERSION="${GITHUB_REF_NAME#v}"
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: installer-${{ matrix.target }}
+          path: |
+            dist/*.dmg
+            dist/*.deb
+            dist/*.tar.gz
+          if-no-files-found: warn
+
+  release:
+    name: GitHub Release
+    needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # create the release
+      id-token: write     # keyless Sigstore signing (OIDC)
+      attestations: write # store the build-provenance attestation
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artefacts
+
+      - name: flatten artefacts
+        run: |
+          mkdir -p release
+          find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
+            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
+            -o -name '*.zip' -o -name '*.xpi' -o -name 'prompt-gate-agent-*' \
+            -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
+          ls -la release/
+
+      # CycloneDX SBOM for the agent — the binary's real dependency graph.
+      # Included in SHA256SUMS, attested, and published as a release asset.
+      - name: Checkout source (for SBOM)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: src
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: src/agent/go.mod
+          cache: true
+          cache-dependency-path: src/agent/go.sum
+
+      - name: Generate CycloneDX SBOM (agent)
+        working-directory: src/agent
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          "$(go env GOPATH)/bin/cyclonedx-gomod" app -json -licenses -main ./cmd/agent \
+            -output "${GITHUB_WORKSPACE}/release/prompt-gate-agent.cyclonedx.json" .
+          ls -la "${GITHUB_WORKSPACE}/release/prompt-gate-agent.cyclonedx.json"
+
+      - name: Generate checksums
+        working-directory: release
+        run: |
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\0' \
+            | sort -z | xargs -0 sha256sum > SHA256SUMS
+          cat SHA256SUMS
+
+      # Sigstore-backed SLSA build provenance for every release artifact.
+      # Keyless (Fulcio/Rekor via OIDC) — no signing secrets required.
+      # Verify with: gh attestation verify <file> --repo <owner>/<repo>
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1.4.4
+        with:
+          subject-path: 'release/*'
+
+      - name: Publish release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

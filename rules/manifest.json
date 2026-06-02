@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "files": [
+    {"name": "ai_allowed.txt",       "sha256": "949136859c8c462078002580c300754af35c9e00020d6f9913fd09d9233cf4ca"},
+    {"name": "ai_chat_blocked.txt",  "sha256": "52464ab3db6673fd365e15713d0c216a38544ff446ac7cf628db2d45b5ab1f37"},
+    {"name": "ai_chat_dlp.txt",      "sha256": "5d44f5d83a037e9a94b1f35aaf74c442b679dfa4f426ddeb59a218b1ef5d718d"},
+    {"name": "ai_code_blocked.txt",  "sha256": "54fc788e20773ba0e69c288a3db77894fbb8df988886ec29168d50ef14983133"},
+    {"name": "news.txt",             "sha256": "68b2d09c97985c49c305824b13d7da5d7923e35f0d2ef67466c1a700d057ad2e"},
+    {"name": "phishing.txt",         "sha256": "b641c98e2b72b02e4fbc61d639b7f48c1daa253d742722d3dff0c9146d552c8f"},
+    {"name": "social.txt",           "sha256": "08a7979116a8c61a2f0075e5be3303934de958f06038ec77da5ec73fbd28fd19"},
+    {"name": "dlp_patterns.json",    "sha256": "862c7dedb6249c8062a5db4b38d2ada5dab649949d4825eb0c1cb76cc56411e0"},
+    {"name": "dlp_exclusions.json",  "sha256": "53428847c641f3c9dcecc2c6018098811262f12358bf87754a401b4b884bf552"}
+  ]
+}

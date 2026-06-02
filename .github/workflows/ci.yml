@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agent:
+    name: Go Agent (test + lint + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: go test (with coverage)
+        working-directory: agent
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out | tail -1
+
+      - name: enforce DLP package coverage threshold
+        working-directory: agent
+        run: |
+          # Phase 6 Task 26: agent/internal/dlp/ is the privacy-critical
+          # surface. Fail CI if its coverage drops below 80%.
+          pct=$(go tool cover -func=coverage.out | awk '/internal\/dlp\// {sub(/%/,"",$3); sum+=$3; n++} END { if (n==0) print 0; else printf "%.1f", sum/n }')
+          echo "DLP package average coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 80.0) { exit 1 } }'
+
+      - name: upload coverage artefact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: agent-coverage
+          path: agent/coverage.out
+          if-no-files-found: error
+
+      - name: go vet
+        working-directory: agent
+        run: make lint
+
+      - name: go build
+        working-directory: agent
+        run: make build
+
+  electron:
+    name: Electron Tray (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: electron/package-lock.json
+
+      - name: npm ci
+        working-directory: electron
+        run: npm ci
+
+      - name: typecheck
+        working-directory: electron
+        run: npm run typecheck
+
+  extension:
+    name: Browser Extension (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: npm ci (or install)
+        working-directory: extension
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: typecheck
+        working-directory: extension
+        run: npm run typecheck
+
+      - name: build (tsc + IIFE bundle)
+        working-directory: extension
+        run: npm run build
+
+      - name: test
+        working-directory: extension
+        run: npm test

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Prompt Gate LaunchDaemon
+  Install path: /Library/LaunchDaemons/com.shieldnet360.promptgate.plist
+  Load with:    sudo launchctl bootstrap system /Library/LaunchDaemons/com.shieldnet360.promptgate.plist
+  Unload with:  sudo launchctl bootout system/com.shieldnet360.promptgate
+
+  The agent must be installed at /usr/local/bin/prompt-gate-agent and its
+  config at /etc/prompt-gate/config.yaml. Binds DNS to 127.0.0.1:15353
+  (no root required for DNS). Runs as a system daemon via RunAtLoad.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.shieldnet360.promptgate</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/prompt-gate-agent</string>
+        <string>--config</string>
+        <string>/etc/prompt-gate/config.yaml</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/prompt-gate-agent.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/prompt-gate-agent.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

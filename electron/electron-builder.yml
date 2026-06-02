@@ -1,0 +1,66 @@
+appId: com.shieldnet360.promptgate
+productName: Prompt Gate
+directories:
+  output: release
+# electron-builder auto-converts icon.png → .icns (macOS) and .ico (Windows).
+# The source PNG must be at least 512x512.
+icon: resources/icon.png
+files:
+  - dist/**/*
+  - package.json
+  - "resources/*.png"
+  - "!resources/*.svg"
+asarUnpack:
+  - "resources/icon.png"
+  - "resources/tray-*.png"
+# Bundle the Go agent binary + macOS proxy-helper + rules alongside the
+# .app. The release workflow builds these into electron/resources/{bin,rules}
+# before invoking electron-builder. They land at <app>/Contents/Resources/
+# resources/{bin,rules} (macOS) — the exact paths agentBinaryPath() and
+# rulesDirPath() probe in main.ts.
+extraResources:
+  - from: resources/bin
+    to: resources/bin
+    filter:
+      - "**/*"
+  - from: resources/rules
+    to: resources/rules
+    filter:
+      - "**/*"
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+dmg:
+  title: Prompt Gate
+  icon: resources/icon.png
+  format: ULFO
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: resources/icon.png
+win:
+  target:
+    - nsis
+  icon: resources/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Prompt Gate
+  runAfterFinish: true
+  deleteAppDataOnUninstall: true
+# Publishing is handled by the release workflow (softprops/action-gh-release).
+# Do NOT add a publish block here — electron-builder would attempt to upload
+# on tagged builds and fail when GH_TOKEN is unavailable.

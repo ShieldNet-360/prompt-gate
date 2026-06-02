@@ -1,0 +1,69 @@
+name: Update package manifests
+
+# When a release is published, refresh the Homebrew cask + winget manifest
+# version and SHA-256 from the release SHA256SUMS and commit them to main.
+# Keeps packaging/ in lock-step with releases so it never drifts.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to sync (e.g. v1.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Sync manifests from release SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          VER="${TAG#v}"
+          echo "Syncing packaging to ${TAG} (version ${VER})"
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p SHA256SUMS -O /tmp/SUMS
+
+          dmg_sha=$(grep -iE 'arm64\.dmg$' /tmp/SUMS | grep -iv blockmap | awk '{print $1}')
+          exe_sha=$(grep -iE 'Setup .*\.exe$' /tmp/SUMS | grep -iv blockmap | awk '{print $1}')
+          if [ -z "$dmg_sha" ] || [ -z "$exe_sha" ]; then
+            echo "Could not find dmg/exe hashes in SHA256SUMS" >&2; exit 1
+          fi
+          exe_sha_uc=$(printf '%s' "$exe_sha" | tr 'a-f' 'A-F')
+
+          # Homebrew cask: version + sha256 (URL uses #{version} interpolation)
+          cask=packaging/homebrew/prompt-gate.rb
+          sed -i -E "s/^  version \".*\"/  version \"${VER}\"/" "$cask"
+          sed -i -E "s/^  sha256 \".*\"/  sha256 \"${dmg_sha}\"/" "$cask"
+
+          # winget: PackageVersion across all three files
+          sed -i -E "s/^PackageVersion: .*/PackageVersion: ${VER}/" packaging/winget/*.yaml
+
+          # winget installer: URL (tag + filename) + sha + release date
+          inst=packaging/winget/ShieldNet360.PromptGate.installer.yaml
+          sed -i -E "s#(releases/download/)v[^/]+/Prompt\.Gate\.Setup\.[^ ]+\.exe#\1${TAG}/Prompt.Gate.Setup.${VER}.exe#" "$inst"
+          sed -i -E "s/^    InstallerSha256: .*/    InstallerSha256: ${exe_sha_uc}/" "$inst"
+          sed -i -E "s/^ReleaseDate: .*/ReleaseDate: $(date -u +%Y-%m-%d)/" "$inst"
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- packaging/; then
+            echo "packaging/ already up to date — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packaging/
+          git commit -m "chore(packaging): sync manifests to ${TAG:-$GITHUB_REF_NAME}"
+          git push origin HEAD:main
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}

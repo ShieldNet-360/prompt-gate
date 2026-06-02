@@ -1,0 +1,28 @@
+name: Notify ntfy on new PR
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push ntfy notification
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          curl -fsSL \
+            -H "Title: New PR #${PR_NUMBER} by ${PR_AUTHOR}" \
+            -H "Tags: rocket" \
+            -H "Click: ${PR_URL}" \
+            -d "${PR_TITLE}
+          ${PR_URL}" \
+            "https://ntfy.sh/${NTFY_TOPIC}"

@@ -1,0 +1,3016 @@
+{
+  "patterns": [
+    {
+      "name": "AWS Access Key",
+      "regex": "AKIA[0-9A-Z]{16}",
+      "prefix": "AKIA",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aws",
+        "access_key",
+        "credentials",
+        "iam",
+        "secret",
+        "amazon"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS Secret Access Key",
+      "regex": "(?i)(?:aws)?_?secret_?access_?key\\s*[:=]\\s*['\"]?[A-Za-z0-9/+=]{40}",
+      "prefix": "secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aws",
+        "secret",
+        "credentials",
+        "iam"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS Session Token",
+      "regex": "(?i)aws_?session_?token\\s*[:=]\\s*['\"]?[A-Za-z0-9/+=]{100,}",
+      "prefix": "aws_session_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aws",
+        "session",
+        "token",
+        "sts"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS ARN",
+      "regex": "arn:aws:[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:\\d{12}:",
+      "prefix": "arn:aws:",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "aws",
+        "arn",
+        "account",
+        "iam",
+        "role"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS MWS Key",
+      "regex": "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+      "prefix": "amzn.mws.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "amazon",
+        "mws",
+        "marketplace",
+        "seller"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure Storage Account Key",
+      "regex": "(?i)(?:account_?key|accountkey)\\s*[:=]\\s*['\"]?[A-Za-z0-9+/]{86}==",
+      "prefix": "AccountKey=",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure",
+        "storage",
+        "account_key",
+        "DefaultEndpointsProtocol",
+        "blob",
+        "queue",
+        "table"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure AD Client Secret",
+      "regex": "(?i)(?:client.?secret|azure.?secret)\\s*[:=]\\s*['\"]?[A-Za-z0-9~._\\-]{34,}",
+      "prefix": "client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure",
+        "ad",
+        "aad",
+        "client_id",
+        "tenant",
+        "oauth",
+        "msal"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure SAS Token",
+      "regex": "(?i)[?&]sig=[A-Za-z0-9%/+=]{43,}",
+      "prefix": "sig=",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure",
+        "sas",
+        "blob",
+        "storage",
+        "queue",
+        "table",
+        "sv=",
+        "se="
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure Connection String",
+      "regex": "DefaultEndpointsProtocol=https;AccountName=[A-Za-z0-9]{3,24};AccountKey=[A-Za-z0-9+/]{86}==",
+      "prefix": "DefaultEndpointsProtocol",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure DevOps PAT",
+      "regex": "(?i)(?:azuredevops|ado|devops)[^A-Za-z0-9]{0,12}[a-z2-7]{52}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure",
+        "devops",
+        "pat",
+        "token",
+        "personal",
+        "dev.azure.com"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure Subscription ID",
+      "regex": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "azure",
+        "subscription",
+        "tenant",
+        "az",
+        "resource_group"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "GCP Service Account Key",
+      "regex": "\"type\"\\s*:\\s*\"service_account\"",
+      "prefix": "service_account",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "gcp",
+        "google",
+        "project_id",
+        "private_key",
+        "client_email"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "GCP OAuth Client Secret",
+      "regex": "GOCSPX-[A-Za-z0-9_\\-]{28}",
+      "prefix": "GOCSPX-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "google",
+        "gcp",
+        "client_secret",
+        "oauth",
+        "client_id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Google API Key",
+      "regex": "AIza[0-9A-Za-z_\\-]{35}",
+      "prefix": "AIza",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "google",
+        "api",
+        "key",
+        "gcp",
+        "firebase",
+        "maps"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Firebase Cloud Messaging Server Key",
+      "regex": "AAAA[A-Za-z0-9_\\-]{7}:[A-Za-z0-9_\\-]{140}",
+      "prefix": "AAAA",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "firebase",
+        "fcm",
+        "messaging",
+        "server_key",
+        "google"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "GitHub Personal Access Token",
+      "regex": "ghp_[A-Za-z0-9]{36}",
+      "prefix": "ghp_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "github",
+        "token",
+        "auth",
+        "personal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ci_cd"
+    },
+    {
+      "name": "GitLab Personal Access Token",
+      "regex": "glpat-[A-Za-z0-9_\\-]{20,}",
+      "prefix": "glpat-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gitlab",
+        "token",
+        "auth",
+        "personal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Stripe Live Secret Key",
+      "regex": "sk_live_[0-9a-zA-Z]{24,}",
+      "prefix": "sk_live_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "stripe",
+        "secret",
+        "key",
+        "payment",
+        "charge"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Stripe Restricted Key",
+      "regex": "rk_live_[0-9a-zA-Z]{24,}",
+      "prefix": "rk_live_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "stripe",
+        "restricted",
+        "key",
+        "payment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "payments"
+    },
+    {
+      "name": "Twilio Account SID",
+      "regex": "AC[a-f0-9]{32}",
+      "prefix": "AC",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twilio",
+        "account",
+        "sid",
+        "auth_token"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Twilio API Key",
+      "regex": "SK[a-f0-9]{32}",
+      "prefix": "SK",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twilio",
+        "api",
+        "key",
+        "sid",
+        "secret"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "messaging"
+    },
+    {
+      "name": "SendGrid API Key",
+      "regex": "SG\\.[A-Za-z0-9_\\-]{22}\\.[A-Za-z0-9_\\-]{43}",
+      "prefix": "SG.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sendgrid",
+        "api",
+        "key",
+        "smtp",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Mailchimp API Key",
+      "regex": "[0-9a-f]{32}-us[0-9]{1,2}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mailchimp",
+        "api",
+        "key",
+        "datacenter",
+        "mandrill"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "messaging"
+    },
+    {
+      "name": "npm Token",
+      "regex": "npm_[A-Za-z0-9]{36}",
+      "prefix": "npm_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "npm",
+        "token",
+        "registry",
+        "publish",
+        "_authToken"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "PyPI API Token",
+      "regex": "pypi-[A-Za-z0-9_\\-]{100,}",
+      "prefix": "pypi-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pypi",
+        "token",
+        "twine",
+        "upload"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "package_manager"
+    },
+    {
+      "name": "Heroku API Key",
+      "regex": "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "heroku",
+        "api",
+        "token",
+        "key",
+        "platform"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "infra_secret"
+    },
+    {
+      "name": "JWT Token",
+      "regex": "eyJ[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}",
+      "prefix": "eyJ",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "jwt",
+        "token",
+        "bearer",
+        "authorization",
+        "auth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Database Connection String",
+      "regex": "(?i)(?:mysql|postgres(?:ql)?|mongodb(?:\\+srv)?|redis|mssql|jdbc:[a-z]+)://[^\\s'\"]+",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "database",
+        "connection",
+        "string",
+        "dsn",
+        "url",
+        "uri"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Password Assignment",
+      "regex": "(?i)(?:password|passwd|pwd)\\s*[:=]\\s*['\"][^\\s'\"]{8,}['\"]",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "password",
+        "passwd",
+        "pwd",
+        "credentials",
+        "login",
+        "auth"
+      ],
+      "hotword_window": 50,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "infra_secret"
+    },
+    {
+      "name": "HashiCorp Vault Token",
+      "regex": "(?:hvs|hvb)\\.[A-Za-z0-9_\\-]{24,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vault",
+        "hashicorp",
+        "token",
+        "x-vault-token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "infra_secret"
+    },
+    {
+      "name": "Datadog API Key",
+      "regex": "(?i)(?:dd_api_key|datadog_api_key)\\s*[:=]\\s*['\"]?[a-f0-9]{32}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "datadog",
+        "dd",
+        "api_key",
+        "monitor"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "infra_secret"
+    },
+    {
+      "name": "Slack Token",
+      "regex": "xox[abprs]-[0-9A-Za-z\\-]{10,}",
+      "prefix": "xox",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "slack",
+        "token",
+        "bot",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Private Key Block",
+      "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----",
+      "prefix": "-----BEGIN",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "infra_secret"
+    },
+    {
+      "name": "Generic API Key",
+      "regex": "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "api",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "api",
+        "key",
+        "token",
+        "secret"
+      ],
+      "hotword_window": 50,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "infra_secret"
+    },
+    {
+      "name": "Email Addresses (bulk)",
+      "regex": "[a-zA-Z0-9_.+\\-]+@[a-zA-Z0-9\\-]+\\.[a-zA-Z0-9\\-.]+",
+      "prefix": "@",
+      "severity": "medium",
+      "score_weight": 1,
+      "min_matches": 5,
+      "hotwords": [
+        "email",
+        "contact",
+        "user",
+        "customer",
+        "subscriber"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "pii"
+    },
+    {
+      "name": "Phone Numbers (bulk, US)",
+      "regex": "(?:\\+?1[\\-. ]?)?\\(?[2-9][0-9]{2}\\)?[\\-. ]?[0-9]{3}[\\-. ]?[0-9]{4}",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "min_matches": 5,
+      "hotwords": [
+        "phone",
+        "tel",
+        "mobile",
+        "contact",
+        "customer"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "pii"
+    },
+    {
+      "name": "US Social Security Number",
+      "regex": "\\b[0-9]{3}-[0-9]{2}-[0-9]{4}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ssn",
+        "social",
+        "security",
+        "tax",
+        "ein"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "pii"
+    },
+    {
+      "name": "Credit Card Number",
+      "regex": "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "credit",
+        "card",
+        "cc",
+        "visa",
+        "mastercard",
+        "amex",
+        "payment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "pii"
+    },
+    {
+      "name": "Source Code Imports",
+      "regex": "(?m)^\\s*(import\\s+[\\w.]+|from\\s+[\\w.]+\\s+import|#include\\s+[<\"][^>\"]+[>\"]|package\\s+\\w+)",
+      "prefix": "",
+      "severity": "low",
+      "score_weight": 1,
+      "min_matches": 3,
+      "hotwords": [
+        "source",
+        "code",
+        "package",
+        "module"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Internal URLs",
+      "regex": "(?i)https?://[a-z0-9\\-.]+\\.(?:internal|corp|intranet|local)\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "internal",
+        "corp",
+        "intranet",
+        "vpn",
+        "wiki",
+        "jira",
+        "confluence"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "infra_secret"
+    },
+    {
+      "name": "Maven Settings Password",
+      "regex": "<password>[^<\\s]{6,}</password>",
+      "prefix": "<password>",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "maven",
+        "settings.xml",
+        "servers",
+        "deploy",
+        "nexus",
+        "artifactory",
+        "repository"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Gradle Repository Credentials",
+      "regex": "(?i)credentials\\s*\\{[^}]*password\\s*=?\\s*['\\\"][^'\\\"\\s]{6,}['\\\"]",
+      "prefix": "credentials",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "gradle",
+        "build.gradle",
+        "repositories",
+        "maven",
+        "artifactory",
+        "nexus"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "JDBC PostgreSQL URL with Password",
+      "regex": "jdbc:postgresql://[^\\s'\\\"]+[?&]password=[^&\\s'\\\"]+",
+      "prefix": "jdbc:postgresql://",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jdbc",
+        "postgres",
+        "spring",
+        "datasource",
+        "url"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "JDBC MySQL URL with Password",
+      "regex": "jdbc:mysql://[^\\s'\\\"]+[?&]password=[^&\\s'\\\"]+",
+      "prefix": "jdbc:mysql://",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jdbc",
+        "mysql",
+        "spring",
+        "datasource",
+        "url"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "JDBC Oracle URL with Password",
+      "regex": "jdbc:oracle:[a-z]+:[^/\\s'\\\"]+/[^@\\s'\\\"]+@[A-Za-z0-9_.\\-]+",
+      "prefix": "jdbc:oracle:",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jdbc",
+        "oracle",
+        "thin",
+        "datasource"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "JDBC SQL Server URL with Password",
+      "regex": "jdbc:sqlserver://[^\\s'\\\"]+[;&]password=[^&;\\s'\\\"]+",
+      "prefix": "jdbc:sqlserver://",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jdbc",
+        "sqlserver",
+        "mssql",
+        "datasource"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Spring Datasource Password",
+      "regex": "(?i)spring\\.datasource\\.password\\s*[:=]\\s*[^\\s#]+",
+      "prefix": "spring.datasource.password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "spring",
+        "datasource",
+        "application.properties",
+        "application.yml",
+        "jdbc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 2.5,
+      "category": "code_secret"
+    },
+    {
+      "name": "Spring OAuth2 Client Secret",
+      "regex": "(?i)spring\\.security\\.oauth2\\.client\\.registration\\.[A-Za-z0-9_\\-]+\\.client-secret\\s*[:=]\\s*[^\\s#]+",
+      "prefix": "spring.security.oauth2",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "spring",
+        "oauth2",
+        "client",
+        "registration"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Java Keystore Password",
+      "regex": "(?i)(?:-storepass|-keypass|keystore\\.password|keystorePassword)\\s*[:= ]\\s*['\\\"]?[^\\s'\\\"#]{6,}",
+      "prefix": "storepass",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "keystore",
+        "keytool",
+        "jks",
+        "pkcs12",
+        "p12",
+        "java",
+        "ssl"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "code_secret"
+    },
+    {
+      "name": "AWS Java SDK BasicAWSCredentials",
+      "regex": "new\\s+BasicAWSCredentials\\s*\\(\\s*['\\\"][A-Z0-9]{16,32}['\\\"]\\s*,\\s*['\\\"][A-Za-z0-9+/=]{30,}['\\\"]\\s*\\)",
+      "prefix": "BasicAWSCredentials",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "aws",
+        "credentials",
+        "java",
+        "sdk"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cargo Registry Token",
+      "regex": "(?i)\\[registry\\][^\\[]*token\\s*=\\s*['\\\"][A-Za-z0-9_\\-]{32,}['\\\"]",
+      "prefix": "[registry]",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cargo",
+        "crates.io",
+        "registry",
+        "credentials.toml"
+      ],
+      "hotword_window": 800,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Crates.io API Token",
+      "regex": "cio[A-Za-z0-9]{32,}",
+      "prefix": "cio",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cargo",
+        "crates",
+        "crates.io",
+        "publish",
+        "registry"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Rocket.toml Secret Key",
+      "regex": "(?i)secret_key\\s*=\\s*['\\\"][A-Za-z0-9+/=_\\-]{32,}['\\\"]",
+      "prefix": "secret_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rocket",
+        "rocket.toml",
+        "rust",
+        "secret_key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Firebase Web Config apiKey",
+      "regex": "(?i)apiKey\\s*:\\s*['\\\"]AIza[A-Za-z0-9_\\-]{35}['\\\"]",
+      "prefix": "AIza",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "firebase",
+        "initializeApp",
+        "authDomain",
+        "projectId",
+        "appId",
+        "storageBucket"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "React App Environment Secret",
+      "regex": "(?i)REACT_APP_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|API)[A-Z0-9_]*\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "REACT_APP_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "react",
+        "create-react-app",
+        ".env",
+        "process.env"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Next.js Public Environment Secret",
+      "regex": "(?i)NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|API)[A-Z0-9_]*\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "NEXT_PUBLIC_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "next.js",
+        "nextjs",
+        ".env",
+        "process.env",
+        "next.config"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Vite Environment Secret",
+      "regex": "(?i)VITE_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|API)[A-Z0-9_]*\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "VITE_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "vite",
+        "vite.config",
+        ".env",
+        "import.meta.env"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Angular Environment Secret",
+      "regex": "(?i)environment\\.[a-z]+\\s*=\\s*\\{[^}]*(?:apiKey|secret|token|password)\\s*:\\s*['\\\"][A-Za-z0-9_\\-]{16,}['\\\"]",
+      "prefix": "environment.",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "angular",
+        "environment.ts",
+        "environment.prod.ts"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Webpack DefinePlugin Secret",
+      "regex": "(?i)new\\s+webpack\\.DefinePlugin\\s*\\(\\s*\\{[^}]*(?:SECRET|TOKEN|API_KEY|PASSWORD)[^}]*:\\s*JSON\\.stringify\\s*\\(\\s*['\\\"][A-Za-z0-9_\\-]{16,}['\\\"]\\s*\\)",
+      "prefix": "DefinePlugin",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "webpack",
+        "defineplugin",
+        "process.env"
+      ],
+      "hotword_window": 600,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Tauri Signing Private Key",
+      "regex": "(?i)(?:tauri\\.signing|TAURI_SIGNING)_?PRIVATE_?KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{60,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tauri",
+        "tauri.conf.json",
+        "updater",
+        "signing"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Electron Forge Publish Token",
+      "regex": "(?i)(?:SNAPCRAFT_TOKEN|ELECTRON_GITHUB_TOKEN|FORGE_PUBLISH_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "electron-forge",
+        "electron",
+        "forge",
+        "publish"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Electron Builder Publish Credentials",
+      "regex": "(?i)(?:GH_TOKEN|BT_TOKEN|KEYGEN_TOKEN|EP_PRE_RELEASE)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "electron-builder",
+        "publish",
+        "electron",
+        "release"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "OpenAI Project API Key",
+      "regex": "sk-proj-[A-Za-z0-9_\\-]{40,}",
+      "prefix": "sk-proj-",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "openai",
+        "api",
+        "chatgpt",
+        "gpt"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "OpenAI Service Account Key",
+      "regex": "sk-svcacct-[A-Za-z0-9_\\-]{40,}",
+      "prefix": "sk-svcacct-",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "openai",
+        "service",
+        "api"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "OpenAI User API Key",
+      "regex": "sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}",
+      "prefix": "sk-",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "openai",
+        "api",
+        "chatgpt",
+        "gpt"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Anthropic API Key",
+      "regex": "sk-ant-api03-[A-Za-z0-9_\\-]{80,}",
+      "prefix": "sk-ant-api03-",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "anthropic",
+        "claude",
+        "api"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "HuggingFace Access Token",
+      "regex": "hf_[A-Za-z0-9]{34,40}",
+      "prefix": "hf_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "huggingface",
+        "hf",
+        "transformers",
+        "datasets"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Cohere API Key",
+      "regex": "(?i)cohere[_\\-]?(?:api[_\\-]?)?key\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "cohere",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cohere",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Replicate API Token",
+      "regex": "r8_[A-Za-z0-9]{30,}",
+      "prefix": "r8_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "replicate",
+        "api",
+        "token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Pinecone API Key",
+      "regex": "(?i)pinecone[_\\-]?(?:api[_\\-]?)?key\\s*[:=]\\s*['\\\"]?[a-f0-9\\-]{36,}",
+      "prefix": "pinecone",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pinecone",
+        "vector",
+        "embedding",
+        "index"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Mistral API Key",
+      "regex": "(?i)mistral[_\\-]?(?:api[_\\-]?)?key\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32,}",
+      "prefix": "mistral",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mistral",
+        "api",
+        "le-platform"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Weights and Biases API Key",
+      "regex": "(?i)(?:wandb|WANDB_API_KEY)\\s*[:=]?\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "wandb",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "wandb",
+        "weights",
+        "biases",
+        "wandb_api_key",
+        "login"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "ai_ml"
+    },
+    {
+      "name": "LangSmith API Key",
+      "regex": "lsv2_(?:pt|sk)_[A-Za-z0-9]{32,}_[A-Za-z0-9]{8,}",
+      "prefix": "lsv2_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "langsmith",
+        "langchain",
+        "tracing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Together AI API Key",
+      "regex": "(?i)together[_\\-]?(?:api[_\\-]?)?key\\s*[:=]\\s*['\\\"]?[a-f0-9]{60,}",
+      "prefix": "together",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "together",
+        "together.ai",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Groq API Key",
+      "regex": "gsk_[A-Za-z0-9]{50,}",
+      "prefix": "gsk_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "groq",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "ai_ml"
+    },
+    {
+      "name": "Apple App Store Connect API Key ID",
+      "regex": "(?i)\\bkey[_\\-]?id\\s*[:=]\\s*['\\\"]?[A-Z0-9]{10}\\b",
+      "prefix": "key",
+      "severity": "high",
+      "score_weight": 2,
+      "hotwords": [
+        "app store connect",
+        "apple",
+        "fastlane",
+        "appstore",
+        "asc",
+        "issuer_id"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Apple Developer Team ID",
+      "regex": "(?i)(?:DEVELOPMENT_TEAM|TEAM_?ID|teamID|apple_team_id)\\s*[:=]?\\s*['\\\"]?[A-Z0-9]{10}['\\\"]?",
+      "prefix": "team",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "apple",
+        "developer",
+        "xcode",
+        "team",
+        "provisioning",
+        "signing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Cocoapods Trunk Token",
+      "regex": "(?i)(?:COCOAPODS_TRUNK_TOKEN|pod\\s+trunk\\s+token)\\s*[:=]?\\s*['\\\"]?[A-Za-z0-9]{32,}",
+      "prefix": "COCOAPODS_TRUNK_TOKEN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cocoapods",
+        "trunk",
+        "pod",
+        "podspec"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Xcode Cloud Secret",
+      "regex": "(?i)XCODE_CLOUD_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "XCODE_CLOUD_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "xcode",
+        "xcode cloud",
+        "ci_post_clone",
+        "ci_workflow"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Apple APNs Auth Key Filename",
+      "regex": "AuthKey_[A-Z0-9]{10}\\.p8",
+      "prefix": "AuthKey_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "apns",
+        "apple push",
+        "p8",
+        "fastlane",
+        "pem"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Google Services JSON API Key",
+      "regex": "\\\"current_key\\\"\\s*:\\s*\\\"AIza[A-Za-z0-9_\\-]{35}\\\"",
+      "prefix": "current_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "google-services.json",
+        "firebase",
+        "android",
+        "client",
+        "project_info"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Android Signing Store Password",
+      "regex": "(?i)(?:storePassword|keyPassword)(?:\\s*[:=]\\s*|\\s+)['\\\"][^'\\\"\\s]{6,}['\\\"]",
+      "prefix": "Password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "android",
+        "signingConfigs",
+        "release",
+        "build.gradle",
+        "gradle"
+      ],
+      "hotword_window": 400,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Play Console Service Account JSON",
+      "regex": "\\\"type\\\"\\s*:\\s*\\\"service_account\\\"[\\s\\S]{0,200}\\\"project_id\\\"\\s*:\\s*\\\"[^\\\"]+(?:android|play|google[_\\-]?play)[^\\\"]*\\\"",
+      "prefix": "service_account",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "play console",
+        "google play",
+        "androidpublisher",
+        "fastlane supply"
+      ],
+      "hotword_window": 1000,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Firebase App Distribution Token",
+      "regex": "(?i)(?:FIREBASE_TOKEN|FIREBASE_APP_DISTRIBUTION_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-/.]{30,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "firebase",
+        "appdistribution",
+        "fastlane",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Android Maps API Key in local.properties",
+      "regex": "(?i)MAPS_API_KEY\\s*=\\s*['\\\"]?AIza[A-Za-z0-9_\\-]{35}",
+      "prefix": "MAPS_API_KEY",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "android",
+        "local.properties",
+        "maps",
+        "manifest"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Expo Access Token",
+      "regex": "(?i)EXPO_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
+      "prefix": "EXPO_TOKEN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "expo",
+        "eas",
+        "react-native",
+        "exp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "React Native CodePush Deployment Key",
+      "regex": "(?i)CodePushDeploymentKey\\s*[:=]?\\s*['\\\"][A-Za-z0-9_\\-]{37}['\\\"]",
+      "prefix": "CodePushDeploymentKey",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "codepush",
+        "react-native",
+        "appcenter",
+        "deployment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Fastlane Match Password",
+      "regex": "(?i)MATCH_PASSWORD\\s*[:=]\\s*['\\\"]?[^\\s'\\\"#]{8,}",
+      "prefix": "MATCH_PASSWORD",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fastlane",
+        "match",
+        "certificates",
+        "git"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 2.5,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "EAS Build Secret",
+      "regex": "(?i)EAS_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "EAS_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "eas",
+        "expo",
+        "eas.json",
+        "build"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "Flutter Dart Environment Secret",
+      "regex": "(?i)(?:flutter_dotenv|String\\.fromEnvironment)[^A-Za-z0-9]{0,32}(?:API_KEY|SECRET|TOKEN|PASSWORD)[^A-Za-z0-9]{0,8}['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "flutter",
+        "dart",
+        ".env",
+        "dotenv"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
+    },
+    {
+      "name": "MongoDB Atlas SRV Connection",
+      "regex": "mongodb\\+srv://[^:\\s]+:[^@\\s]+@[A-Za-z0-9.\\-]+\\.mongodb\\.net",
+      "prefix": "mongodb+srv://",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "mongodb",
+        "mongo",
+        "atlas",
+        "connection"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "MSSQL Connection String with Password",
+      "regex": "(?i)(?:Server|Data Source)=[^;]+;\\s*(?:Database|Initial Catalog)=[^;]+;[^;]*(?:User\\s*Id|UID)=[^;]+;[^;]*Password=[^;\\s'\\\"]{4,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "mssql",
+        "sql server",
+        "ado.net",
+        "connectionstring"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Redis URL with Password",
+      "regex": "rediss?://[^:@\\s]*:[^@\\s]+@[A-Za-z0-9.\\-]+",
+      "prefix": "redis",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "redis",
+        "rediss",
+        "connection",
+        "url",
+        "REDIS_URL"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "SQLite PRAGMA Encryption Key",
+      "regex": "(?i)PRAGMA\\s+(?:key|rekey)\\s*=\\s*['\\\"][^'\\\"\\s]{6,}['\\\"]",
+      "prefix": "PRAGMA",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sqlite",
+        "sqlcipher",
+        "encrypted",
+        "key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Cassandra Auth Provider Credentials",
+      "regex": "(?i)PlainTextAuthProvider\\s*\\(\\s*['\\\"][^'\\\"]+['\\\"]\\s*,\\s*['\\\"][^'\\\"\\s]{6,}['\\\"]\\s*\\)",
+      "prefix": "PlainTextAuthProvider",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cassandra",
+        "scylla",
+        "datastax",
+        "auth"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 2.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Elasticsearch URL with Credentials",
+      "regex": "https?://[^:\\s'\\\"@]+:[^@\\s'\\\"]+@[A-Za-z0-9.\\-]+:?\\d*/?[^\\s'\\\"]*(?:_search|_cluster|_cat|elasticsearch|opensearch)",
+      "prefix": "https://",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "elasticsearch",
+        "opensearch",
+        "elastic",
+        "kibana",
+        "cluster"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Terraform State Sensitive Value",
+      "regex": "\\\"sensitive\\\"\\s*:\\s*true[\\s\\S]{0,200}\\\"value\\\"\\s*:\\s*\\\"[^\\\"]{16,}\\\"",
+      "prefix": "\"sensitive\"",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "terraform",
+        "tfstate",
+        ".tfstate",
+        "outputs"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Secret YAML",
+      "regex": "(?i)kind\\s*:\\s*Secret[\\s\\S]{0,300}data\\s*:[\\s\\S]{0,500}[A-Za-z0-9+/]{40,}={0,2}",
+      "prefix": "kind: Secret",
+      "severity": "high",
+      "score_weight": 2,
+      "hotwords": [
+        "kubernetes",
+        "k8s",
+        "apiVersion",
+        "metadata",
+        "stringData",
+        "Opaque"
+      ],
+      "hotword_window": 1000,
+      "hotword_boost": 1,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Docker Registry Auth",
+      "regex": "(?i)\\\"auths\\\"\\s*:\\s*\\{[\\s\\S]{0,200}\\\"auth\\\"\\s*:\\s*\\\"[A-Za-z0-9+/=]{20,}\\\"",
+      "prefix": "\"auths\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "docker",
+        "config.json",
+        ".docker",
+        "registry",
+        "login"
+      ],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Helm Values Password",
+      "regex": "(?i)(?:adminPassword|rootPassword|dbPassword|postgresqlPassword|mysqlRootPassword)\\s*:\\s*['\\\"]?[^\\s'\\\"#]{8,}",
+      "prefix": "Password",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "helm",
+        "values.yaml",
+        "chart",
+        "tiller"
+      ],
+      "hotword_window": 400,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 2.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Pulumi Stack Config Secret",
+      "regex": "secure:v1:[A-Za-z0-9+/=_\\-]{32,}",
+      "prefix": "secure:v1:",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pulumi",
+        "stack",
+        "config",
+        "passphrase"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare API Token",
+      "regex": "(?i)(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN|cloudflare_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "cf",
+        "wrangler",
+        "api token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "DigitalOcean Personal Access Token",
+      "regex": "dop_v1_[a-f0-9]{64}",
+      "prefix": "dop_v1_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "digitalocean",
+        "do",
+        "doctl",
+        "ocean"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "DigitalOcean OAuth Token",
+      "regex": "doo_v1_[a-f0-9]{64}",
+      "prefix": "doo_v1_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "digitalocean",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Vercel Token",
+      "regex": "(?i)(?:VERCEL_TOKEN|vercel[_\\-]?token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24}",
+      "prefix": "VERCEL_TOKEN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vercel",
+        "now",
+        "deploy",
+        "next.js"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Netlify Personal Access Token",
+      "regex": "nfp_[A-Za-z0-9]{32,}",
+      "prefix": "nfp_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "netlify",
+        "deploy",
+        "ntl"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Supabase Service Role Key",
+      "regex": "sbp_[A-Za-z0-9]{40}",
+      "prefix": "sbp_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "supabase",
+        "service_role",
+        "service role"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "CircleCI Personal Token",
+      "regex": "(?i)(?:circle[_\\-]?token|CIRCLE_TOKEN)\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "circle",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "circleci",
+        "circle",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Travis CI Token",
+      "regex": "(?i)TRAVIS_(?:API_)?TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{22,}",
+      "prefix": "TRAVIS_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "travis",
+        "travis-ci",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Bitbucket App Password",
+      "regex": "(?i)(?:bitbucket[_\\-]?app[_\\-]?password|BITBUCKET_APP_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "bitbucket",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitbucket",
+        "atlassian",
+        "app password"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Bitbucket Server Token (BBDC)",
+      "regex": "BBDC-[A-Za-z0-9_\\-]{32,}",
+      "prefix": "BBDC-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitbucket",
+        "data center",
+        "access token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Jenkins API Token",
+      "regex": "(?i)(?:JENKINS_TOKEN|jenkins[_\\-]?api[_\\-]?token)\\s*[:=]\\s*['\\\"]?[A-Fa-f0-9]{32,34}",
+      "prefix": "jenkins",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jenkins",
+        "ci",
+        "build"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "ci_cd"
+    },
+    {
+      "name": "GitLab CI Pipeline Trigger Token",
+      "regex": "glptt-[A-Za-z0-9]{40}",
+      "prefix": "glptt-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gitlab",
+        "pipeline",
+        "trigger"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "ci_cd"
+    },
+    {
+      "name": "Discord Bot Token",
+      "regex": "[MN][A-Za-z\\d]{23,28}\\.[A-Za-z\\d_\\-]{6,7}\\.[A-Za-z\\d_\\-]{27,38}",
+      "prefix": "MT",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "discord",
+        "bot",
+        "token"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Discord Webhook URL",
+      "regex": "https://(?:ptb\\.|canary\\.)?discord(?:app)?\\.com/api/webhooks/\\d{17,20}/[A-Za-z0-9_\\-]{60,}",
+      "prefix": "discord",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "discord",
+        "webhook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Telegram Bot Token",
+      "regex": "\\b\\d{8,12}:[A-Za-z0-9_\\-]{35}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "telegram",
+        "bot",
+        "botfather",
+        "TELEGRAM_BOT_TOKEN"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "messaging"
+    },
+    {
+      "name": "Vonage Nexmo API Secret",
+      "regex": "(?i)(?:vonage|nexmo)[_\\-]?api[_\\-]?secret\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{16}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "vonage",
+        "nexmo",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "PayPal Client Secret",
+      "regex": "(?i)(?:paypal[_\\-]?client[_\\-]?secret|PAYPAL_SECRET)\\s*[:=]\\s*['\\\"]?E[A-Za-z0-9_\\-]{40,}",
+      "prefix": "paypal",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "paypal",
+        "client_id",
+        "merchant",
+        "sandbox"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Square Access Token",
+      "regex": "sq0atp-[A-Za-z0-9_\\-]{22}",
+      "prefix": "sq0atp-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "square",
+        "squareup",
+        "merchant"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "payments"
+    },
+    {
+      "name": "Square OAuth Secret",
+      "regex": "sq0csp-[A-Za-z0-9_\\-]{43}",
+      "prefix": "sq0csp-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "square",
+        "oauth",
+        "squareup"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Braintree Access Token",
+      "regex": "access_token\\$production\\$[a-z0-9]{16}\\$[a-f0-9]{32}",
+      "prefix": "access_token$production$",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "braintree",
+        "payment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "payments"
+    },
+    {
+      "name": "Adyen API Key",
+      "regex": "AQE[A-Za-z0-9+/=]{60,}",
+      "prefix": "AQE",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "adyen",
+        "api",
+        "payment"
+      ],
+      "hotword_window": 400,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "payments"
+    },
+    {
+      "name": "Plaid Client Secret",
+      "regex": "(?i)(?:PLAID_SECRET|plaid[_\\-]?client[_\\-]?secret)\\s*[:=]\\s*['\\\"]?[a-f0-9]{30}",
+      "prefix": "PLAID",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "plaid",
+        "client_id",
+        "banking",
+        "transactions"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Coinbase Commerce API Key",
+      "regex": "(?i)(?:COINBASE_COMMERCE_API_KEY|coinbase[_\\-]?commerce[_\\-]?api[_\\-]?key)\\s*[:=]\\s*['\\\"]?[a-f0-9\\-]{36}",
+      "prefix": "COINBASE",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "coinbase",
+        "commerce",
+        "crypto"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "payments"
+    },
+    {
+      "name": "Auth0 Client Secret",
+      "regex": "(?i)(?:AUTH0_CLIENT_SECRET|auth0[_\\-]?client[_\\-]?secret)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{64}",
+      "prefix": "AUTH0_CLIENT_SECRET",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "auth0",
+        "tenant",
+        "client_id"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Okta API Token",
+      "regex": "00[A-Za-z0-9_\\-]{38}",
+      "prefix": "00",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "okta",
+        "sso",
+        "api",
+        "okta.com",
+        "oktapreview"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "OneLogin API Credentials",
+      "regex": "(?i)(?:ONELOGIN_CLIENT_SECRET|onelogin[_\\-]?client[_\\-]?secret)\\s*[:=]\\s*['\\\"]?[a-f0-9]{40,64}",
+      "prefix": "ONELOGIN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "onelogin",
+        "client_id",
+        "sso"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "auth"
+    },
+    {
+      "name": "Keycloak Client Secret",
+      "regex": "(?i)(?:KEYCLOAK_CLIENT_SECRET|keycloak[_\\-]?client[_\\-]?secret)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9\\-]{36}",
+      "prefix": "KEYCLOAK",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "keycloak",
+        "realm",
+        "client_id",
+        "oidc"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Firebase Admin SDK Private Key",
+      "regex": "(?i)\\\"private_key_id\\\"\\s*:\\s*\\\"[a-f0-9]{40}\\\"[\\s\\S]{0,200}\\\"client_email\\\"\\s*:\\s*\\\"firebase-adminsdk",
+      "prefix": "private_key_id",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "firebase",
+        "firebase-admin",
+        "service_account"
+      ],
+      "hotword_window": 1000,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "Supabase JWT Secret",
+      "regex": "(?i)SUPABASE_JWT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{32,}",
+      "prefix": "SUPABASE_JWT_SECRET",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "supabase",
+        "jwt",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Clerk Secret Key",
+      "regex": "sk_(?:live|test)_[A-Za-z0-9]{40,}",
+      "prefix": "sk_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "clerk",
+        "clerk.com",
+        "frontend_api"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "Clerk Publishable Key",
+      "regex": "pk_(?:live|test)_[A-Za-z0-9]{40,}",
+      "prefix": "pk_",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "clerk",
+        "clerk.com",
+        "frontend_api"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Java Password Literal",
+      "regex": "(?i)String\\s+(?:password|passwd|pwd|secret|apiKey)\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "String",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "java",
+        "class",
+        "import",
+        "private",
+        "public"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Rust Password Literal",
+      "regex": "(?i)let\\s+(?:password|passwd|pwd|secret|api_key)\\s*(?::\\s*&?str)?\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "let",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rust",
+        "fn",
+        "pub",
+        "use",
+        "mod",
+        "cargo"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Go Password Literal",
+      "regex": "(?i)(?:password|passwd|pwd|secret|apiKey)\\s*:?=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "go",
+        "package",
+        "func",
+        "import"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Swift Password Literal",
+      "regex": "(?i)let\\s+(?:password|passwd|pwd|secret|apiKey)\\s*(?::\\s*String)?\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "let",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "swift",
+        "import",
+        "func",
+        "class",
+        "struct"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Kotlin Password Literal",
+      "regex": "(?i)val\\s+(?:password|passwd|pwd|secret|apiKey)\\s*(?::\\s*String)?\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "val",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kotlin",
+        "fun",
+        "package",
+        "import",
+        "android"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Dart Password Literal",
+      "regex": "(?i)(?:final|const|var)\\s+(?:password|passwd|pwd|secret|apiKey)\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dart",
+        "flutter",
+        "void",
+        "import",
+        "class"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "code_secret"
+    },
+    {
+      "name": "Python Secret Key Literal",
+      "regex": "(?i)(?:SECRET_KEY|PASSWORD|API_KEY|PRIVATE_KEY)\\s*=\\s*\\\"[^\\\"\\s]{12,}\\\"",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "python",
+        "def",
+        "import",
+        "django",
+        "flask",
+        "fastapi"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Terraform Cloud API Token",
+      "regex": "(?i)[A-Za-z0-9]{12,32}\\.atlasv1\\.[A-Za-z0-9]{40,}",
+      "prefix": ".atlasv1.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "terraform",
+        "tfe",
+        "atlas",
+        "tfc",
+        "TFE_TOKEN",
+        "TF_TOKEN",
+        "TF_CLI_CONFIG",
+        "credentials"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Spacelift API Key",
+      "regex": "(?i)SPACELIFT_API_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{40,}",
+      "prefix": "SPACELIFT_API_KEY",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "spacelift",
+        "stack",
+        "SPACELIFT_API_KEY_ID",
+        "SPACELIFT_API_KEY_ENDPOINT"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "env0 API Key",
+      "regex": "(?i)ENV0_API_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{32,}",
+      "prefix": "ENV0_API_KEY",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "env0",
+        "ENV0_API_KEY_ID",
+        "environment",
+        "deployment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Scalr API Token",
+      "regex": "(?i)(?:SCALR_TOKEN|scalr_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{40,}",
+      "prefix": "SCALR_TOKEN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "scalr",
+        "workspace",
+        "environment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Harbor Robot Token",
+      "regex": "(?i)robot\\$[A-Za-z0-9_+\\-.]{3,64}\\s*[:=]\\s*['\\\"]?[A-Za-z0-9./_\\-]{30,}",
+      "prefix": "robot$",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "harbor",
+        "registry",
+        "docker",
+        "goharbor"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Quay.io Encrypted Password",
+      "regex": "(?i)(?:QUAY_TOKEN|QUAY_PASSWORD|QUAY_DOCKER_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{30,}",
+      "prefix": "QUAY_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "quay",
+        "quay.io",
+        "registry",
+        "docker",
+        "redhat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "AWS ECR Login Token",
+      "regex": "(?i)(?:ECR_PASSWORD|ECR_LOGIN_PASSWORD|ecr_get_login_password)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{200,}",
+      "prefix": "ECR_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ecr",
+        "aws",
+        "docker",
+        "dkr.ecr",
+        "amazonaws.com"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "GCR JSON Key Paste",
+      "regex": "(?s)\\\"type\\\"\\s*:\\s*\\\"service_account\\\".{0,1000}\\\"(?:gcr\\.io|pkg\\.dev)\\\"",
+      "prefix": "service_account",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gcr",
+        "gcr.io",
+        "pkg.dev",
+        "google",
+        "docker"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "AWS Secrets Manager SecretString Paste",
+      "regex": "(?s)\"SecretString\"\\s*:\\s*\"(?:\\\\.|[^\"])*[A-Za-z0-9+/=._\\-]{16,}",
+      "prefix": "\"SecretString\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "secretsmanager",
+        "GetSecretValue",
+        "aws",
+        "SecretId",
+        "VersionId"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure Key Vault GetSecret Paste",
+      "regex": "(?i)\\\"id\\\"\\s*:\\s*\\\"https://[a-z0-9\\-]+\\.vault\\.azure\\.net/secrets/[A-Za-z0-9\\-]+/[a-f0-9]{32}\\\"",
+      "prefix": "vault.azure.net/secrets/",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "keyvault",
+        "azure",
+        "vault",
+        "GetSecret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "GCP Secret Manager Payload Paste",
+      "regex": "(?s)\\\"payload\\\"\\s*:\\s*\\{\\s*\\\"data\\\"\\s*:\\s*\\\"[A-Za-z0-9+/=]{16,}\\\"",
+      "prefix": "\"payload\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "secretmanager",
+        "google",
+        "gcloud",
+        "AccessSecretVersion",
+        "projects/"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "OAuth2 Refresh Token Assignment",
+      "regex": "(?i)refresh_token\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-/+=]{40,}",
+      "prefix": "refresh_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oauth",
+        "oidc",
+        "token",
+        "grant_type"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "auth"
+    },
+    {
+      "name": "OIDC ID Token Assignment",
+      "regex": "(?i)id_token\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "id_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oidc",
+        "openid",
+        "iss",
+        "aud",
+        "sub"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Auth0 Management API Token",
+      "regex": "(?i)(?:AUTH0_MGMT_TOKEN|AUTH0_MANAGEMENT_TOKEN|management_api_token)\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "AUTH0_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "auth0",
+        "management",
+        "AUTH0_DOMAIN",
+        "audience"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Keycloak Admin Token",
+      "regex": "(?i)(?:KEYCLOAK_TOKEN|KC_TOKEN|admin_cli_token)\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "KEYCLOAK_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "keycloak",
+        "admin-cli",
+        "realm",
+        "openid-connect"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Ansible Vault Block",
+      "regex": "\\$ANSIBLE_VAULT;[0-9.]+;AES256",
+      "prefix": "$ANSIBLE_VAULT",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ansible",
+        "vault",
+        "playbook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "iac"
+    },
+    {
+      "name": "Puppet Hiera eyaml Block",
+      "regex": "ENC\\[PKCS7,[A-Za-z0-9+/=\\s]{40,}\\]",
+      "prefix": "ENC[PKCS7",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "puppet",
+        "hiera",
+        "eyaml",
+        "pkcs7"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "iac"
+    },
+    {
+      "name": "Chef Encrypted Data Bag",
+      "regex": "(?s)\\\"cipher\\\"\\s*:\\s*\\\"aes-256-cbc\\\".{0,200}\\\"encrypted_data\\\"\\s*:\\s*\\\"[A-Za-z0-9+/=]{40,}",
+      "prefix": "\"cipher\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "chef",
+        "data_bag",
+        "encrypted_data",
+        "aes-256-cbc",
+        "iv"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "iac"
+    },
+    {
+      "name": "RubyGems API Key",
+      "regex": "rubygems_[a-f0-9]{48}",
+      "prefix": "rubygems_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rubygems",
+        "gem",
+        "credentials"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Composer Packagist Token",
+      "regex": "(?i)(?:packagist[._-]?token|composer[._-]?auth[._-]?token)[\"\\']?\\s*[:=]\\s*[\"\\']?[A-Za-z0-9]{40,}",
+      "prefix": "packagist",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "composer",
+        "packagist",
+        "auth.json",
+        "http-basic"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "NuGet API Key",
+      "regex": "oy2[a-z2-7]{43}",
+      "prefix": "oy2",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "nuget",
+        "nuget.org",
+        "dotnet",
+        "apikey"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "package_manager"
+    },
+    {
+      "name": "Hex.pm API Key",
+      "regex": "(?i)(?:HEX_API_KEY|HEX_AUTH_KEY|hex[._-]?api[._-]?key)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{40,}",
+      "prefix": "HEX_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hex.pm",
+        "elixir",
+        "erlang",
+        "mix"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "package_manager"
+    },
+    {
+      "name": "Pub.dev OAuth Refresh Token",
+      "regex": "(?i)(?:PUB_DEV_TOKEN|pub-credentials|pub\\.dev[._-]?token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-/+=]{40,}",
+      "prefix": "PUB_DEV_TOKEN",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pub.dev",
+        "dart",
+        "flutter",
+        "pubspec"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "CocoaPods Trunk Session Cookie",
+      "regex": "(?i)_pods_session\\s*=\\s*[A-Za-z0-9._%\\-+/=]{20,}",
+      "prefix": "_pods_session",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cocoapods",
+        "trunk",
+        "pod"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Linear Personal API Key",
+      "regex": "lin_api_[A-Za-z0-9]{40,128}",
+      "prefix": "lin_api_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linear",
+        "graphql",
+        "api",
+        "authorization",
+        "token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "productivity"
+    },
+    {
+      "name": "Linear OAuth Token",
+      "regex": "lin_oauth_[A-Za-z0-9]{40,128}",
+      "prefix": "lin_oauth_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linear",
+        "oauth",
+        "graphql",
+        "authorization",
+        "token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "productivity"
+    }
+  ]
+}

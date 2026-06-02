@@ -1,0 +1,6 @@
+
+# Agent binary + helper + rules copied in at package time (not source)
+resources/bin/prompt-gate-agent
+resources/bin/prompt-gate-agent.exe
+resources/bin/prompt-gate-proxy-helper
+resources/rules/

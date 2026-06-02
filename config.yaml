@@ -1,0 +1,24 @@
+# Prompt Gate agent configuration
+
+upstream_dns: "8.8.8.8:53"
+dns_listen: "127.0.0.1:15353"
+api_listen: "127.0.0.1:9191"
+proxy_listen: "127.0.0.1:8443"
+
+db_path: "prompt-gate.db"
+
+rule_paths:
+  - rules/ai_chat_blocked.txt
+  - rules/ai_code_blocked.txt
+  - rules/ai_chat_dlp.txt
+  - rules/ai_allowed.txt
+  - rules/phishing.txt
+  - rules/social.txt
+
+dlp_patterns: rules/dlp_patterns.json
+dlp_exclusions: rules/dlp_exclusions.json
+
+proxy_enabled: false
+heartbeat_interval: 1h
+stats_flush_interval: 60s
+rule_update_interval: 6h

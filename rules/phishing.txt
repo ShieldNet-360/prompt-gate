@@ -1,0 +1,8 @@
+# Sample phishing / credential-theft domains.
+# Community contributions welcome via PR — add one entry per line.
+# Leading "." matches all subdomains; no leading "." means exact match only.
+secure-paypa1.com
+appleid-verify.support
+account-update-login.com
+microsoft-secure-login.com
+login-verify-bank.com

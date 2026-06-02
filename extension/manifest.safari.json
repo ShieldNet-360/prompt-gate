@@ -1,0 +1,94 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Gate DLP Companion",
+  "version": "0.1.0",
+  "description": "Intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local Prompt Gate DLP pipeline.",
+
+  "browser_specific_settings": {
+    "safari": {
+      "strict_min_version": "17.0"
+    }
+  },
+
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+
+  "host_permissions": [
+    "http://127.0.0.1:9191/*",
+    "http://localhost:9191/*"
+  ],
+
+  "background": {
+    "scripts": ["dist/background/service-worker.js"],
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "Prompt Gate",
+    "default_popup": "src/popup/popup.html"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/paste-interceptor.js",
+        "dist/content/form-interceptor.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/network-interceptor.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dist/content/main-world-network.js"
+      ],
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ]
+    }
+  ]
+}

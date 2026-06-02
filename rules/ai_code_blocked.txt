@@ -1,0 +1,5 @@
+# Blocked AI code assistant domains.
+.cursor.sh
+.codeium.com
+.tabnine.com
+.replit.com

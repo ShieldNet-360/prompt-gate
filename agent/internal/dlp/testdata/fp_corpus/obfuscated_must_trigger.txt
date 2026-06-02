@@ -1,0 +1,18 @@
+# Obfuscated synthetic secrets — MUST block (after A1 normalize).
+# Tests homoglyph / zero-width / base64 paths.
+
+# Homoglyph: Cyrillic А (U+0410) in place of Latin A
+my key АKIAQDIO5JZ8H4PB7M2N for prod
+the access key is АKIAQDIO5JZ8H4PB7M2N
+
+# Greek Alpha (U+0391) in place of Latin A
+Α prod key: ΑKIAQDIO5JZ8H4PB7M2N
+
+# Zero-width characters interspersed
+my key A​K​I​A​Q​D​I​O​5​J​Z​8​H​4​P​B​7​M​2​N
+
+# Base64-encoded AWS key (decodes to AKIAQDIO5JZ8H4PB7M2N)
+the b64-encoded key is QUtJQVFESU81Slo4SDRQQjdNMk4=
+
+# Fullwidth Latin (NFKC normalizes)
+my AWS key ＡＫＩＡＱＤＩＯ５ＪＺ８Ｈ４ＰＢ７Ｍ２Ｎ

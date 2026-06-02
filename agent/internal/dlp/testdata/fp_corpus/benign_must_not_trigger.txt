@@ -1,0 +1,39 @@
+# Benign prose, code, and high-entropy non-secret content — MUST NOT block.
+
+# Conversational prompts
+Hey can you help me debug this Python function?
+What's the best way to do React state management?
+Please review this code for performance issues.
+Can you explain how OAuth works?
+How do I write a recursive Fibonacci function?
+Explain the difference between TCP and UDP.
+
+# Benign code paste
+def fibonacci(n): return n if n < 2 else fibonacci(n-1) + fibonacci(n-2)
+function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+SELECT id, name, email FROM users WHERE active = true LIMIT 10;
+docker run --rm -it ubuntu:22.04 /bin/bash
+
+# Git commit SHAs / object hashes (high entropy, public)
+8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d1e0f9a8b
+abc123def456789012345678901234567890abcd
+The commit hash is 8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d1e0f9a8b
+
+# Random UUIDs (legit, not in known-example set)
+8b1f3a7c-d4e5-4f6a-9b8c-1d2e3f4a5b6c
+2c4f1a92-3e7b-4f8a-9c1d-5e6f7a8b9c0d
+Session ID: 8b1f3a7c-d4e5-4f6a-9b8c-1d2e3f4a5b6c
+
+# RFC example IPs/domains (not in our bloom but commonly used in docs)
+The server is at 192.0.2.10 on the test network.
+contact us at support@example.com
+visit https://example.com/docs
+
+# Documentation pseudo-code
+let url = `https://api.example.com/v1/users/${userId}`;
+const config = { timeout: 5000, retries: 3 };
+
+# Tutorial language
+First, install the dependencies with npm install.
+The function returns a promise that resolves with the data.
+Memory usage peaked at 256 MB during the test.

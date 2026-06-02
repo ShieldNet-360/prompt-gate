@@ -1,0 +1,41 @@
+{
+  "name": "prompt-gate-tray",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prompt Gate tray app — minimal Electron shell that talks to the Go agent over localhost HTTP.",
+  "homepage": "https://github.com/ShieldNet-360/prompt-gate",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShieldNet-360/prompt-gate.git"
+  },
+  "author": {
+    "name": "Ken Nguyen",
+    "email": "ken@promptgate.dev"
+  },
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "start": "electron .",
+    "package": "npm run build && electron-builder --publish never",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "sharp": "^0.34.5",
+    "typescript": "^5.4.5",
+    "vite": "^5.4.10"
+  }
+}
