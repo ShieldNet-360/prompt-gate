@@ -2,7 +2,7 @@
 
 <!-- Build & quality -->
 [![CI](https://github.com/ShieldNet-360/prompt-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/ShieldNet-360/prompt-gate/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ShieldNet-360/prompt-gate)](https://goreportcard.com/report/github.com/ShieldNet-360/prompt-gate)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ShieldNet-360/prompt-gate/agent)](https://goreportcard.com/report/github.com/ShieldNet-360/prompt-gate/agent)
 [![Coverage: agent/internal/dlp ≥ 80%](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen)](./.github/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/ShieldNet-360/prompt-gate/agent.svg)](https://pkg.go.dev/github.com/ShieldNet-360/prompt-gate/agent)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://shieldnet-360.github.io/prompt-gate/)
