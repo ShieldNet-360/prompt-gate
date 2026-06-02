@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hardened Runtime: required for notarisation (macOS 10.15+). -->
+
+    <!-- Electron / Chromium / V8 need JIT and unsigned-memory to function. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Allow loading Electron's non-Apple-signed helper frameworks. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Network: the tray app talks to the Go agent on localhost and the
+         agent itself listens for browser/extension connections. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- File access: read/write config, rules, DB in ~/.prompt-gate. -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+
+    <!-- Apple Events: osascript "with administrator privileges" for
+         CA install, proxy-helper install, and permission repair. -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>

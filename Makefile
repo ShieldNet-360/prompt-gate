@@ -150,9 +150,10 @@ RES_BIN    := electron/resources/bin
 RES_RULES  := electron/resources/rules
 .PHONY: macos
 macos: electron-deps
-	@echo "==> [1/3] Building Go agent (release)..."
+	@echo "==> [1/3] Building Go agent + proxy-helper (release)..."
 	@mkdir -p $(RES_BIN) $(RES_RULES)
 	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-agent ./cmd/agent
+	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-proxy-helper ./cmd/proxy-helper
 	@cp rules/*.txt rules/*.json $(RES_RULES)/ 2>/dev/null || true
 	@echo "==> [2/3] Building Electron renderer + main..."
 	cd electron && npm run build
@@ -194,16 +195,16 @@ endif
 
 # ──────────────── make portable-win ────────────────
 # Build a portable ZIP for Windows (full Electron UI + bundled agent
-# + rules). No installer — just unzip and double-click "Secure Edge.exe".
+# + rules). No installer — just unzip and double-click "Prompt Gate.exe".
 # Cross-compiles from macOS / Linux.
 .PHONY: portable-win
 portable-win: electron-deps
 	@echo "==> [1/3] Cross-compiling Go agent for Windows amd64..."
 	@mkdir -p $(RES_BIN) $(RES_RULES)
 ifeq ($(PLATFORM),windows)
-	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/secure-edge-agent.exe ./cmd/agent
+	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-agent.exe ./cmd/agent
 else
-	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/secure-edge-agent.exe ./cmd/agent
+	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-agent.exe ./cmd/agent
 endif
 	@cp rules/*.txt rules/*.json $(RES_RULES)/ 2>/dev/null || true
 	@echo "==> [2/3] Building Electron renderer + main..."

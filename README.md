@@ -162,6 +162,38 @@ npm start
 
 The default `dns_listen` port is `127.0.0.1:15353` — no `sudo` required.
 
+### Build Prerequisites
+
+| Dependency | Version | Required for |
+|------------|---------|-------------|
+| Go | ≥ 1.22 | Agent binary |
+| Node.js | ≥ 22 | Electron app, browser extension |
+| Python | ≤ 3.13 | macOS DMG packaging (`electron-builder` uses `dmgbuild` which is incompatible with Python 3.14+) |
+
+> **macOS note:** macOS no longer ships `python`. Install a compatible version
+> and ensure it is available as `python` (not just `python3`) in your PATH,
+> because `electron-builder` spawns a non-interactive shell where aliases are
+> not loaded:
+>
+> ```bash
+> brew install python@3.12
+> sudo ln -sf /opt/homebrew/opt/python@3.12/bin/python3.12 /opt/homebrew/bin/python
+> ```
+
+### Makefile Targets
+
+```bash
+make macos         # macOS .dmg (drag-to-Applications)
+make windows       # Windows NSIS installer (.exe) + portable ZIP
+make portable-win  # Windows portable ZIP only (no installer)
+make linux         # Linux .deb or .tar.gz
+make agent         # Go agent binary (current OS)
+make electron      # Electron app only
+make extension     # Browser extension only
+make test          # Run all tests
+make clean         # Remove all build artifacts
+```
+
 Example `config.yaml`:
 
 ```yaml
