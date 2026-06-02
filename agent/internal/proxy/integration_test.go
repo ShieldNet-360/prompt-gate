@@ -156,6 +156,12 @@ func TestIntegration_ProxyDoesNotLogContent(t *testing.T) {
 	pipeline := buildIntegrationPipeline(t)
 	stats := &fakeStats{}
 	srv, ca := newServer(t, policy, pipeline, stats)
+	// This request is forwarded to the upstream after the (non-blocking)
+	// scan, so the proxy re-originates TLS to the self-signed test
+	// upstream. goproxy verifies upstream certs, so trust the test CA.
+	upstreamPool := x509.NewCertPool()
+	upstreamPool.AddCert(upstream.Certificate())
+	srv.SetUpstreamRootCAs(upstreamPool)
 	proxySrv := httptest.NewServer(srv.Handler())
 	defer proxySrv.Close()
 

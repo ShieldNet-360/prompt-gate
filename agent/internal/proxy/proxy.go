@@ -23,6 +23,8 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"html"
@@ -261,6 +263,32 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 
 	s.httpProxy = proxy
 	return s, nil
+}
+
+// SetUpstreamRootCAs adds trusted root certificates for verifying the
+// TLS connection the proxy makes to an upstream host when MITM'ing a
+// request. Production leaves this unset, so the host's system root
+// store is used and upstream certificates are fully verified (goproxy
+// no longer disables this). It exists for tests that route through a
+// self-signed upstream, and for deployments that pin an internal CA.
+// A nil pool is a no-op.
+func (s *Server) SetUpstreamRootCAs(pool *x509.CertPool) {
+	if s == nil || s.httpProxy == nil || pool == nil {
+		return
+	}
+	tr := s.httpProxy.Tr
+	if tr == nil {
+		tr = http.DefaultTransport.(*http.Transport).Clone()
+	} else {
+		tr = tr.Clone()
+	}
+	if tr.TLSClientConfig == nil {
+		tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	} else {
+		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
+	}
+	tr.TLSClientConfig.RootCAs = pool
+	s.httpProxy.Tr = tr
 }
 
 // Handler exposes the underlying http.Handler. Tests and the API
