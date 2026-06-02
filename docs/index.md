@@ -112,13 +112,13 @@ Prefer a packaged build? Grab a [v1.0.0 release](https://github.com/ShieldNet-36
 for your OS, or use a package manager — see **[Installation](installation/)** for
 Homebrew / winget and how to verify what you install.
 
-The agent exposes a loopback API at `127.0.0.1:8080`. The browser extension and tray app pick it up automatically.
+The agent exposes a loopback API at `127.0.0.1:9191`. The browser extension and tray app pick it up automatically.
 
 ```yaml
 # config.yaml — minimal
 upstream_dns: "8.8.8.8:53"
 dns_listen:   "127.0.0.1:15353"
-api_listen:   "127.0.0.1:8080"
+api_listen:   "127.0.0.1:9191"
 rule_paths:
   - rules/ai_chat_blocked.txt    # Tier 3 — DNS block
   - rules/ai_chat_dlp.txt        # Tier 2 — inspect with DLP
@@ -129,12 +129,12 @@ dlp_exclusions: rules/dlp_exclusions.json
 
 ```bash
 # Test the DLP pipeline
-$ curl -s -X POST http://127.0.0.1:8080/api/dlp/scan \
+$ curl -s -X POST http://127.0.0.1:9191/api/dlp/scan \
     -H 'Content-Type: application/json' \
     -d '{"content":"AKIAIOSFODNN7EXAMPLE is my real key"}'
 {"blocked":true,"pattern_name":"aws_access_key_id","score":0.95}
 
-$ curl -s -X POST http://127.0.0.1:8080/api/dlp/scan \
+$ curl -s -X POST http://127.0.0.1:9191/api/dlp/scan \
     -H 'Content-Type: application/json' \
     -d '{"content":"hello, what is the weather"}'
 {"blocked":false,"pattern_name":"","score":0.0}
