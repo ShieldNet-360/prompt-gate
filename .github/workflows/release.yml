@@ -139,6 +139,7 @@ jobs:
 
       - name: Sync version from git tag
         working-directory: electron
+        shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
           echo "Setting electron package version to ${TAG}"
@@ -189,90 +190,6 @@ jobs:
             electron/release/*.blockmap
           if-no-files-found: warn
 
-  build-extension:
-    name: Browser extension (Chrome + Firefox)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: extension/package-lock.json
-
-      - name: install
-        working-directory: extension
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
-
-      - name: build chrome
-        working-directory: extension
-        run: npm run build
-
-      - name: build firefox
-        working-directory: extension
-        run: npm run build:firefox
-
-      - name: package
-        working-directory: extension
-        run: |
-          mkdir -p artefacts
-          # Chrome: zip the dist/ tree alongside the manifest and assets.
-          (cd dist && zip -r "../artefacts/prompt-gate-chrome-${GITHUB_REF_NAME}.zip" .)
-          # Firefox: same idea but as an .xpi (still a zip under the hood).
-          (cd dist-firefox && zip -r "../artefacts/prompt-gate-firefox-${GITHUB_REF_NAME}.xpi" .)
-
-      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: extension
-          path: extension/artefacts/*
-          if-no-files-found: error
-
-  build-extension-safari:
-    name: Browser extension (Safari)
-    # xcrun safari-web-extension-converter ships with Xcode, so the
-    # Safari Web Extension wrapper can only be produced on a macOS
-    # runner. The dist-safari/ payload itself is cross-platform; only
-    # the Xcode project (.app bundle) requires darwin.
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: extension/package-lock.json
-
-      - name: install
-        working-directory: extension
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
-
-      - name: build safari
-        working-directory: extension
-        run: npm run build:safari
-
-      - name: package
-        working-directory: extension
-        run: |
-          mkdir -p artefacts
-          # Raw extension payload — usable for sideloading via Safari's
-          # Develop menu and for the converter on any other macOS host.
-          (cd dist-safari && zip -r "../artefacts/prompt-gate-safari-${GITHUB_REF_NAME}.zip" .)
-          # Xcode wrapper project, in case downstream packaging wants
-          # to build the .app outside the release pipeline.
-          if [ -d dist-safari-xcode ]; then
-            (cd dist-safari-xcode && zip -r "../artefacts/prompt-gate-safari-xcode-${GITHUB_REF_NAME}.zip" .)
-          fi
-
-      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: extension-safari
-          path: extension/artefacts/*
-          if-no-files-found: warn
-
   build-installers:
     name: Installer (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
@@ -318,7 +235,7 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
+    needs: [build-agent, build-electron, build-installers]
     runs-on: ubuntu-latest
     permissions:
       contents: write     # create the release
@@ -334,7 +251,7 @@ jobs:
           mkdir -p release
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
             -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
-            -o -name '*.zip' -o -name '*.xpi' -o -name 'prompt-gate-agent-*' \
+            -o -name '*.zip' -o -name 'prompt-gate-agent-*' \
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
 
