@@ -16,7 +16,7 @@
 [![Vulnerabilities](https://img.shields.io/badge/govulncheck-0-brightgreen)](https://shieldnet-360.github.io/prompt-gate/reports/security/)
 [![DLP precision](https://img.shields.io/badge/DLP%20precision-100%25-brightgreen)](https://shieldnet-360.github.io/prompt-gate/reports/security/)
 [![Whitepaper](https://img.shields.io/badge/whitepaper-engine%20math-7c3aed)](https://shieldnet-360.github.io/prompt-gate/whitepaper/)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13054/badge)](https://www.bestpractices.dev/projects/13054)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13075/badge)](https://www.bestpractices.dev/projects/13075)
 <!-- Release & meta -->
 [![Latest release](https://img.shields.io/github/v/release/ShieldNet-360/prompt-gate?sort=semver)](https://github.com/ShieldNet-360/prompt-gate/releases)
 [![Downloads](https://img.shields.io/github/downloads/ShieldNet-360/prompt-gate/total)](https://github.com/ShieldNet-360/prompt-gate/releases)

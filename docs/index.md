@@ -15,7 +15,7 @@ Open-source, privacy-first AI Data Loss Prevention for desktop. Block unauthoriz
   <a href="https://github.com/ShieldNet-360/prompt-gate/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ShieldNet-360/prompt-gate/ci.yml?branch=main&label=CI" alt="CI"></a>
   <a href="https://github.com/ShieldNet-360/prompt-gate/actions/workflows/codeql.yml"><img src="https://github.com/ShieldNet-360/prompt-gate/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/ShieldNet-360/prompt-gate"><img src="https://api.scorecard.dev/projects/github.com/ShieldNet-360/prompt-gate/badge" alt="OpenSSF Scorecard"></a>
-  <a href="https://www.bestpractices.dev/projects/13054"><img src="https://www.bestpractices.dev/projects/13054/badge" alt="OpenSSF Best Practices"></a>
+  <a href="https://www.bestpractices.dev/projects/13075"><img src="https://www.bestpractices.dev/projects/13075/badge" alt="OpenSSF Best Practices"></a>
   <a href="https://github.com/ShieldNet-360/prompt-gate/attestations"><img src="https://img.shields.io/badge/provenance-SLSA%20build-blue" alt="SLSA build provenance"></a>
   <img src="https://img.shields.io/badge/signed-Sigstore-0a84ff" alt="Signed with Sigstore">
   <a href="reproducible-builds/"><img src="https://img.shields.io/badge/agent%20build-reproducible-2b6cb0" alt="Reproducible build"></a>
