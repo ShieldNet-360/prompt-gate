@@ -93,12 +93,12 @@ func applyProxyWithCA(host string, port int, caPath string) error {
 }
 
 // caTrusted reports whether our CA is present in any keychain.
-// Checks system keychain first (where installCA puts it), then login.
+// Checks login keychain first (where installCA puts it), then system.
 func caTrusted(_ string) bool {
-	if exec.Command("security", "find-certificate", "-c", caCommonName, systemKeychain).Run() == nil {
+	if exec.Command("security", "find-certificate", "-c", caCommonName, loginKeychain()).Run() == nil {
 		return true
 	}
-	return exec.Command("security", "find-certificate", "-c", caCommonName, loginKeychain()).Run() == nil
+	return exec.Command("security", "find-certificate", "-c", caCommonName, systemKeychain).Run() == nil
 }
 
 func restoreProxy() error {
@@ -174,8 +174,7 @@ func loginKeychain() string {
 func installCA(caPath string) error {
 	kc := loginKeychain()
 
-	// 1. Clean up old duplicates from both keychains.
-	//    Login keychain — no admin needed.
+	// 1. Clean up old duplicates from the login keychain (no prompt).
 	for {
 		if exec.Command("security", "find-certificate", "-c", caCommonName, kc).Run() != nil {
 			break
@@ -184,42 +183,33 @@ func installCA(caPath string) error {
 			break
 		}
 	}
-	//    System keychain — needs admin privileges.
-	if exec.Command("security", "find-certificate", "-c", caCommonName, systemKeychain).Run() == nil {
-		_ = runWithAdmin("clean old CA", fmt.Sprintf(
-			`while /usr/bin/security find-certificate -c %s %s >/dev/null 2>&1; do `+
-				`/usr/bin/security delete-certificate -c %s %s || break; done`,
-			shQuote(caCommonName), shQuote(systemKeychain),
-			shQuote(caCommonName), shQuote(systemKeychain),
-		))
-	}
+	// NOTE: we intentionally do NOT clean the system keychain here.
+	// That would require runWithAdmin (one admin prompt) + the trust
+	// dialog below = two prompts. User-domain trust in the login
+	// keychain takes precedence over system keychain entries, so any
+	// stale system cert is harmless. System keychain cleanup happens
+	// in removeCA instead (single prompt there too).
 
-	// 2. Add cert to the SYSTEM keychain with admin-domain trust (-d).
-	//    Writing to the System keychain requires root, so we use
-	//    runWithAdmin (osascript "with administrator privileges") which
-	//    prompts the user for their password via the macOS admin dialog.
-	//    Once running as root, both the keychain write and the -d trust
-	//    setting succeed in a single prompt.
-	script := fmt.Sprintf(
-		`/usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k %s %s`,
-		shQuote(systemKeychain), shQuote(caPath),
-	)
-	if err := runWithAdmin("install CA", script); err != nil {
-		// Clean up any untrusted cert that may have been added.
-		_ = runWithAdmin("clean failed CA", fmt.Sprintf(
-			`/usr/bin/security delete-certificate -c %s %s 2>/dev/null || true`,
-			shQuote(caCommonName), shQuote(systemKeychain),
-		))
-		return err
+	// 2. Add cert to the LOGIN keychain with user-domain trust.
+	//    This shows exactly ONE macOS trust-settings dialog — the user
+	//    enters their login password and that's it. No osascript admin
+	//    prompt. We avoid the system keychain + admin-domain (-d)
+	//    approach because `security add-trusted-cert -d` triggers
+	//    SecTrustSettingsSetTrustSettings which is blocked under
+	//    hardened runtime ("no user interaction was possible").
+	out, err := exec.Command("security", "add-trusted-cert",
+		"-r", "trustRoot", "-p", "ssl",
+		"-k", kc, caPath,
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("sysconf: install CA (login keychain): %s (%w)", strings.TrimSpace(string(out)), err)
 	}
 
 	// 3. Verify the trust was actually applied.
 	if err := exec.Command("security", "verify-cert", "-c", caPath, "-p", "ssl").Run(); err != nil {
-		_ = runWithAdmin("clean untrusted CA", fmt.Sprintf(
-			`/usr/bin/security delete-certificate -c %s %s 2>/dev/null || true`,
-			shQuote(caCommonName), shQuote(systemKeychain),
-		))
-		return fmt.Errorf("sysconf: CA installed but not trusted (authorization may have been cancelled)")
+		// Clean up the untrusted cert.
+		_ = exec.Command("security", "delete-certificate", "-c", caCommonName, kc).Run()
+		return fmt.Errorf("sysconf: CA installed but not trusted (verify-cert failed)")
 	}
 	return nil
 }

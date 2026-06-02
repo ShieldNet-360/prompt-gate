@@ -137,6 +137,13 @@ jobs:
         working-directory: electron
         run: npm ci
 
+      - name: Sync version from git tag
+        working-directory: electron
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "Setting electron package version to ${TAG}"
+          npm version "${TAG}" --no-git-tag-version --allow-same-version
+
       - name: build renderer + main
         working-directory: electron
         run: npm run build

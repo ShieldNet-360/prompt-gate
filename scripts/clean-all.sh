@@ -7,7 +7,7 @@ APP_NAME="Prompt Gate"
 AGENT_NAME="prompt-gate-agent"
 HELPER_NAME="prompt-gate-proxy-helper"
 CA_CN="Prompt Gate Local CA"
-BUNDLE_ID="com.prompt-gate.app"
+BUNDLE_ID="com.shieldnet360.promptgate"
 LOGIN_KC="$HOME/Library/Keychains/login.keychain-db"
 SYSTEM_KC="/Library/Keychains/System.keychain"
 
@@ -36,11 +36,16 @@ fi
 
 echo "==> Removing ~/.prompt-gate..."
 rm -rf "$HOME/.prompt-gate"
+# Clean legacy Secure Edge data directory if present.
+rm -rf "$HOME/.secure-edge"
 
 echo "==> Removing Electron user data (localStorage, caches)..."
 rm -rf "$HOME/Library/Application Support/Prompt Gate"
 rm -rf "$HOME/Library/Caches/Prompt Gate"
-rm -rf "$HOME/Library/Preferences/com.prompt-gate.app.plist"
+rm -rf "$HOME/Library/Preferences/com.shieldnet360.promptgate.plist"
+# Clean legacy Secure Edge Electron data if present.
+rm -rf "$HOME/Library/Application Support/Secure Edge"
+rm -rf "$HOME/Library/Caches/Secure Edge"
 
 echo "==> Removing from /Applications..."
 rm -rf "/Applications/Prompt Gate.app"
@@ -55,16 +60,17 @@ rm -rf "$SCRIPT_DIR/electron/release"
 echo "==> Removing electron/resources/bin..."
 rm -rf "$SCRIPT_DIR/electron/resources/bin"
 
-echo "==> Checking /Volumes for Prompt Gate..."
-if [ -d "/Volumes/Prompt Gate" ]; then
-  echo "    Ejecting /Volumes/Prompt Gate..."
-  hdiutil detach "/Volumes/Prompt Gate" -force 2>/dev/null || true
-fi
+echo "==> Ejecting any mounted Prompt Gate DMG volumes..."
+for vol in /Volumes/Prompt\ Gate*; do
+  [ -d "$vol" ] || continue
+  echo "    Ejecting $vol..."
+  hdiutil detach "$vol" -force 2>/dev/null || true
+done
 
 echo "==> Removing proxy-helper launchd service..."
 sudo launchctl bootout system/com.shieldnet360.promptgate.proxy-helper 2>/dev/null || true
 sudo rm -f /Library/LaunchDaemons/com.shieldnet360.promptgate.proxy-helper.plist
-sudo rm -f /usr/local/bin/prompt-gate-proxy-helper
+sudo rm -f /Library/PrivilegedHelperTools/com.shieldnet360.promptgate.proxy-helper
 
 echo "==> Restoring system proxy settings..."
 for svc in $(networksetup -listallnetworkservices | tail -n +2 | grep -v '^\*'); do

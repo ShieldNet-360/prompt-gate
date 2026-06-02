@@ -29,6 +29,10 @@ extraResources:
       - "**/*"
 mac:
   category: public.app-category.utilities
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.inherit.plist
   target:
     - dmg
 dmg:
