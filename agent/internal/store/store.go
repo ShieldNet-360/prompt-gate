@@ -563,7 +563,7 @@ func (s *Store) SetBlockEventsEnabled(ctx context.Context, enabled bool, nowUnix
 type BlockEvent struct {
 	ID          int64  `json:"id"`
 	Timestamp   string `json:"timestamp"`
-	EventType   string `json:"event_type"`   // "dlp" or "category"
+	EventType   string `json:"event_type"` // "dlp" or "category"
 	Host        string `json:"host"`
 	PatternName string `json:"pattern_name"` // DLP pattern that triggered, or category name
 	Action      string `json:"action"`       // "blocked"

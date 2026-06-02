@@ -46,12 +46,12 @@ func TestPipeline_ScanWithContext_EmptySource_MatchesScan(t *testing.T) {
 	// Build a tiny pipeline with one AWS-shape pattern.
 	patterns := []*Pattern{
 		mustCompilePattern(t, &Pattern{
-			Name:        "AWS Access Key",
-			Regex:       `AKIA[0-9A-Z]{16}`,
-			Prefix:      "AKIA",
-			Severity:    SeverityCritical,
-			ScoreWeight: 1,
-			Hotwords:    []string{"aws"},
+			Name:          "AWS Access Key",
+			Regex:         `AKIA[0-9A-Z]{16}`,
+			Prefix:        "AKIA",
+			Severity:      SeverityCritical,
+			ScoreWeight:   1,
+			Hotwords:      []string{"aws"},
 			HotwordWindow: 200,
 			HotwordBoost:  2,
 		}),

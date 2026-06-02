@@ -51,16 +51,16 @@ func NormalizeContent(content string) string {
 // zeroWidthRunes is the set of zero-width and invisible format
 // characters that should be stripped before scanning.
 var zeroWidthRunes = map[rune]struct{}{
-	'​': {}, // zero-width space
-	'‌': {}, // zero-width non-joiner
-	'‍': {}, // zero-width joiner
-	'‎': {}, // left-to-right mark
-	'‏': {}, // right-to-left mark
-	'⁠': {}, // word joiner
+	'​':      {}, // zero-width space
+	'‌':      {}, // zero-width non-joiner
+	'‍':      {}, // zero-width joiner
+	'‎':      {}, // left-to-right mark
+	'‏':      {}, // right-to-left mark
+	'⁠':      {}, // word joiner
 	'\uFEFF': {}, // BOM / ZWNBSP
-	'­': {}, // soft hyphen
-	'᠎': {}, // Mongolian vowel separator
-	'؜': {}, // Arabic letter mark
+	'­':      {}, // soft hyphen
+	'᠎':      {}, // Mongolian vowel separator
+	'؜':      {}, // Arabic letter mark
 }
 
 func stripZeroWidth(s string) string {

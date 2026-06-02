@@ -68,7 +68,9 @@ func TestAllowlist_AddListRemoveRoundTrip(t *testing.T) {
 	if addRec.Code != http.StatusCreated {
 		t.Fatalf("POST: expected 201, got %d (body=%q)", addRec.Code, addRec.Body.String())
 	}
-	var addResp struct{ SaltedHash string `json:"salted_hash"` }
+	var addResp struct {
+		SaltedHash string `json:"salted_hash"`
+	}
 	if err := json.Unmarshal(addRec.Body.Bytes(), &addResp); err != nil {
 		t.Fatalf("decode add: %v", err)
 	}

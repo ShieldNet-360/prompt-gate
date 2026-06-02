@@ -51,14 +51,14 @@ type StatusResponse struct {
 // All fields are derived from runtime.MemStats / runtime.NumGoroutine
 // and contain no user-derived data.
 type RuntimeStats struct {
-	GoVersion     string `json:"go_version"`
-	NumGoroutine  int    `json:"num_goroutine"`
-	NumCPU        int    `json:"num_cpu"`
-	HeapAllocKB   uint64 `json:"heap_alloc_kb"`
-	HeapInuseKB   uint64 `json:"heap_inuse_kb"`
-	SysKB         uint64 `json:"sys_kb"`
-	NumGC         uint32 `json:"num_gc"`
-	GoMaxProcs    int    `json:"gomaxprocs"`
+	GoVersion    string `json:"go_version"`
+	NumGoroutine int    `json:"num_goroutine"`
+	NumCPU       int    `json:"num_cpu"`
+	HeapAllocKB  uint64 `json:"heap_alloc_kb"`
+	HeapInuseKB  uint64 `json:"heap_inuse_kb"`
+	SysKB        uint64 `json:"sys_kb"`
+	NumGC        uint32 `json:"num_gc"`
+	GoMaxProcs   int    `json:"gomaxprocs"`
 }
 
 // RuleFileInfo carries the modification time and byte size of a rule

@@ -54,15 +54,15 @@ const maxScanBytes = 4 * 1024 * 1024
 type PolicyAction string
 
 const (
-	PolicyAllow       PolicyAction = "allow"
-	PolicyAllowDLP    PolicyAction = "allow_with_dlp"
-	PolicyDeny        PolicyAction = "deny"
+	PolicyAllow    PolicyAction = "allow"
+	PolicyAllowDLP PolicyAction = "allow_with_dlp"
+	PolicyDeny     PolicyAction = "deny"
 	// PolicyMonitor is used for categorized domains whose current policy
 	// is "allow". The CONNECT is MITM'd so DoFunc runs on every
 	// request and re-checks the live policy — if the admin flips the
 	// category to "deny", the very next request is blocked without
 	// waiting for Chrome to tear down the keep-alive connection.
-	PolicyMonitor     PolicyAction = "monitor"
+	PolicyMonitor PolicyAction = "monitor"
 )
 
 // PolicyChecker reports the resolved action for a given hostname.
@@ -216,11 +216,15 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 		}
 
 		result := s.dlp.Scan(req.Context(), bytesToString(body))
-		// Drop the in-memory slice as soon as the scan completes.
-		// The DLP pipeline copies any matched ranges into ScanResult
-		// fields (just the pattern name) before returning, so the
-		// raw body has no further reason to live in this goroutine.
-		body = nil
+		// Wipe the raw body as soon as the scan completes. The DLP
+		// pipeline copies any matched ranges into ScanResult fields
+		// (just the pattern name) before returning, so the request
+		// bytes — which may contain a secret — have no further reason
+		// to live in this goroutine. Zero them rather than just
+		// dropping the reference so the values don't linger in memory.
+		for i := range body {
+			body[i] = 0
+		}
 		s.scans.Add(1)
 		s.bumpStats(req.Context(), result.Blocked)
 
