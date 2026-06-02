@@ -146,6 +146,33 @@ func TestLoadFromURL(t *testing.T) {
 	}
 }
 
+// TestLoadFromURL_DialGuardBlocksPrivate proves the SSRF guard is
+// TOCTOU-safe: even when the host pre-check is bypassed (simulating a
+// DNS-rebind that defeats rejectPrivateHost) and the default client is
+// used, the dial-time Control hook refuses to connect to a private /
+// reserved IP — so the secret never leaves to an internal target.
+func TestLoadFromURL_DialGuardBlocksPrivate(t *testing.T) {
+	orig := rejectPrivateHost
+	rejectPrivateHost = func(string) error { return nil } // simulate the host pre-check being raced/bypassed
+	t.Cleanup(func() { rejectPrivateHost = orig })
+
+	ctx := context.Background()
+	// client == nil → the guarded default client is built. The dial
+	// Control must reject these before any connection is made.
+	for _, target := range []string{
+		"http://127.0.0.1:9/profile.json",         // loopback
+		"http://169.254.169.254/latest/meta-data", // cloud metadata (link-local)
+	} {
+		_, err := LoadFromURL(ctx, nil, target)
+		if err == nil {
+			t.Fatalf("expected dial guard to block %q", target)
+		}
+		if !strings.Contains(err.Error(), "private/reserved IP") {
+			t.Fatalf("expected private/reserved IP refusal for %q, got: %v", target, err)
+		}
+	}
+}
+
 func TestHolder(t *testing.T) {
 	h := NewHolder(nil)
 	if h.Get() != nil {

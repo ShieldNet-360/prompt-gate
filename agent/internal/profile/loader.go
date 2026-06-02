@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -57,7 +58,7 @@ func LoadFromURL(ctx context.Context, client *http.Client, rawURL string) (*Prof
 	}
 
 	if client == nil {
-		client = &http.Client{Timeout: DefaultHTTPTimeout}
+		client = newGuardedClient()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -113,4 +114,44 @@ func strictRejectPrivateHost(host string) error {
 // RFC-1918 / RFC-4193 private range.
 func isPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate()
+}
+
+// newGuardedClient builds the default HTTP client used when the caller
+// supplies none. Its dialer validates the *connected* IP at dial time,
+// closing the DNS-rebinding / TOCTOU gap that the host pre-check
+// (rejectPrivateHost) leaves open: rejectPrivateHost resolves the host
+// once, but client.Do resolves again before connecting, so a low-TTL
+// attacker could rebind a public hostname to a private/reserved IP
+// between the two. The Control hook runs on the exact address the socket
+// is about to connect to, so the SSRF guard cannot be raced.
+func newGuardedClient() *http.Client {
+	dialer := &net.Dialer{
+		Timeout: DefaultHTTPTimeout,
+		Control: func(_, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+			ip := net.ParseIP(host)
+			if ip == nil {
+				return fmt.Errorf("profile: refusing to dial unresolved address %q", address)
+			}
+			if isPrivateIP(ip) {
+				return fmt.Errorf("profile: refusing to connect to private/reserved IP %s", ip)
+			}
+			return nil
+		},
+	}
+	return &http.Client{
+		Timeout: DefaultHTTPTimeout,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           dialer.DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          10,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 }
