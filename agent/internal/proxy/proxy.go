@@ -262,16 +262,32 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 	})
 
 	s.httpProxy = proxy
+
+	// TEMPORARY (preserve v1.0.0 behavior): goproxy 1.8.4 turned on
+	// upstream TLS verification by default. We don't yet expose an
+	// upstream CA-bundle config or a fail page for verification errors,
+	// so enabling it now would break enterprise/double-proxy and
+	// internal/self-signed upstream deployments that worked in v1.0.0.
+	// Keep the prior skip-verify behavior; opt back into verification
+	// per-server via SetUpstreamRootCAs once that config lands.
+	tr := proxy.Tr.Clone()
+	if tr.TLSClientConfig == nil {
+		tr.TLSClientConfig = &tls.Config{}
+	} else {
+		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
+	}
+	tr.TLSClientConfig.InsecureSkipVerify = true // intentional; see note above
+	proxy.Tr = tr
+
 	return s, nil
 }
 
-// SetUpstreamRootCAs adds trusted root certificates for verifying the
-// TLS connection the proxy makes to an upstream host when MITM'ing a
-// request. Production leaves this unset, so the host's system root
-// store is used and upstream certificates are fully verified (goproxy
-// no longer disables this). It exists for tests that route through a
-// self-signed upstream, and for deployments that pin an internal CA.
-// A nil pool is a no-op.
+// SetUpstreamRootCAs opts this proxy back into upstream TLS verification
+// and trusts the given roots when it MITM's a request and re-originates
+// to the destination host. By default the proxy skips upstream
+// verification (preserving v1.0.0 behavior — see New); calling this
+// enables full verification against pool. A nil pool is a no-op. This
+// is the seam an upstream CA-bundle config option will use.
 func (s *Server) SetUpstreamRootCAs(pool *x509.CertPool) {
 	if s == nil || s.httpProxy == nil || pool == nil {
 		return
@@ -288,6 +304,7 @@ func (s *Server) SetUpstreamRootCAs(pool *x509.CertPool) {
 		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
 	}
 	tr.TLSClientConfig.RootCAs = pool
+	tr.TLSClientConfig.InsecureSkipVerify = false
 	s.httpProxy.Tr = tr
 }
 
