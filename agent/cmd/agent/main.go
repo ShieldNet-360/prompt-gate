@@ -774,6 +774,16 @@ func (p *proxyAdapter) Status() api.ProxyStatus {
 	}
 }
 
+func (p *proxyAdapter) SetUpstreamCA(pem []byte) ([]string, error) {
+	return p.c.SetUpstreamCA(pem)
+}
+
+func (p *proxyAdapter) ClearUpstreamCA() error { return p.c.ClearUpstreamCA() }
+
+func (p *proxyAdapter) UpstreamCAStatus() (bool, []string) {
+	return p.c.UpstreamCAStatus()
+}
+
 // allowlistSaltPath returns the path where the per-install feedback-allowlist
 // salt is written (~/.prompt-gate/allowlist-salt). Returns an error
 // when HOME cannot be determined.

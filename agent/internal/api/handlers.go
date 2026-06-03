@@ -893,6 +893,61 @@ func (s *Server) handleProxyStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
 }
 
+// maxUpstreamCABytes caps the size of an imported upstream CA bundle.
+const maxUpstreamCABytes = 256 * 1024 // 256 KiB — a few certs at most.
+
+// upstreamCARequest is the POST body for /api/proxy/upstream-ca: a PEM
+// bundle of CA certificates to trust for upstream TLS verification.
+type upstreamCARequest struct {
+	PEM string `json:"pem"`
+}
+
+// upstreamCAResponse reports whether a bundle is configured and the
+// subject common names of its certificates.
+type upstreamCAResponse struct {
+	Configured bool     `json:"configured"`
+	Subjects   []string `json:"subjects,omitempty"`
+}
+
+// handleProxyUpstreamCA manages the proxy's extra upstream CA bundle:
+//
+//	GET    → current status (configured + subjects)
+//	POST   → import a PEM bundle ({"pem": "..."}); trusted alongside the
+//	         system store. Verification stays on; this only widens trust.
+//	DELETE → remove the bundle, reverting to the system store only.
+func (s *Server) handleProxyUpstreamCA(w http.ResponseWriter, r *http.Request) {
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		configured, subjects := s.Proxy.UpstreamCAStatus()
+		writeJSON(w, http.StatusOK, upstreamCAResponse{Configured: configured, Subjects: subjects})
+	case http.MethodPost:
+		var body upstreamCARequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, maxUpstreamCABytes)).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		subjects, err := s.Proxy.SetUpstreamCA([]byte(body.PEM))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, upstreamCAResponse{Configured: true, Subjects: subjects})
+	case http.MethodDelete:
+		if err := s.Proxy.ClearUpstreamCA(); err != nil {
+			writeErrorRedacted(w, http.StatusInternalServerError, "clear upstream CA failed", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, upstreamCAResponse{Configured: false})
+	default:
+		w.Header().Set("Allow", "GET, POST, DELETE")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
 // maxProfileBytes caps the size of a profile uploaded via
 // /api/profile/import to keep an unbounded body from exhausting
 // memory. Profiles are tiny JSON documents in practice.

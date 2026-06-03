@@ -18,6 +18,7 @@ export interface PromptGateBridge {
   onNavigate(cb: (view: PromptGateView) => void): () => void;
   onEvent?(cb: (event: AgentEvent) => void): () => void;
   openExternal?(url: string): void;
+  pickUpstreamCA?(): Promise<{ name: string; pem: string } | null>;
 }
 
 declare global {

@@ -248,6 +248,59 @@ func TestUpstreamVerification_DefaultRejects_BundleTrusts(t *testing.T) {
 	}
 }
 
+// TestController_UpstreamCAManagement covers importing, reading, and
+// clearing an upstream CA bundle through the controller.
+func TestController_UpstreamCAManagement(t *testing.T) {
+	dir := t.TempDir()
+	c, err := NewController(ControllerConfig{
+		ListenAddr: "127.0.0.1:0",
+		CertPath:   filepath.Join(dir, "ca.crt"),
+		KeyPath:    filepath.Join(dir, "ca.key"),
+		Policy:     PolicyCheckerFunc(func(string) PolicyAction { return PolicyAllow }),
+		Scanner:    buildIntegrationPipeline(t),
+	})
+	if err != nil {
+		t.Fatalf("NewController: %v", err)
+	}
+
+	// A valid cert PEM (borrow an httptest server's self-signed cert).
+	up := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer up.Close()
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: up.Certificate().Raw})
+
+	if ok, _ := c.UpstreamCAStatus(); ok {
+		t.Fatal("expected no bundle initially")
+	}
+	subjects, err := c.SetUpstreamCA(certPEM)
+	if err != nil {
+		t.Fatalf("SetUpstreamCA: %v", err)
+	}
+	if len(subjects) == 0 {
+		t.Fatal("expected at least one subject")
+	}
+	if !fileExists(filepath.Join(dir, "upstream-ca.pem")) {
+		t.Fatal("bundle not persisted at managed path")
+	}
+	if ok, subs := c.UpstreamCAStatus(); !ok || len(subs) == 0 {
+		t.Fatalf("status after import = (%v, %v)", ok, subs)
+	}
+
+	// Garbage PEM is rejected and does not clobber the existing bundle.
+	if _, err := c.SetUpstreamCA([]byte("not a certificate")); err == nil {
+		t.Fatal("expected error for invalid PEM")
+	}
+
+	if err := c.ClearUpstreamCA(); err != nil {
+		t.Fatalf("ClearUpstreamCA: %v", err)
+	}
+	if ok, _ := c.UpstreamCAStatus(); ok {
+		t.Fatal("bundle should be cleared")
+	}
+	if fileExists(filepath.Join(dir, "upstream-ca.pem")) {
+		t.Fatal("managed file should be removed after clear")
+	}
+}
+
 // buildIntegrationPipeline returns a real dlp.Pipeline configured
 // with a single regex that matches "OPENAI_KEY=sk-..." style
 // strings. The token used by TestIntegration_Tier2HTTPSBlockedByRealDLP

@@ -21,6 +21,7 @@ export interface PromptGateBridge {
   onNavigate(cb: (view: PromptGateView) => void): () => void;
   onEvent(cb: (event: AgentEvent) => void): () => void;
   openExternal(url: string): void;
+  pickUpstreamCA(): Promise<{ name: string; pem: string } | null>;
 }
 
 const bridge: PromptGateBridge = {
@@ -39,6 +40,7 @@ const bridge: PromptGateBridge = {
   openExternal: (url) => {
     void ipcRenderer.invoke('prompt-gate:open-external', url);
   },
+  pickUpstreamCA: () => ipcRenderer.invoke('prompt-gate:pick-upstream-ca'),
 };
 
 contextBridge.exposeInMainWorld('secureEdge', bridge);

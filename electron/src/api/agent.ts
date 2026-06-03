@@ -117,6 +117,12 @@ export interface ProxyStatus {
   dlp_blocks_total: number;
 }
 
+// UpstreamCAStatus mirrors the /api/proxy/upstream-ca response.
+export interface UpstreamCAStatus {
+  configured: boolean;
+  subjects?: string[];
+}
+
 export interface ProxyEnableResponse {
   ca_cert_path: string;
 }
@@ -212,6 +218,18 @@ export const agent = {
       method: 'POST',
       body: JSON.stringify({ remove_ca: removeCA }),
     });
+  },
+  async getUpstreamCA(): Promise<UpstreamCAStatus> {
+    return http<UpstreamCAStatus>('/api/proxy/upstream-ca');
+  },
+  async setUpstreamCA(pem: string): Promise<UpstreamCAStatus> {
+    return http<UpstreamCAStatus>('/api/proxy/upstream-ca', {
+      method: 'POST',
+      body: JSON.stringify({ pem }),
+    });
+  },
+  async clearUpstreamCA(): Promise<UpstreamCAStatus> {
+    return http<UpstreamCAStatus>('/api/proxy/upstream-ca', { method: 'DELETE' });
   },
 
   // DLP scoring threshold tuning.
