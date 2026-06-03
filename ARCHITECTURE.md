@@ -590,7 +590,7 @@ and `recall ≥ 60 %`. The wider `TestDLPAccuracyCorpus`
 
 #### Shipped Pattern Coverage
 
-The repository ships **163** patterns across **13** JSON categories — see
+The repository ships **165** patterns across **14** JSON categories — see
 [`SECURITY_RULES.md`](./SECURITY_RULES.md) for the full reference table.
 Categories include cloud providers (AWS, Azure, GCP), cloud
 infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify, Supabase,

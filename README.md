@@ -452,7 +452,7 @@ launch-day measurement is precision 100 %, recall 73 %, FP rate 0 %.
 
 ## DLP Coverage
 
-Prompt Gate ships **163** real-world detection patterns across **13**
+Prompt Gate ships **165** real-world detection patterns across **14**
 JSON categories: cloud providers (AWS, Azure, GCP, Google Services),
 cloud infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify,
 Supabase, Pulumi, Helm, Terraform, Docker, K8s), version control

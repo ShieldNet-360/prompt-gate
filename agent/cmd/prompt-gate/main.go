@@ -1,6 +1,6 @@
 // Command prompt-gate is the standalone CLI for the Prompt Gate DLP
 // engine. It scans content from a file or stdin against the same
-// 163-pattern library the agent uses, with the full accuracy and
+// 165-pattern library the agent uses, with the full accuracy and
 // source-context layers active.
 //
 // Quick start:

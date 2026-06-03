@@ -38,16 +38,23 @@ export const MAX_SCAN_BYTES = 1 * 1024 * 1024; // 1 MiB
 export const SESSION_ID: string = generateSessionID();
 
 function generateSessionID(): string {
-    try {
-        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    // The session id is a per-tab correlation token (opaque, in-memory,
+    // sent only to the local loopback agent) — not a security secret. We
+    // still source it from Web Crypto so there is no weak randomness in
+    // the codebase. crypto is always present in an extension content
+    // script (a secure context); the non-random tail is an unreachable
+    // safety net, never Math.random.
+    if (typeof crypto !== "undefined") {
+        if (typeof crypto.randomUUID === "function") {
             return crypto.randomUUID();
         }
-    } catch {
-        // crypto unavailable — fall through.
+        if (typeof crypto.getRandomValues === "function") {
+            const b = new Uint8Array(16);
+            crypto.getRandomValues(b);
+            return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+        }
     }
-    // Fallback for environments without crypto.randomUUID. Not
-    // cryptographically strong, but the correlator only needs uniqueness per tab.
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+    return Date.now().toString(36) + "-" + performance.now().toString(36);
 }
 
 /** Scan `content` through the local agent's DLP pipeline.

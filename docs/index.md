@@ -24,8 +24,8 @@ Open-source, privacy-first AI Data Loss Prevention for desktop. Block unauthoriz
   <a href="https://github.com/ShieldNet-360/prompt-gate/releases"><img src="https://img.shields.io/github/downloads/ShieldNet-360/prompt-gate/total?label=downloads&color=brightgreen" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/platforms-win%20%7C%20mac%20%7C%20linux-green" alt="Platforms">
   <img src="https://img.shields.io/badge/browsers-chrome%20%7C%20firefox%20%7C%20safari-blue" alt="Browsers">
-  <img src="https://img.shields.io/badge/DLP%20patterns-163-cyan" alt="DLP patterns">
-  <img src="https://img.shields.io/badge/categories-13-blueviolet" alt="Categories">
+  <img src="https://img.shields.io/badge/DLP%20patterns-165-cyan" alt="DLP patterns">
+  <img src="https://img.shields.io/badge/categories-14-blueviolet" alt="Categories">
   <img src="https://img.shields.io/badge/privacy%20invariant-tested-brightgreen" alt="Privacy invariant tested">
   <img src="https://img.shields.io/badge/OWASP_Agentic-ASI--02_%2B_ASI--06_endpoint-orange" alt="OWASP scoped">
 </div>
@@ -44,8 +44,8 @@ git clone https://github.com/ShieldNet-360/prompt-gate.git && cd prompt-gate && 
 </div>
 
 <div class="se-stats">
-  <div class="se-stat"><span class="se-stat-value">163</span><span class="se-stat-label">DLP Patterns</span></div>
-  <div class="se-stat"><span class="se-stat-value">13</span><span class="se-stat-label">Categories</span></div>
+  <div class="se-stat"><span class="se-stat-value">165</span><span class="se-stat-label">DLP Patterns</span></div>
+  <div class="se-stat"><span class="se-stat-value">14</span><span class="se-stat-label">Categories</span></div>
   <div class="se-stat"><span class="se-stat-value">3</span><span class="se-stat-label">Operating Systems</span></div>
   <div class="se-stat"><span class="se-stat-value">3</span><span class="se-stat-label">Browsers</span></div>
   <div class="se-stat"><span class="se-stat-value">&lt;1ms</span><span class="se-stat-label">DLP Scan Budget</span></div>
@@ -66,7 +66,7 @@ git clone https://github.com/ShieldNet-360/prompt-gate.git && cd prompt-gate && 
 <div class="se-card">
 <span class="se-card-icon">⚡</span>
 <span class="se-card-body"><span class="se-card-title">On-device & fast</span>
-<span class="se-card-desc">A single static Go binary. 163 patterns scanned in &lt;1ms, no cloud round-trip, no account, no telemetry.</span></span>
+<span class="se-card-desc">A single static Go binary. 165 patterns scanned in &lt;1ms, no cloud round-trip, no account, no telemetry.</span></span>
 </div>
 <div class="se-card">
 <span class="se-card-icon">🧩</span>
@@ -179,7 +179,7 @@ Every layer is optional. DNS alone gives you allow-listed AI. Add the extension 
 <a class="se-card" data-pkg="dlp" href="dlp-pattern-authoring-guide/">
 <span class="se-card-icon">🛡️</span>
 <span class="se-card-body"><span class="se-card-title">DLP Pipeline</span>
-<span class="se-card-desc">5 stages: classifier · Aho-Corasick · regex · scoring · threshold. 163 patterns, &lt;1ms.</span></span>
+<span class="se-card-desc">5 stages: classifier · Aho-Corasick · regex · scoring · threshold. 165 patterns, &lt;1ms.</span></span>
 </a>
 <a class="se-card" data-pkg="dns" href="admin-guide/">
 <span class="se-card-icon">🌐</span>

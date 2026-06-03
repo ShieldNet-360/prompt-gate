@@ -60,6 +60,10 @@ jobs:
         working-directory: agent
         run: make build
 
+      - name: govulncheck
+        working-directory: agent
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
   electron:
     name: Electron Tray (typecheck)
     runs-on: ubuntu-latest
