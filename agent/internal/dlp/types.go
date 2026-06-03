@@ -56,6 +56,12 @@ type Pattern struct {
 	RequireHotword bool     `json:"require_hotword"`
 	EntropyMin     float64  `json:"entropy_min"`
 
+	// Disabled marks a pattern as off by default. The pattern is
+	// still loaded and available for override files or API toggles,
+	// but LoadPatterns strips it from the active set unless an
+	// override explicitly re-enables it.
+	Disabled bool `json:"disabled,omitempty"`
+
 	// Category groups patterns for selective enable/disable
 	// ("PII", "cloud", "auth", …). Patterns loaded without a
 	// category default to CategoryUncategorized so the toggle UI
