@@ -1,0 +1,33 @@
+name: Notify ntfy on new star
+
+# GitHub fires the `watch` event (action: started) when someone stars the
+# repo — there is no separate "star" event, and unstarring does not fire.
+# The event payload carries the new total (stargazers_count) and who starred.
+
+on:
+  watch:
+    types: [started]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push ntfy notification
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          STARGAZER: ${{ github.event.sender.login }}
+          STARGAZER_URL: ${{ github.event.sender.html_url }}
+          STAR_COUNT: ${{ github.event.repository.stargazers_count }}
+          REPO: ${{ github.repository }}
+          REPO_URL: ${{ github.event.repository.html_url }}
+        run: |
+          curl -fsSL \
+            -H "Title: ⭐ ${REPO} is at ${STAR_COUNT} stars" \
+            -H "Tags: star" \
+            -H "Click: ${STARGAZER_URL}" \
+            -d "${STARGAZER} just starred ${REPO}
+          ${REPO_URL}/stargazers" \
+            "https://ntfy.sh/${NTFY_TOPIC}"
