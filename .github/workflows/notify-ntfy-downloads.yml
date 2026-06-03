@@ -1,0 +1,74 @@
+name: Notify ntfy on new downloads
+
+# GitHub fires NO event when a release asset is downloaded (unlike stars,
+# which use the `watch` event). The only way to track downloads is to poll
+# the release assets' download_count on a schedule and notify when the total
+# rises. The previous total is kept in the Actions cache — a daily run keeps
+# the entry warm so it is never evicted (eviction needs 7 days of no access).
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # daily at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  downloads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore previous download total
+        id: state
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .dl-state
+          key: ntfy-downloads-${{ github.run_id }}
+          restore-keys: |
+            ntfy-downloads-
+
+      - name: Compare totals and notify on increase
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cur=$(gh api "repos/${REPO}/releases" \
+            -q '[.[].assets[].download_count] | add // 0')
+
+          prev=""
+          [ -f .dl-state ] && prev=$(cat .dl-state)
+
+          echo "previous=${prev:-<none>} current=${cur}"
+
+          if [ -z "$prev" ]; then
+            echo "First run — seeding baseline at ${cur}, no notification."
+          elif [ "$cur" -gt "$prev" ]; then
+            delta=$((cur - prev))
+            # short per-release breakdown for context
+            breakdown=$(gh api "repos/${REPO}/releases" \
+              -q '[.[] | "\(.tag_name): \([.assets[].download_count] | add // 0)"] | join(" | ")')
+            curl -fsSL \
+              -H "Title: ⬇️ ${REPO}: +${delta} downloads (${cur} total)" \
+              -H "Tags: arrow_down" \
+              -H "Click: https://github.com/${REPO}/releases" \
+              -d "${breakdown}" \
+              "https://ntfy.sh/${NTFY_TOPIC}"
+            echo "Notified: +${delta} (now ${cur})."
+          else
+            echo "No increase (current ${cur} <= previous ${prev})."
+          fi
+
+          printf '%s' "$cur" > .dl-state
+
+      - name: Save updated download total
+        if: always()
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .dl-state
+          key: ntfy-downloads-${{ github.run_id }}
