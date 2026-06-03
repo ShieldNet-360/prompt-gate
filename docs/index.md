@@ -37,7 +37,7 @@ git clone https://github.com/ShieldNet-360/prompt-gate.git && cd prompt-gate && 
 <div class="se-hero-badges">
   <a href="installation/">📦 Install</a>
   <a href="quickstart/">🚀 Quick Start</a>
-  <a href="https://github.com/ShieldNet-360/prompt-gate/releases/latest">⬇️ Download v1.0.0</a>
+  <a href="https://github.com/ShieldNet-360/prompt-gate/releases/latest">⬇️ Download v1.0.1</a>
   <a href="https://github.com/ShieldNet-360/prompt-gate">💻 GitHub</a>
   <a href="admin-guide/">⚙️ Admin Guide</a>
   <a href="user-guide/">👤 User Guide</a>
@@ -108,7 +108,7 @@ cd prompt-gate && make dist
 ./agent/prompt-gate-agent --config config.yaml
 ```
 
-Prefer a packaged build? Grab a [v1.0.0 release](https://github.com/ShieldNet-360/prompt-gate/releases/latest)
+Prefer a packaged build? Grab a [v1.0.1 release](https://github.com/ShieldNet-360/prompt-gate/releases/latest)
 for your OS, or use a package manager — see **[Installation](installation/)** for
 Homebrew / winget and how to verify what you install.
 
@@ -356,7 +356,7 @@ Prompt Gate is open source under the MIT license and built in the open.
 
 <div class="se-hero-badges">
   <a href="https://github.com/ShieldNet-360/prompt-gate">⭐ Star on GitHub</a>
-  <a href="https://github.com/ShieldNet-360/prompt-gate/releases/latest">⬇️ Download v1.0.0</a>
+  <a href="https://github.com/ShieldNet-360/prompt-gate/releases/latest">⬇️ Download v1.0.1</a>
   <a href="https://github.com/ShieldNet-360/prompt-gate/blob/main/CONTRIBUTING.md">🤝 Contribute</a>
   <a href="https://github.com/ShieldNet-360/prompt-gate/issues">🐛 Report an issue</a>
   <a href="https://github.com/ShieldNet-360/prompt-gate/security/policy">🔐 Security policy</a>

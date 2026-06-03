@@ -2,7 +2,7 @@
 
 Prompt Gate ships a Go agent, a browser companion, and an Electron tray. Pick the
 path that suits you — all artifacts for the current release are on the
-[v1.0.0 release page](https://github.com/ShieldNet-360/prompt-gate/releases/tag/v1.0.0).
+[v1.0.1 release page](https://github.com/ShieldNet-360/prompt-gate/releases/tag/v1.0.1).
 
 !!! note "Code-signing status"
     Builds are **not yet Apple-notarized / Authenticode-signed**, so Gatekeeper

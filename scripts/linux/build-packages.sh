@@ -13,7 +13,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")"/../.. && pwd)"
 OUT_DIR="${REPO_ROOT}/dist/linux"
 NFPM_CONFIG="${REPO_ROOT}/agent/nfpm.yaml"
-VERSION="${SECURE_EDGE_VERSION:-1.0.0}"
+VERSION="${SECURE_EDGE_VERSION:-1.0.1}"
 ARCH="${SECURE_EDGE_ARCH:-amd64}"
 AGENT_BIN="${SECURE_EDGE_AGENT_BIN:-${REPO_ROOT}/agent/prompt-gate-agent}"
 

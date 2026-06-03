@@ -8,7 +8,7 @@
 # NOTE: builds are not yet Apple Developer ID notarized. Until then macOS
 # Gatekeeper may block the app; see the caveats below.
 cask "prompt-gate" do
-  version "1.0.0"
+  version "1.0.1"
   sha256 "38280052d3ca1bd277a6fc8a6d0ab8c89a8da2f83ee0cdf8f4df5719ea8ccabf"
 
   url "https://github.com/ShieldNet-360/prompt-gate/releases/download/v#{version}/Prompt.Gate-#{version}-arm64.dmg",
