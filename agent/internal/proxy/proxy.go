@@ -340,6 +340,28 @@ func (s *Server) SetUpstreamCABundle(path string) error {
 	return nil
 }
 
+// ResetUpstreamVerification reverts upstream TLS verification to the
+// system trust store only (dropping any imported CA bundle). Verification
+// stays on.
+func (s *Server) ResetUpstreamVerification() {
+	if s == nil || s.httpProxy == nil {
+		return
+	}
+	tr := s.httpProxy.Tr
+	if tr == nil {
+		return
+	}
+	tr = tr.Clone()
+	if tr.TLSClientConfig == nil {
+		tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	} else {
+		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
+	}
+	tr.TLSClientConfig.RootCAs = nil
+	tr.TLSClientConfig.InsecureSkipVerify = false
+	s.httpProxy.Tr = tr
+}
+
 // Handler exposes the underlying http.Handler. Tests and the API
 // layer can drive the proxy with httptest without binding a real
 // port.

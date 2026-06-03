@@ -602,6 +602,31 @@ type fakeProxyController struct {
 	statusSnap   ProxyStatus
 	enableErr    error
 	disableErr   error
+
+	upstreamCASet   []byte
+	upstreamCACfg   bool
+	upstreamCASubj  []string
+	upstreamCAErr   error
+	upstreamCAClear bool
+}
+
+func (f *fakeProxyController) SetUpstreamCA(pem []byte) ([]string, error) {
+	if f.upstreamCAErr != nil {
+		return nil, f.upstreamCAErr
+	}
+	f.upstreamCASet = pem
+	f.upstreamCACfg = true
+	return f.upstreamCASubj, nil
+}
+
+func (f *fakeProxyController) ClearUpstreamCA() error {
+	f.upstreamCAClear = true
+	f.upstreamCACfg = false
+	return nil
+}
+
+func (f *fakeProxyController) UpstreamCAStatus() (bool, []string) {
+	return f.upstreamCACfg, f.upstreamCASubj
 }
 
 func (f *fakeProxyController) Enable(_ context.Context) (string, error) {

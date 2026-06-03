@@ -12,9 +12,13 @@ package proxy
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -108,7 +112,16 @@ func (c *Controller) Enable(ctx context.Context) (string, error) {
 		if c.cfg.Recorder != nil {
 			srv.SetRecorder(c.cfg.Recorder)
 		}
-		if err := srv.SetUpstreamCABundle(c.cfg.UpstreamCABundle); err != nil {
+		// Apply the upstream CA bundle from config, or a previously
+		// imported one persisted at the managed path (so it survives
+		// agent restarts without a config edit).
+		bundle := c.cfg.UpstreamCABundle
+		if bundle == "" {
+			if p := c.upstreamCAPath(); fileExists(p) {
+				bundle = p
+			}
+		}
+		if err := srv.SetUpstreamCABundle(bundle); err != nil {
 			return "", err
 		}
 		c.server = srv
@@ -182,4 +195,100 @@ func (c *Controller) Handler() http.Handler {
 		return nil
 	}
 	return c.server.Handler()
+}
+
+// upstreamCAPath is the managed location for an imported upstream CA
+// bundle — kept next to the proxy CA so it shares the agent's data dir.
+func (c *Controller) upstreamCAPath() string {
+	return filepath.Join(filepath.Dir(c.cfg.CertPath), "upstream-ca.pem")
+}
+
+// SetUpstreamCA validates a PEM bundle (must contain at least one
+// certificate), persists it at the managed path, and applies it to the
+// running proxy and all future Enables, so the proxy trusts these CAs —
+// alongside the system trust store — when verifying upstream TLS. It
+// returns the imported certificates' subject common names.
+func (c *Controller) SetUpstreamCA(pemData []byte) ([]string, error) {
+	subjects, err := parseCASubjects(pemData)
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	path := c.upstreamCAPath()
+	if err := os.WriteFile(path, pemData, 0o600); err != nil {
+		return nil, fmt.Errorf("proxy: persist upstream CA bundle: %w", err)
+	}
+	c.cfg.UpstreamCABundle = path
+	if c.server != nil {
+		if err := c.server.SetUpstreamCABundle(path); err != nil {
+			return nil, err
+		}
+	}
+	return subjects, nil
+}
+
+// ClearUpstreamCA removes the imported bundle and reverts upstream
+// verification to the system trust store only.
+func (c *Controller) ClearUpstreamCA() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := os.Remove(c.upstreamCAPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("proxy: remove upstream CA bundle: %w", err)
+	}
+	c.cfg.UpstreamCABundle = ""
+	if c.server != nil {
+		c.server.ResetUpstreamVerification()
+	}
+	return nil
+}
+
+// UpstreamCAStatus reports whether an upstream CA bundle is configured
+// and the subject common names of the certificates in it.
+func (c *Controller) UpstreamCAStatus() (bool, []string) {
+	c.mu.Lock()
+	path := c.cfg.UpstreamCABundle
+	if path == "" {
+		path = c.upstreamCAPath()
+	}
+	c.mu.Unlock()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, nil
+	}
+	subjects, err := parseCASubjects(data)
+	if err != nil {
+		return false, nil
+	}
+	return true, subjects
+}
+
+// parseCASubjects decodes a PEM bundle and returns the subject common
+// names of every CERTIFICATE block, erroring if none are valid.
+func parseCASubjects(pemData []byte) ([]string, error) {
+	var subjects []string
+	rest := pemData
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("proxy: invalid certificate in CA bundle: %w", err)
+		}
+		name := cert.Subject.CommonName
+		if name == "" {
+			name = cert.Subject.String()
+		}
+		subjects = append(subjects, name)
+	}
+	if len(subjects) == 0 {
+		return nil, errors.New("proxy: no PEM certificates found in CA bundle")
+	}
+	return subjects, nil
 }

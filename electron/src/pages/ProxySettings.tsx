@@ -1,27 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import { agent, ProxyStatus } from '../api/agent';
+import { agent, ProxyStatus, UpstreamCAStatus } from '../api/agent';
 
 // ProxySettings drives the "Advanced DLP" wizard. The actual MITM
 // listener lives in the Go agent (`/api/proxy/*`); this component
 // only orchestrates the lifecycle and shows install instructions.
 
 type Feedback = { kind: 'success' | 'error'; message: string };
-type BusyState = 'enable' | 'disable' | 'install-ca' | 'remove-ca' | 'proxy-toggle' | null;
+type BusyState =
+  | 'enable'
+  | 'disable'
+  | 'install-ca'
+  | 'remove-ca'
+  | 'proxy-toggle'
+  | 'import-upstream-ca'
+  | 'clear-upstream-ca'
+  | null;
 
 export function ProxySettings() {
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState<BusyState>(null);
   const [proxyOn, setProxyOn] = useState(false);
+  const [upstreamCA, setUpstreamCA] = useState<UpstreamCAStatus | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, sp] = await Promise.all([
+      const [s, sp, uca] = await Promise.all([
         agent.getProxyStatus(),
         agent.getSystemProxy().catch(() => null),
+        agent.getUpstreamCA().catch(() => null),
       ]);
       setStatus(s);
       if (sp) setProxyOn(sp.active);
+      if (uca) setUpstreamCA(uca);
     } catch (err) {
       const msg = String(err);
       if (msg.includes('503')) {
@@ -137,6 +148,40 @@ export function ProxySettings() {
     }
   }, [status]);
 
+  const importUpstreamCA = useCallback(async () => {
+    setFeedback(null);
+    const picked = await window.secureEdge?.pickUpstreamCA?.();
+    if (!picked) return; // cancelled
+    setBusy('import-upstream-ca');
+    try {
+      const res = await agent.setUpstreamCA(picked.pem);
+      setUpstreamCA(res);
+      const n = res.subjects?.length ?? 0;
+      setFeedback({
+        kind: 'success',
+        message: `Imported "${picked.name}" (${n} certificate${n === 1 ? '' : 's'} now trusted).`,
+      });
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  const clearUpstreamCA = useCallback(async () => {
+    setBusy('clear-upstream-ca');
+    setFeedback(null);
+    try {
+      const res = await agent.clearUpstreamCA();
+      setUpstreamCA(res);
+      setFeedback({ kind: 'success', message: 'Removed; verifying against the system trust store only.' });
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
   return (
     <div className="page">
       <div className="proxy-header">
@@ -232,6 +277,51 @@ export function ProxySettings() {
             )}
           </li>
         </ol>
+      </section>
+
+      <section className="proxy-upstream-ca">
+        <h3>Upstream certificates</h3>
+        <p className="page-hint">
+          The proxy checks the security certificate of every site it inspects.
+          On a corporate or school network, import your organization’s
+          certificate so trusted sites aren’t blocked. Most users don’t need
+          this.
+        </p>
+        {upstreamCA?.configured ? (
+          <>
+            <p>
+              Trusting:{' '}
+              <strong>{upstreamCA.subjects?.join(', ') || 'a custom certificate'}</strong>
+            </p>
+            <div className="proxy-buttons">
+              <button
+                type="button"
+                onClick={() => void importUpstreamCA()}
+                disabled={busy !== null}
+              >
+                {busy === 'import-upstream-ca' ? 'Importing…' : 'Replace certificate…'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void clearUpstreamCA()}
+                disabled={busy !== null}
+                style={{ marginLeft: 8 }}
+              >
+                {busy === 'clear-upstream-ca' ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="proxy-buttons">
+            <button
+              type="button"
+              onClick={() => void importUpstreamCA()}
+              disabled={busy !== null}
+            >
+              {busy === 'import-upstream-ca' ? 'Importing…' : 'Import certificate…'}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="proxy-shutdown">

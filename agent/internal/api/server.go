@@ -147,6 +147,10 @@ type ProxyController interface {
 	Enable(ctx context.Context) (caCertPath string, err error)
 	Disable(ctx context.Context, removeCA bool) error
 	Status() ProxyStatus
+	// Upstream CA bundle management (proxy_upstream_ca_bundle):
+	SetUpstreamCA(pem []byte) (subjects []string, err error)
+	ClearUpstreamCA() error
+	UpstreamCAStatus() (configured bool, subjects []string)
 }
 
 // TamperStatus is the body returned by GET /api/tamper/status. It
@@ -323,6 +327,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/proxy/enable", s.handleProxyEnable)
 	mux.HandleFunc("/api/proxy/disable", s.handleProxyDisable)
 	mux.HandleFunc("/api/proxy/status", s.handleProxyStatus)
+	mux.HandleFunc("/api/proxy/upstream-ca", s.handleProxyUpstreamCA)
 	mux.HandleFunc("/api/profile", s.handleProfileGet)
 	mux.HandleFunc("/api/profile/import", s.handleProfileImport)
 	mux.HandleFunc("/api/tamper/status", s.handleTamperStatus)

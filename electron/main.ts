@@ -842,6 +842,29 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Native file picker for importing an upstream CA bundle. The main
+  // process reads the file and returns its PEM text so the renderer can
+  // POST it to the agent — the agent never receives a filesystem path.
+  ipcMain.handle('prompt-gate:pick-upstream-ca', async () => {
+    const res = await dialog.showOpenDialog({
+      title: 'Select your organization’s certificate',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Certificates', extensions: ['pem', 'crt', 'cer', 'ca-bundle'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (res.canceled || res.filePaths.length === 0) {
+      return null;
+    }
+    try {
+      const pem = fs.readFileSync(res.filePaths[0], 'utf-8');
+      return { name: path.basename(res.filePaths[0]), pem };
+    } catch {
+      return null;
+    }
+  });
+
   tray = new Tray(buildTrayImage('error'));
   tray.setToolTip('Prompt Gate');
   tray.setContextMenu(buildMenu());
