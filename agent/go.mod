@@ -1,6 +1,6 @@
 module github.com/ShieldNet-360/prompt-gate/agent
 
-go 1.25.9
+go 1.26.4
 
 require (
 	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396

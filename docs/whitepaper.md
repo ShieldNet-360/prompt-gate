@@ -90,7 +90,7 @@ scan  : O(n + z)            n = |content|, z = number of matches
 ```
 
 i.e. independent of the *number* of patterns at scan time — adding patterns
-grows the automaton, not the per-scan cost. This is why 163 patterns scan in
+grows the automaton, not the per-scan cost. This is why 165 patterns scan in
 15.9 µs.
 
 **Shannon entropy.** For survivors, the engine measures byte-level entropy to
