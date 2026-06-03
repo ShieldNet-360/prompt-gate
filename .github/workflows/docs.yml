@@ -36,7 +36,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install MkDocs Material
-        run: pip install mkdocs-material==9.7.6 pymdown-extensions
+        run: pip install mkdocs-material==9.7.6 pymdown-extensions==10.21.3
 
       - name: Build site
         run: mkdocs build --config-file mkdocs.yml --site-dir _site

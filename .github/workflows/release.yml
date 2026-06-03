@@ -252,7 +252,7 @@ jobs:
       - name: Generate CycloneDX SBOM (agent)
         working-directory: src/agent
         run: |
-          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.10.0
           "$(go env GOPATH)/bin/cyclonedx-gomod" app -json -licenses -main ./cmd/agent \
             -output "${GITHUB_WORKSPACE}/release/prompt-gate-agent.cyclonedx.json" .
           ls -la "${GITHUB_WORKSPACE}/release/prompt-gate-agent.cyclonedx.json"
