@@ -165,6 +165,12 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 	// aggregate scan/block counters.
 	proxy.Logger = noopLogger{}
 
+	// When the proxy can't reach or can't verify the upstream, return a
+	// clear, actionable page instead of a blank failure — so a user who
+	// enabled the proxy understands what happened (e.g. a corporate CA
+	// they need to trust) rather than seeing the site silently break.
+	proxy.ConnectionErrHandler = writeUpstreamErrorPage
+
 	tlsConfig := goproxy.TLSConfigFromCA(&caCert)
 
 	proxy.OnRequest().HandleConnectFunc(func(host string, _ *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
@@ -189,6 +195,18 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 	})
 
 	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		// On the MITM forward path, goproxy drops the connection on a
+		// transport error (e.g. an unverifiable upstream certificate),
+		// leaving the user with a blank failure. Wrap the round-trip so
+		// such errors become a clear, actionable page instead.
+		ctx.RoundTripper = goproxy.RoundTripperFunc(func(r *http.Request, _ *goproxy.ProxyCtx) (*http.Response, error) {
+			resp, err := s.httpProxy.Tr.RoundTrip(r)
+			if err != nil {
+				return upstreamErrorResponse(r, err), nil
+			}
+			return resp, nil
+		})
+
 		hostname := stripPort(req.Host)
 		// Re-check the LIVE policy on every request. This is
 		// critical for PolicyMonitor connections: the CONNECT
@@ -821,6 +839,80 @@ func badGateway(req *http.Request) *http.Response {
 		Close:         true,
 	}
 	return resp
+}
+
+// isUpstreamCertError reports whether err is an upstream TLS certificate
+// verification failure (as opposed to a generic connection error).
+func isUpstreamCertError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var cve *tls.CertificateVerificationError
+	var ua x509.UnknownAuthorityError
+	var hn x509.HostnameError
+	var ci x509.CertificateInvalidError
+	return errors.As(err, &cve) || errors.As(err, &ua) ||
+		errors.As(err, &hn) || errors.As(err, &ci)
+}
+
+// upstreamErrorTitleMessage maps an upstream transport error to a
+// user-facing title + message. It names no host or URL (privacy
+// invariant). message may contain trusted inline HTML.
+func upstreamErrorTitleMessage(err error) (title, message string) {
+	if isUpstreamCertError(err) {
+		return "Couldn't securely verify this site",
+			"Prompt Gate could not verify the security certificate of the site you're connecting to, so it stopped the connection to keep your data safe. " +
+				"If you're on a corporate or school network, your organization's certificate may need to be trusted — add it under <b>Settings → Proxy → Upstream certificates</b> (or set <code>proxy_upstream_ca_bundle</code>)."
+	}
+	return "Couldn't reach this site",
+		"Prompt Gate couldn't establish a connection to the site you're connecting to. Check your network connection and try again."
+}
+
+// upstreamErrorResponse is a synthetic HTTP response carrying the clear
+// error page, returned from the MITM round-tripper when the forward to
+// the upstream fails (so the user sees an explanation, not a blank page).
+func upstreamErrorResponse(req *http.Request, err error) *http.Response {
+	body := upstreamErrorHTML(upstreamErrorTitleMessage(err))
+	h := make(http.Header)
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	return &http.Response{
+		Status:        "502 Bad Gateway",
+		StatusCode:    http.StatusBadGateway,
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Request:       req,
+		Header:        h,
+		Body:          io.NopCloser(strings.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Close:         true,
+	}
+}
+
+// writeUpstreamErrorPage is goproxy's ConnectionErrHandler for the
+// non-MITM proxy paths: it writes the same clear page directly to the
+// client connection. Writes only to the client — never to a log.
+func writeUpstreamErrorPage(conn io.Writer, _ *goproxy.ProxyCtx, err error) {
+	body := upstreamErrorHTML(upstreamErrorTitleMessage(err))
+	fmt.Fprintf(conn,
+		"HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
+		len(body), body)
+}
+
+func upstreamErrorHTML(title, message string) string {
+	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+		`<meta name="viewport" content="width=device-width, initial-scale=1">` +
+		`<title>` + html.EscapeString(title) + ` — Prompt Gate</title>` +
+		`<style>body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;background:#f6f9fc;color:#1a2230;` +
+		`display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}` +
+		`.card{max-width:460px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:32px;text-align:center;` +
+		`box-shadow:0 6px 24px rgba(11,31,58,.06)}h1{font-size:19px;color:#0b1f3a;margin:0 0 10px}` +
+		`p{font-size:14px;line-height:1.55;color:#42526e;margin:0 0 18px}code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12px}` +
+		`.btn{display:inline-block;background:#0a84ff;color:#fff;text-decoration:none;padding:9px 18px;border-radius:8px;font-weight:600;font-size:14px}` +
+		`.f{margin-top:18px;font-size:11px;color:#90a0b5}</style></head><body><div class="card">` +
+		`<h1>` + html.EscapeString(title) + `</h1><p>` + message + `</p>` +
+		`<a class="btn" href="javascript:history.back()">Go Back</a>` +
+		`<div class="f">Secured by Prompt Gate</div></div></body></html>`
 }
 
 func stripPort(host string) string {
