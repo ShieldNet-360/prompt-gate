@@ -33,8 +33,12 @@ func ParsePatterns(raw []byte) ([]*Pattern, error) {
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, fmt.Errorf("dlp: parse patterns: %w", err)
 	}
+	active := make([]*Pattern, 0, len(body.Patterns))
 	for _, p := range body.Patterns {
 		if p == nil {
+			continue
+		}
+		if p.Disabled {
 			continue
 		}
 		if p.Regex == "" {
@@ -48,8 +52,9 @@ func ParsePatterns(raw []byte) ([]*Pattern, error) {
 		if p.Category == "" {
 			p.Category = CategoryUncategorized
 		}
+		active = append(active, p)
 	}
-	return body.Patterns, nil
+	return active, nil
 }
 
 // LoadExclusions reads exclusions from path and compiles each regex
