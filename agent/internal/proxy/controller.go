@@ -34,6 +34,12 @@ type ControllerConfig struct {
 	Stats    StatsBumper
 	Notifier Notifier
 	Recorder EventRecorder
+
+	// UpstreamCABundle is an optional path to a PEM file of extra CA
+	// certificates to trust (alongside the system store) when verifying
+	// upstream TLS connections. Empty = system roots only. Verification
+	// is always on.
+	UpstreamCABundle string
 }
 
 // StatusSnapshot mirrors api.ProxyStatus without importing the api
@@ -101,6 +107,9 @@ func (c *Controller) Enable(ctx context.Context) (string, error) {
 		}
 		if c.cfg.Recorder != nil {
 			srv.SetRecorder(c.cfg.Recorder)
+		}
+		if err := srv.SetUpstreamCABundle(c.cfg.UpstreamCABundle); err != nil {
+			return "", err
 		}
 		c.server = srv
 	}

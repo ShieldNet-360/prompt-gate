@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"net"
 	"net/http"
@@ -157,9 +158,11 @@ func TestIntegration_ProxyDoesNotLogContent(t *testing.T) {
 	stats := &fakeStats{}
 	srv, ca := newServer(t, policy, pipeline, stats)
 	// This request is forwarded to the self-signed test upstream after a
-	// non-blocking scan. The proxy skips upstream verification by default
-	// (preserving v1.0.0 behavior), so the forward succeeds without
-	// trusting the upstream cert.
+	// non-blocking scan. The proxy verifies upstream TLS by default, so
+	// trust the test upstream's cert (mirrors proxy_upstream_ca_bundle).
+	upstreamPool := x509.NewCertPool()
+	upstreamPool.AddCert(upstream.Certificate())
+	srv.SetUpstreamRootCAs(upstreamPool)
 	proxySrv := httptest.NewServer(srv.Handler())
 	defer proxySrv.Close()
 
@@ -185,6 +188,53 @@ func TestIntegration_ProxyDoesNotLogContent(t *testing.T) {
 			t.Errorf("captured proxy output contains %q (length %d bytes):\n%s",
 				sentinel, len(out), out)
 		}
+	}
+}
+
+// TestUpstreamVerification_DefaultRejects_BundleTrusts proves the proxy
+// verifies upstream TLS by default (rejecting a self-signed upstream) and
+// that proxy_upstream_ca_bundle (SetUpstreamCABundle) widens trust to it
+// — without ever disabling verification.
+func TestUpstreamVerification_DefaultRejects_BundleTrusts(t *testing.T) {
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	policy := PolicyCheckerFunc(func(string) PolicyAction { return PolicyAllowDLP })
+	srv, ca := newServer(t, policy, buildIntegrationPipeline(t), &fakeStats{})
+	proxySrv := httptest.NewServer(srv.Handler())
+	defer proxySrv.Close()
+	pool := x509.NewCertPool()
+	pool.AddCert(ca.Certificate())
+	client := proxyClient(t, proxySrv.URL, &tls.Config{RootCAs: pool})
+
+	// Default: system roots only → the self-signed upstream must NOT verify.
+	if resp, err := client.Get(upstream.URL); err == nil && resp.StatusCode == http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("expected upstream verification to fail by default for a self-signed upstream")
+	} else if resp != nil {
+		resp.Body.Close()
+	}
+
+	// Write the upstream's cert to a PEM bundle and load it.
+	bundle := filepath.Join(t.TempDir(), "upstream-ca.pem")
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: upstream.Certificate().Raw})
+	if err := os.WriteFile(bundle, certPEM, 0o600); err != nil {
+		t.Fatalf("write bundle: %v", err)
+	}
+	if err := srv.SetUpstreamCABundle(bundle); err != nil {
+		t.Fatalf("SetUpstreamCABundle: %v", err)
+	}
+
+	// With the bundle trusted, the forward succeeds.
+	resp, err := client.Get(upstream.URL)
+	if err != nil {
+		t.Fatalf("with bundle: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("with bundle: status %d, want 200", resp.StatusCode)
 	}
 }
 
