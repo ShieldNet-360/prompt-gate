@@ -48,8 +48,9 @@ dmg:
       path: /Applications
 linux:
   target:
-    - AppImage
     - deb
+    - rpm
+    - AppImage
   category: Utility
   icon: resources/icon.png
 win:

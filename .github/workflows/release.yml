@@ -182,41 +182,18 @@ jobs:
           name: electron-${{ matrix.os }}
           path: |
             electron/release/*.dmg
-            electron/release/*.AppImage
             electron/release/*.deb
+            electron/release/*.rpm
+            electron/release/*.AppImage
             electron/release/*.exe
             electron/release/*.zip
             electron/release/*.yml
             electron/release/*.blockmap
           if-no-files-found: warn
 
-  build-installers:
-    name: Installer (linux)
-    runs-on: ubuntu-latest
-    needs: [build-agent]
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: agent/go.mod
-          cache: true
-          cache-dependency-path: agent/go.sum
-
-      - name: make linux
-        run: make linux VERSION="${GITHUB_REF_NAME#v}"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: installer-linux
-          path: |
-            dist/*.deb
-            dist/*.tar.gz
-          if-no-files-found: warn
-
   release:
     name: GitHub Release
-    needs: [build-agent, build-electron, build-installers]
+    needs: [build-agent, build-electron]
     runs-on: ubuntu-latest
     permissions:
       contents: write     # create the release
@@ -232,7 +209,7 @@ jobs:
           mkdir -p release
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
             -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
-            -o -name '*.zip' -o -name 'prompt-gate-agent-*' \
+            -o -name '*.zip' \
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
 
