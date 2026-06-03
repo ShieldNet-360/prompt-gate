@@ -62,7 +62,7 @@ jobs:
 
       - name: govulncheck
         working-directory: agent
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
 
   electron:
     name: Electron Tray (typecheck)
@@ -98,14 +98,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: extension/package-lock.json
 
-      - name: npm ci (or install)
+      - name: npm ci
         working-directory: extension
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: npm ci
 
       - name: typecheck
         working-directory: extension
