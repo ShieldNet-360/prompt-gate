@@ -209,12 +209,22 @@ func TestUpstreamVerification_DefaultRejects_BundleTrusts(t *testing.T) {
 	pool.AddCert(ca.Certificate())
 	client := proxyClient(t, proxySrv.URL, &tls.Config{RootCAs: pool})
 
-	// Default: system roots only → the self-signed upstream must NOT verify.
-	if resp, err := client.Get(upstream.URL); err == nil && resp.StatusCode == http.StatusOK {
-		resp.Body.Close()
-		t.Fatalf("expected upstream verification to fail by default for a self-signed upstream")
-	} else if resp != nil {
-		resp.Body.Close()
+	// Default: system roots only → the self-signed upstream must NOT verify,
+	// and the user gets a clear, actionable page (not a blank failure).
+	resp, err := client.Get(upstream.URL)
+	if err != nil {
+		t.Fatalf("default: expected a clear error page, got transport error: %v", err)
+	}
+	page, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		t.Fatalf("default: self-signed upstream should not verify, got 200")
+	}
+	if !strings.Contains(string(page), "securely verify") || !strings.Contains(string(page), "Settings") {
+		t.Fatalf("default: error page missing the actionable message:\n%s", page)
+	}
+	if hostPort := mustHost(t, upstream.URL); strings.Contains(string(page), hostPort) {
+		t.Errorf("error page leaked the upstream host %q", hostPort)
 	}
 
 	// Write the upstream's cert to a PEM bundle and load it.
@@ -228,7 +238,7 @@ func TestUpstreamVerification_DefaultRejects_BundleTrusts(t *testing.T) {
 	}
 
 	// With the bundle trusted, the forward succeeds.
-	resp, err := client.Get(upstream.URL)
+	resp, err = client.Get(upstream.URL)
 	if err != nil {
 		t.Fatalf("with bundle: %v", err)
 	}
