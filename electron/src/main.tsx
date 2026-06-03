@@ -654,7 +654,7 @@ function AboutUsPage({ onBack }: { onBack: () => void }) {
           <SetupIcon size={64} />
         </div>
         <h2 className="about-heading">Prompt Gate</h2>
-        <p className="about-version">Version 0.1.0</p>
+        <p className="about-version">Version 1.0.1</p>
         <div className="about-section">
           <p>
             Built by <strong>ShieldNet 360</strong> — a small team passionate about
@@ -670,6 +670,7 @@ function AboutUsPage({ onBack }: { onBack: () => void }) {
           <h3>Contact</h3>
           <p>GitHub: <a href="https://github.com/ShieldNet-360/prompt-gate" className="about-link">github.com/ShieldNet-360/prompt-gate</a></p>
           <p>Issues &amp; questions: <a href="https://github.com/ShieldNet-360/prompt-gate/issues" className="about-link">open an issue</a></p>
+          <p>Email: <a href="mailto:Support@shieldnet360.com" className="about-link">Support@shieldnet360.com</a></p>
         </div>
         <div className="about-section">
           <p className="about-copy">&copy; 2026 ShieldNet 360. All rights reserved.</p>

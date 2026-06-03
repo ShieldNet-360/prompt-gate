@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "files": [
     {"name": "ai_allowed.txt",       "sha256": "949136859c8c462078002580c300754af35c9e00020d6f9913fd09d9233cf4ca"},
     {"name": "ai_chat_blocked.txt",  "sha256": "52464ab3db6673fd365e15713d0c216a38544ff446ac7cf628db2d45b5ab1f37"},
