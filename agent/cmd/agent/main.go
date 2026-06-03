@@ -378,9 +378,10 @@ func run(configPath string) error {
 		pinning := buildPinningSet(cfg.ProxyPinningBypass)
 		log.Debugf("proxy pinning bypass hosts: %d entries", len(pinning))
 		controller, err := proxy.NewController(proxy.ControllerConfig{
-			ListenAddr: cfg.ProxyListen,
-			CertPath:   caCertPath,
-			KeyPath:    caKeyPath,
+			ListenAddr:       cfg.ProxyListen,
+			CertPath:         caCertPath,
+			KeyPath:          caKeyPath,
+			UpstreamCABundle: cfg.ProxyUpstreamCABundle,
 			Policy: proxy.PolicyCheckerFunc(func(host string) proxy.PolicyAction {
 				if _, bypass := pinning[strings.ToLower(host)]; bypass {
 					return proxy.PolicyAllow

@@ -60,6 +60,13 @@ type Config struct {
 	// at runtime via POST /api/proxy/enable.
 	ProxyEnabled bool `yaml:"proxy_enabled"`
 
+	// ProxyUpstreamCABundle is an optional path to a PEM file of extra
+	// CA certificates the proxy trusts (alongside the system store) when
+	// verifying upstream TLS connections. Set this behind a corporate
+	// TLS-inspecting proxy or for internal/self-signed upstreams. Empty
+	// (default) uses the system trust store; verification is always on.
+	ProxyUpstreamCABundle string `yaml:"proxy_upstream_ca_bundle"`
+
 	// CACertPath / CAKeyPath are where the per-device Root CA is
 	// persisted. Defaults to ~/.prompt-gate/ca.crt and ca.key.
 	CACertPath string `yaml:"ca_cert_path"`
@@ -272,6 +279,9 @@ func merge(defaults, override Config) Config {
 	}
 	if override.ProxyListen != "" {
 		out.ProxyListen = override.ProxyListen
+	}
+	if override.ProxyUpstreamCABundle != "" {
+		out.ProxyUpstreamCABundle = override.ProxyUpstreamCABundle
 	}
 	if override.ProxyEnabled {
 		out.ProxyEnabled = true

@@ -30,6 +30,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -262,32 +263,19 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 	})
 
 	s.httpProxy = proxy
-
-	// TEMPORARY (preserve v1.0.0 behavior): goproxy 1.8.4 turned on
-	// upstream TLS verification by default. We don't yet expose an
-	// upstream CA-bundle config or a fail page for verification errors,
-	// so enabling it now would break enterprise/double-proxy and
-	// internal/self-signed upstream deployments that worked in v1.0.0.
-	// Keep the prior skip-verify behavior; opt back into verification
-	// per-server via SetUpstreamRootCAs once that config lands.
-	tr := proxy.Tr.Clone()
-	if tr.TLSClientConfig == nil {
-		tr.TLSClientConfig = &tls.Config{}
-	} else {
-		tr.TLSClientConfig = tr.TLSClientConfig.Clone()
-	}
-	tr.TLSClientConfig.InsecureSkipVerify = true // intentional; see note above
-	proxy.Tr = tr
-
+	// Upstream TLS verification is ON by default: when the proxy MITM's a
+	// request and re-originates to the destination host, it verifies the
+	// upstream certificate against the system trust store. This prevents
+	// an on-path attacker from feeding the proxy a forged upstream cert.
+	// Deployments behind a corporate CA or with internal upstreams add
+	// extra roots via SetUpstreamCABundle (proxy_upstream_ca_bundle).
 	return s, nil
 }
 
-// SetUpstreamRootCAs opts this proxy back into upstream TLS verification
-// and trusts the given roots when it MITM's a request and re-originates
-// to the destination host. By default the proxy skips upstream
-// verification (preserving v1.0.0 behavior — see New); calling this
-// enables full verification against pool. A nil pool is a no-op. This
-// is the seam an upstream CA-bundle config option will use.
+// SetUpstreamRootCAs makes the proxy verify upstream TLS connections
+// against exactly the given roots (instead of the system trust store)
+// when it MITM's a request. Used by tests and as the primitive behind
+// SetUpstreamCABundle. A nil pool is a no-op.
 func (s *Server) SetUpstreamRootCAs(pool *x509.CertPool) {
 	if s == nil || s.httpProxy == nil || pool == nil {
 		return
@@ -306,6 +294,32 @@ func (s *Server) SetUpstreamRootCAs(pool *x509.CertPool) {
 	tr.TLSClientConfig.RootCAs = pool
 	tr.TLSClientConfig.InsecureSkipVerify = false
 	s.httpProxy.Tr = tr
+}
+
+// SetUpstreamCABundle adds the CA certificates in the PEM file at path to
+// the set the proxy trusts when verifying upstream TLS connections,
+// alongside the host's system trust store. Use it for deployments behind
+// a corporate TLS-inspecting proxy or with internal/self-signed upstreams
+// (the proxy_upstream_ca_bundle config option). An empty path is a no-op
+// (system roots only). Verification stays ON — this only widens trust, it
+// never disables checking.
+func (s *Server) SetUpstreamCABundle(path string) error {
+	if s == nil || path == "" {
+		return nil
+	}
+	pemData, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("proxy: read upstream CA bundle %q: %w", path, err)
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
+	if !pool.AppendCertsFromPEM(pemData) {
+		return fmt.Errorf("proxy: no PEM certificates found in upstream CA bundle %q", path)
+	}
+	s.SetUpstreamRootCAs(pool)
+	return nil
 }
 
 // Handler exposes the underlying http.Handler. Tests and the API

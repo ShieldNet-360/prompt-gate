@@ -19,6 +19,11 @@ dlp_patterns: rules/dlp_patterns.json
 dlp_exclusions: rules/dlp_exclusions.json
 
 proxy_enabled: false
+# When the MITM proxy is on it verifies upstream TLS certificates against
+# the system trust store. Behind a corporate TLS-inspecting proxy, or for
+# internal/self-signed upstreams, point this at a PEM file of extra CA
+# certs to trust (added alongside the system store). Verification stays on.
+# proxy_upstream_ca_bundle: "/etc/prompt-gate/upstream-ca.pem"
 heartbeat_interval: 1h
 stats_flush_interval: 60s
 rule_update_interval: 6h
