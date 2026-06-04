@@ -796,6 +796,26 @@ function stopManagedAgent(): void {
   agentProcess = null;
 }
 
+// ── Single-instance lock ──
+// Only one Prompt Gate instance may run at a time. A second instance
+// would fight over the agent API port, system proxy settings, and DNS
+// configuration. If the lock is already held, focus the existing
+// window and quit this duplicate process.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // A second instance was launched — bring the existing window to front.
+    if (window) {
+      if (window.isMinimized()) window.restore();
+      window.focus();
+    } else {
+      showView('status');
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   // Show the app in the Dock so users on notched MacBooks (where menu
   // bar space is limited) can click the Dock icon to open the UI.
