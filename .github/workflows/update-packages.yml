@@ -35,11 +35,11 @@ jobs:
           gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p SHA256SUMS -O /tmp/SUMS
 
           dmg_sha=$(grep -iE 'arm64\.dmg$' /tmp/SUMS | grep -iv blockmap | awk '{print $1}')
-          exe_sha=$(grep -iE 'Setup .*\.exe$' /tmp/SUMS | grep -iv blockmap | awk '{print $1}')
-          if [ -z "$dmg_sha" ] || [ -z "$exe_sha" ]; then
-            echo "Could not find dmg/exe hashes in SHA256SUMS" >&2; exit 1
+          msi_sha=$(grep -iE '\.msi$' /tmp/SUMS | grep -iv blockmap | awk '{print $1}')
+          if [ -z "$dmg_sha" ] || [ -z "$msi_sha" ]; then
+            echo "Could not find dmg/msi hashes in SHA256SUMS" >&2; exit 1
           fi
-          exe_sha_uc=$(printf '%s' "$exe_sha" | tr 'a-f' 'A-F')
+          msi_sha_uc=$(printf '%s' "$msi_sha" | tr 'a-f' 'A-F')
 
           # Homebrew cask: version + sha256 (URL uses #{version} interpolation)
           cask=packaging/homebrew/prompt-gate.rb
@@ -51,8 +51,8 @@ jobs:
 
           # winget installer: URL (tag + filename) + sha + release date
           inst=packaging/winget/ShieldNet360.PromptGate.installer.yaml
-          sed -i -E "s#(releases/download/)v[^/]+/Prompt\.Gate\.Setup\.[^ ]+\.exe#\1${TAG}/Prompt.Gate.Setup.${VER}.exe#" "$inst"
-          sed -i -E "s/^    InstallerSha256: .*/    InstallerSha256: ${exe_sha_uc}/" "$inst"
+          sed -i -E "s#(releases/download/)v[^/]+/Prompt[. ]Gate[. ][^ ]+\.msi#\1${TAG}/Prompt.Gate.${VER}.msi#" "$inst"
+          sed -i -E "s/^    InstallerSha256: .*/    InstallerSha256: ${msi_sha_uc}/" "$inst"
           sed -i -E "s/^ReleaseDate: .*/ReleaseDate: $(date -u +%Y-%m-%d)/" "$inst"
 
       - name: Commit if changed

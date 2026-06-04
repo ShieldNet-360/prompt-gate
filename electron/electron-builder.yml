@@ -55,18 +55,16 @@ linux:
   icon: resources/icon.png
 win:
   target:
-    - nsis
+    - msi
     - zip
   icon: resources/icon.png
-nsis:
+msi:
   oneClick: false
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Prompt Gate
   runAfterFinish: true
-  deleteAppDataOnUninstall: true
 # Publishing is handled by the release workflow (softprops/action-gh-release).
 # Do NOT add a publish block here — electron-builder would attempt to upload
 # on tagged builds and fail when GH_TOKEN is unavailable.
