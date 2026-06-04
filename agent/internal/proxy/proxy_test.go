@@ -369,6 +369,93 @@ func proxyClient(t *testing.T, proxyURL string, tlsCfg *tls.Config) *http.Client
 	}
 }
 
+func TestDecodeScanBody(t *testing.T) {
+	cases := []struct {
+		name string
+		ct   string
+		body string
+		want string
+	}{
+		{
+			name: "json passthrough",
+			ct:   "application/json",
+			body: `{"text":"Visa 4916338506082832"}`,
+			want: `{"text":"Visa 4916338506082832"}`,
+		},
+		{
+			name: "form urlencoded decoded",
+			ct:   "application/x-www-form-urlencoded",
+			body: "f.req=%5B%5Bnull%2C%22Visa+4916338506082832%22%5D%5D",
+			want: `[[null,"Visa 4916338506082832"]]`,
+		},
+		{
+			name: "form urlencoded multiple values",
+			ct:   "application/x-www-form-urlencoded;charset=UTF-8",
+			body: "a=hello&b=world+123",
+			want: "hello\nworld 123",
+		},
+		{
+			name: "empty body",
+			ct:   "application/x-www-form-urlencoded",
+			body: "",
+			want: "",
+		},
+		{
+			name: "nil request",
+			ct:   "",
+			body: "raw bytes",
+			want: "raw bytes",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var req *http.Request
+			if tc.ct != "" {
+				req = &http.Request{Header: http.Header{"Content-Type": []string{tc.ct}}}
+			}
+			got := decodeScanBody(req, []byte(tc.body))
+			if got != tc.want {
+				t.Errorf("decodeScanBody() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestServer_URLEncodedFormBodyBlocked(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Fatal("upstream must never be reached on a blocked request")
+	}))
+	defer upstream.Close()
+
+	ca := newTestCA(t)
+	scanner := &fakeScanner{blockOn: "AKIAIOSFODNN7EXAMPLE", patternName: "AWS Access Key"}
+	srv, err := New(ca, PolicyCheckerFunc(func(_ string) PolicyAction { return PolicyAllowDLP }), scanner, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	proxySrv := httptest.NewServer(srv.Handler())
+	defer proxySrv.Close()
+
+	client := proxyClient(t, proxySrv.URL, nil)
+	// Simulate a Gemini-style URL-encoded form POST with a secret inside.
+	encoded := url.Values{"f.req": {`[["AKIAIOSFODNN7EXAMPLE is leaking"]]`}}.Encode()
+	req, _ := http.NewRequest(http.MethodPost, upstream.URL, strings.NewReader(encoded))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnavailableForLegalReasons {
+		t.Fatalf("status = %d, want 451 (URL-encoded body should be decoded before DLP scan)", resp.StatusCode)
+	}
+	if srv.BlocksTotal() != 1 {
+		t.Errorf("BlocksTotal = %d, want 1", srv.BlocksTotal())
+	}
+}
+
 func freePort(t *testing.T) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
