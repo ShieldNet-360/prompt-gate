@@ -30,6 +30,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -236,7 +237,8 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			return req, nil
 		}
 
-		result := s.dlp.Scan(req.Context(), bytesToString(body))
+		scanText := decodeScanBody(req, body)
+		result := s.dlp.Scan(req.Context(), scanText)
 		// Wipe the raw body as soon as the scan completes. The DLP
 		// pipeline copies any matched ranges into ScanResult fields
 		// (just the pattern name) before returning, so the request
@@ -568,6 +570,47 @@ func combineReaders(parts ...[]byte) io.Reader {
 		readers = append(readers, strings.NewReader(bytesToString(p)))
 	}
 	return io.MultiReader(readers...)
+}
+
+// decodeScanBody converts the raw request body bytes into a string
+// suitable for DLP scanning. For application/x-www-form-urlencoded
+// bodies (used by Gemini, ChatGPT, and similar SPA front-ends) the
+// percent-encoded values are decoded so the DLP regex patterns can
+// match the actual text. For all other content types the raw bytes
+// are returned as-is.
+func decodeScanBody(req *http.Request, body []byte) string {
+	ct := ""
+	if req != nil {
+		ct = req.Header.Get("Content-Type")
+	}
+	raw := bytesToString(body)
+	if !strings.Contains(ct, "application/x-www-form-urlencoded") {
+		return raw
+	}
+	// Parse form values and concatenate all decoded values separated
+	// by newlines. This preserves every user-supplied string while
+	// stripping the key= framing and percent encoding.
+	vals, err := url.ParseQuery(raw)
+	if err != nil {
+		// Fall back to a simple percent-decode of the entire body.
+		if decoded, e := url.QueryUnescape(raw); e == nil {
+			return decoded
+		}
+		return raw
+	}
+	var sb strings.Builder
+	for _, vs := range vals {
+		for _, v := range vs {
+			if sb.Len() > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(v)
+		}
+	}
+	if sb.Len() == 0 {
+		return raw
+	}
+	return sb.String()
 }
 
 // deniedResponse builds an HTTP 403 reply for domains blocked by

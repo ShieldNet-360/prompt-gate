@@ -268,7 +268,7 @@ function GridIcon() {
 }
 
 /* ── Settings sub-pages ── */
-type SettingsSubPage = 'menu' | 'policy' | 'statistics' | 'overrides' | 'proxy' | 'privacy';
+type SettingsSubPage = 'menu' | 'general' | 'policy' | 'statistics' | 'overrides' | 'proxy' | 'privacy';
 
 /* ── Protection presets ── */
 type ProtectionLevel = 'extra' | 'light' | 'custom';
@@ -590,9 +590,78 @@ function ProxySettingsPage({ onBack }: { onBack: () => void }) {
 }
 
 /* ── Settings page — menu list matching the design ── */
+/* ── General settings sub-page (startup toggle, etc.) ── */
+function GeneralPage({ onBack }: { onBack: () => void }) {
+  const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
+  }, []);
+
+  const toggle = useCallback(async () => {
+    if (openAtLogin === null || busy) return;
+    setBusy(true);
+    try {
+      const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
+      if (next !== undefined) setOpenAtLogin(next);
+    } finally {
+      setBusy(false);
+    }
+  }, [openAtLogin, busy]);
+
+  return (
+    <div className="settings-page">
+      <div className="settings-header">
+        <BackButton onClick={onBack} label="Back to settings" />
+        <h1 className="settings-title">General</h1>
+      </div>
+      <div className="page" style={{ paddingTop: 0 }}>
+        <section className="privacy-section">
+          <div className="privacy-row">
+            <div className="privacy-row-text">
+              <div className="privacy-row-title">Run at startup</div>
+              <div className="privacy-row-desc">
+                Automatically launch Prompt Gate when you log in so you are
+                always protected. Works on macOS, Windows, and Linux.
+              </div>
+            </div>
+            <div className="privacy-row-control">
+              {openAtLogin === null ? (
+                <span style={{ color: '#888', fontSize: '0.85rem' }}>Loading…</span>
+              ) : openAtLogin ? (
+                <button
+                  type="button"
+                  className="privacy-toggle privacy-toggle-on"
+                  onClick={() => void toggle()}
+                  disabled={busy}
+                  aria-pressed="true"
+                >
+                  On
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="privacy-toggle privacy-toggle-off"
+                  onClick={() => void toggle()}
+                  disabled={busy}
+                  aria-pressed="false"
+                >
+                  Off
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPage({ onBack }: { onBack: () => void }) {
   const [sub, setSub] = useState<SettingsSubPage>('menu');
 
+  if (sub === 'general') return <GeneralPage onBack={() => setSub('menu')} />;
   if (sub === 'policy') return <PolicyLevelPage onBack={() => setSub('menu')} />;
   if (sub === 'statistics') return <StatisticsPage onBack={() => setSub('menu')} />;
   if (sub === 'overrides') return <OverridesPage onBack={() => setSub('menu')} />;
@@ -608,6 +677,17 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
       <p className="settings-subtitle">Follow steps below to continue set up.</p>
 
       <div className="settings-menu">
+        <button type="button" className="settings-menu-item" onClick={() => setSub('general')}>
+          <span className="settings-menu-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
+          </span>
+          <span className="settings-menu-label">General</span>
+          <ChevronRight />
+        </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('policy')}>
           <span className="settings-menu-icon"><ShieldIcon /></span>
           <span className="settings-menu-label">Policy Level</span>

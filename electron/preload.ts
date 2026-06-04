@@ -22,6 +22,8 @@ export interface PromptGateBridge {
   onEvent(cb: (event: AgentEvent) => void): () => void;
   openExternal(url: string): void;
   pickUpstreamCA(): Promise<{ name: string; pem: string } | null>;
+  getOpenAtLogin(): Promise<boolean>;
+  setOpenAtLogin(enabled: boolean): Promise<boolean>;
 }
 
 const bridge: PromptGateBridge = {
@@ -41,6 +43,8 @@ const bridge: PromptGateBridge = {
     void ipcRenderer.invoke('prompt-gate:open-external', url);
   },
   pickUpstreamCA: () => ipcRenderer.invoke('prompt-gate:pick-upstream-ca'),
+  getOpenAtLogin: () => ipcRenderer.invoke('prompt-gate:get-open-at-login'),
+  setOpenAtLogin: (enabled: boolean) => ipcRenderer.invoke('prompt-gate:set-open-at-login', enabled),
 };
 
 contextBridge.exposeInMainWorld('secureEdge', bridge);

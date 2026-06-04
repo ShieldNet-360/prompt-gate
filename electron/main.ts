@@ -865,6 +865,30 @@ app.whenReady().then(async () => {
     }
   });
 
+  // ── Auto-start at login (macOS / Windows / Linux) ──
+  // Renderer can query/toggle this via IPC. On first install we
+  // default to ON so the user is protected from boot.
+  ipcMain.handle('prompt-gate:get-open-at-login', () => {
+    return app.getLoginItemSettings().openAtLogin;
+  });
+
+  ipcMain.handle('prompt-gate:set-open-at-login', (_e, enabled: unknown) => {
+    const on = enabled === true;
+    app.setLoginItemSettings({
+      openAtLogin: on,
+      openAsHidden: true,
+    });
+    return on;
+  });
+
+  // Default to ON in production builds so the user is protected from boot.
+  if (app.isPackaged && !app.getLoginItemSettings().openAtLogin) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true,
+    });
+  }
+
   tray = new Tray(buildTrayImage('error'));
   tray.setToolTip('Prompt Gate');
   tray.setContextMenu(buildMenu());
@@ -873,6 +897,17 @@ app.whenReady().then(async () => {
   // Bring up the agent. This can take up to 6s; the tray and IPC
   // handlers are already live so the UI is responsive during the wait.
   await startManagedAgent();
+
+  // ── Safety net: restore system proxy to OFF on startup ──
+  // If the app was force-killed or crashed while the proxy was active,
+  // the system proxy still points at 127.0.0.1:8443 with nothing
+  // listening — the user loses internet. Always restore on launch so
+  // connectivity is guaranteed. The user can re-enable via the toggle.
+  void restoreSystemProxy().then((ok) => {
+    if (ok) console.log('startup: system proxy restored to OFF');
+    proxyRunning = false;
+    refreshTrayMenu();
+  }).catch(() => { /* agent not reachable yet — no-op */ });
 
   // Install the privileged proxy-helper daemon in the background.
   void ensureHelperInstalled();
