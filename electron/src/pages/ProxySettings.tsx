@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { agent, ProxyStatus, UpstreamCAStatus } from '../api/agent';
+import { agent, ProxyStatus } from '../api/agent';
 
 // ProxySettings drives the "Advanced DLP" wizard. The actual MITM
 // listener lives in the Go agent (`/api/proxy/*`); this component
@@ -8,12 +8,9 @@ import { agent, ProxyStatus, UpstreamCAStatus } from '../api/agent';
 type Feedback = { kind: 'success' | 'error'; message: string };
 type BusyState =
   | 'enable'
-  | 'disable'
   | 'install-ca'
   | 'remove-ca'
   | 'proxy-toggle'
-  | 'import-upstream-ca'
-  | 'clear-upstream-ca'
   | null;
 
 export function ProxySettings() {
@@ -21,18 +18,14 @@ export function ProxySettings() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState<BusyState>(null);
   const [proxyOn, setProxyOn] = useState(false);
-  const [upstreamCA, setUpstreamCA] = useState<UpstreamCAStatus | null>(null);
-
   const refresh = useCallback(async () => {
     try {
-      const [s, sp, uca] = await Promise.all([
+      const [s, sp] = await Promise.all([
         agent.getProxyStatus(),
         agent.getSystemProxy().catch(() => null),
-        agent.getUpstreamCA().catch(() => null),
       ]);
       setStatus(s);
       if (sp) setProxyOn(sp.active);
-      if (uca) setUpstreamCA(uca);
     } catch (err) {
       const msg = String(err);
       if (msg.includes('503')) {
@@ -93,32 +86,6 @@ export function ProxySettings() {
     }
   }, [refresh]);
 
-  const disable = useCallback(
-    async (removeCA: boolean) => {
-      setBusy('disable');
-      setFeedback(null);
-      try {
-        if (proxyOn) {
-          await agent.setSystemProxy('restore').catch(() => {});
-          setProxyOn(false);
-        }
-        const updated = await agent.disableProxy(removeCA);
-        setStatus(updated);
-        setFeedback({
-          kind: 'success',
-          message: removeCA
-            ? 'Proxy stopped, system proxy restored, and CA removed.'
-            : 'Proxy stopped and system proxy restored.',
-        });
-      } catch (err) {
-        setFeedback({ kind: 'error', message: String(err) });
-      } finally {
-        setBusy(null);
-      }
-    },
-    [proxyOn],
-  );
-
   const installCA = useCallback(async () => {
     setBusy('install-ca');
     setFeedback(null);
@@ -147,40 +114,6 @@ export function ProxySettings() {
       setBusy(null);
     }
   }, [status]);
-
-  const importUpstreamCA = useCallback(async () => {
-    setFeedback(null);
-    const picked = await window.secureEdge?.pickUpstreamCA?.();
-    if (!picked) return; // cancelled
-    setBusy('import-upstream-ca');
-    try {
-      const res = await agent.setUpstreamCA(picked.pem);
-      setUpstreamCA(res);
-      const n = res.subjects?.length ?? 0;
-      setFeedback({
-        kind: 'success',
-        message: `Imported "${picked.name}" (${n} certificate${n === 1 ? '' : 's'} now trusted).`,
-      });
-    } catch (err) {
-      setFeedback({ kind: 'error', message: String(err) });
-    } finally {
-      setBusy(null);
-    }
-  }, []);
-
-  const clearUpstreamCA = useCallback(async () => {
-    setBusy('clear-upstream-ca');
-    setFeedback(null);
-    try {
-      const res = await agent.clearUpstreamCA();
-      setUpstreamCA(res);
-      setFeedback({ kind: 'success', message: 'Removed; verifying against the system trust store only.' });
-    } catch (err) {
-      setFeedback({ kind: 'error', message: String(err) });
-    } finally {
-      setBusy(null);
-    }
-  }, []);
 
   return (
     <div className="page">
@@ -277,74 +210,6 @@ export function ProxySettings() {
             )}
           </li>
         </ol>
-      </section>
-
-      <section className="proxy-upstream-ca">
-        <h3>Upstream certificates</h3>
-        <p className="page-hint">
-          The proxy checks the security certificate of every site it inspects.
-          On a corporate or school network, import your organization’s
-          certificate so trusted sites aren’t blocked. Most users don’t need
-          this.
-        </p>
-        {upstreamCA?.configured ? (
-          <>
-            <p>
-              Trusting:{' '}
-              <strong>{upstreamCA.subjects?.join(', ') || 'a custom certificate'}</strong>
-            </p>
-            <div className="proxy-buttons">
-              <button
-                type="button"
-                onClick={() => void importUpstreamCA()}
-                disabled={busy !== null}
-              >
-                {busy === 'import-upstream-ca' ? 'Importing…' : 'Replace certificate…'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void clearUpstreamCA()}
-                disabled={busy !== null}
-                style={{ marginLeft: 8 }}
-              >
-                {busy === 'clear-upstream-ca' ? 'Removing…' : 'Remove'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="proxy-buttons">
-            <button
-              type="button"
-              onClick={() => void importUpstreamCA()}
-              disabled={busy !== null}
-            >
-              {busy === 'import-upstream-ca' ? 'Importing…' : 'Import certificate…'}
-            </button>
-          </div>
-        )}
-      </section>
-
-      <section className="proxy-shutdown">
-        <h3>Disable</h3>
-        <p className="page-hint">
-          Stops the proxy, restores system proxy settings, and optionally removes the CA.
-        </p>
-        <div className="proxy-buttons">
-          <button
-            type="button"
-            onClick={() => void disable(false)}
-            disabled={busy !== null}
-          >
-            Stop proxy
-          </button>
-          <button
-            type="button"
-            onClick={() => void disable(true)}
-            disabled={busy !== null}
-          >
-            Stop proxy &amp; delete CA
-          </button>
-        </div>
       </section>
     </div>
   );
