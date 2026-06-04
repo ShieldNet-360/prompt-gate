@@ -28,7 +28,7 @@ jobs:
           - { goos: darwin,  goarch: amd64 }
           - { goos: darwin,  goarch: arm64 }
           # Windows agent is bundled inside the Electron portable ZIP
-          # and NSIS installer (build-electron job) — no standalone exe.
+          # and MSI installer (build-electron job) — no standalone exe.
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -114,7 +114,7 @@ jobs:
           rebuild darwin  amd64
           rebuild darwin  arm64
           # Windows agent is not built standalone; it ships inside
-          # the Electron portable ZIP / NSIS installer.
+          # the Electron portable ZIP / MSI installer.
           exit $rc
 
   build-electron:
@@ -185,7 +185,7 @@ jobs:
             electron/release/*.deb
             electron/release/*.rpm
             electron/release/*.AppImage
-            electron/release/*.exe
+            electron/release/*.msi
             electron/release/*.zip
             electron/release/*.yml
             electron/release/*.blockmap
@@ -208,7 +208,7 @@ jobs:
         run: |
           mkdir -p release
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
-            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
+            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' \
             -o -name '*.zip' \
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
