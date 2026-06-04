@@ -67,10 +67,22 @@ function GearIcon() {
   );
 }
 
+/* ── License icon ── */
+function LicenseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 12h6M9 16h6M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" />
+      <polyline points="13 2 13 9 20 9" />
+    </svg>
+  );
+}
+
 /* ── Dropdown menu from the hamburger icon ── */
-function HamburgerMenu({ onAbout, onGuideline }: {
+function HamburgerMenu({ onAbout, onGuideline, onLicense }: {
   onAbout: () => void;
   onGuideline: () => void;
+  onLicense: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -99,6 +111,10 @@ function HamburgerMenu({ onAbout, onGuideline }: {
             <BookIcon />
             <span>Guideline</span>
           </button>
+          <button type="button" className="hamburger-item" onClick={() => { setOpen(false); onLicense(); }}>
+            <LicenseIcon />
+            <span>License</span>
+          </button>
         </div>
       )}
     </div>
@@ -106,10 +122,11 @@ function HamburgerMenu({ onAbout, onGuideline }: {
 }
 
 /* ── Dashboard: large toggle + Safe Browsing indicator ── */
-function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline }: {
+function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense }: {
   onOpenSettings: () => void;
   onOpenAbout: () => void;
   onOpenGuideline: () => void;
+  onOpenLicense: () => void;
 }) {
   const [proxyRunning, setProxyRunning] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -172,7 +189,7 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline }: {
     <div className="dashboard">
       {/* Top bar */}
       <div className="dash-topbar">
-        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} />
+        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} onLicense={onOpenLicense} />
         <SetupIcon size={48} />
         <button type="button" className="dash-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
           <GearIcon />
@@ -742,9 +759,70 @@ function GuidelinePage({ onBack }: { onBack: () => void }) {
   );
 }
 
+/* ── License page ── */
+function LicensePage({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="settings-page">
+      <div className="settings-header">
+        <BackButton onClick={onBack} label="Back to dashboard" />
+        <h1 className="settings-title">License</h1>
+      </div>
+      <div className="about-content">
+        <div className="about-logo-area">
+          <LicenseIcon />
+        </div>
+        <h2 className="about-heading">MIT License</h2>
+        <div className="about-section">
+          <p>Copyright &copy; 2026 ShieldNet 360</p>
+        </div>
+        <div className="about-section" style={{ textAlign: 'left' }}>
+          <p>
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software and associated documentation files (the &ldquo;Software&rdquo;), to deal
+            in the Software without restriction, including without limitation the rights
+            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+            copies of the Software, and to permit persons to whom the Software is
+            furnished to do so, subject to the following conditions:
+          </p>
+          <p>
+            The above copyright notice and this permission notice shall be included in all
+            copies or substantial portions of the Software.
+          </p>
+          <p style={{ fontSize: '0.82rem', color: '#666' }}>
+            THE SOFTWARE IS PROVIDED &ldquo;AS IS&rdquo;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+            SOFTWARE.
+          </p>
+        </div>
+        <div className="about-section">
+          <h3>Third-Party Licenses</h3>
+          <ul style={{ textAlign: 'left', fontSize: '0.85rem', lineHeight: 1.7 }}>
+            <li><strong>Electron</strong> &mdash; MIT License</li>
+            <li><strong>React</strong> &mdash; MIT License</li>
+            <li><strong>Go standard library</strong> &mdash; BSD 3-Clause</li>
+            <li><strong>modernc.org/sqlite</strong> &mdash; BSD 3-Clause</li>
+          </ul>
+        </div>
+        <div className="about-section">
+          <p className="about-copy">
+            Full license text:&nbsp;
+            <a href="https://github.com/ShieldNet-360/prompt-gate/blob/main/LICENSE" className="about-link">
+              github.com/ShieldNet-360/prompt-gate/LICENSE
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Root app ── */
 function App() {
-  const [page, setPage] = useState<'dashboard' | 'settings' | 'about' | 'guideline'>('dashboard');
+  const [page, setPage] = useState<'dashboard' | 'settings' | 'about' | 'guideline' | 'license'>('dashboard');
   const [showSetup, setShowSetup] = useState<boolean>(isSetupPending);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -793,11 +871,13 @@ function App() {
           onOpenSettings={() => setPage('settings')}
           onOpenAbout={() => setPage('about')}
           onOpenGuideline={() => setPage('guideline')}
+          onOpenLicense={() => setPage('license')}
         />
       )}
       {page === 'settings' && <SettingsPage onBack={() => setPage('dashboard')} />}
       {page === 'about' && <AboutUsPage onBack={() => setPage('dashboard')} />}
       {page === 'guideline' && <GuidelinePage onBack={() => setPage('dashboard')} />}
+      {page === 'license' && <LicensePage onBack={() => setPage('dashboard')} />}
     </>
   );
 }
