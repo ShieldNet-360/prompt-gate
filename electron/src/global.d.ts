@@ -19,6 +19,8 @@ export interface PromptGateBridge {
   onEvent?(cb: (event: AgentEvent) => void): () => void;
   openExternal?(url: string): void;
   pickUpstreamCA?(): Promise<{ name: string; pem: string } | null>;
+  getOpenAtLogin?(): Promise<boolean>;
+  setOpenAtLogin?(enabled: boolean): Promise<boolean>;
 }
 
 declare global {
