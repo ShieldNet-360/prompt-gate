@@ -74,8 +74,8 @@ deb:
     - libxss1
     - libxtst6
     - xdg-utils
-  afterInstall: ../scripts/linux/postinstall.sh
-  afterRemove: ../scripts/linux/preremove.sh
+  afterInstall: scripts/postinstall.sh
+  afterRemove: scripts/preremove.sh
 win:
   target:
     - msi
