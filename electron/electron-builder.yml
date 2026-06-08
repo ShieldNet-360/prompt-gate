@@ -47,12 +47,34 @@ dmg:
       type: link
       path: /Applications
 linux:
+  executableName: prompt-gate
   target:
     - deb
     - rpm
     - AppImage
   category: Utility
   icon: resources/icon.png
+  synopsis: Privacy-first AI DLP agent
+  description: >
+    Prompt Gate blocks unauthorized AI tools at the DNS layer and inspects
+    content sent to approved AI tools through a layered DLP pipeline.
+  desktop:
+    entry:
+      Name: Prompt Gate
+      Comment: Privacy-first AI DLP agent
+      Categories: Utility;Security;Network;
+      StartupWMClass: prompt-gate
+      StartupNotify: "true"
+      Terminal: "false"
+deb:
+  depends:
+    - libc6
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
 win:
   target:
     - msi

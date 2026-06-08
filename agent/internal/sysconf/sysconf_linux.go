@@ -63,8 +63,16 @@ func applyProxy(host string, port int) error {
 		"# Managed by Prompt Gate\nexport HTTP_PROXY=http://%s:%d\nexport HTTPS_PROXY=http://%s:%d\nexport http_proxy=http://%s:%d\nexport https_proxy=http://%s:%d\nexport NO_PROXY=localhost,127.0.0.1,::1\nexport no_proxy=localhost,127.0.0.1,::1\n",
 		host, port, host, port, host, port, host, port,
 	)
-	if e := os.WriteFile("/etc/profile.d/prompt-gate-proxy.sh", []byte(content), 0644); e != nil {
-		errs = append(errs, fmt.Sprintf("profile.d: %v", e))
+	// /etc/profile.d requires root — use runElevated. Non-fatal if it
+	// fails because gsettings is the primary mechanism for GUI apps.
+	if tmpf, e := os.CreateTemp("", "prompt-gate-proxy-*.sh"); e == nil {
+		_, _ = tmpf.WriteString(content)
+		tmpf.Close()
+		script := fmt.Sprintf("cp %s /etc/profile.d/prompt-gate-proxy.sh\n", shellQuote(tmpf.Name()))
+		if out, e2 := runElevated(script); e2 != nil {
+			errs = append(errs, fmt.Sprintf("profile.d: %s (%v)", strings.TrimSpace(string(out)), e2))
+		}
+		_ = os.Remove(tmpf.Name())
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("sysconf: proxy apply partial failures: %s", strings.Join(errs, "; "))
@@ -84,7 +92,7 @@ func restoreProxy() error {
 			errs = append(errs, fmt.Sprintf("%s: %v", bin, e))
 		}
 	}
-	_ = os.Remove("/etc/profile.d/prompt-gate-proxy.sh")
+	_, _ = runElevated("rm -f /etc/profile.d/prompt-gate-proxy.sh\n")
 	if len(errs) > 0 {
 		return fmt.Errorf("sysconf: proxy restore partial failures: %s", strings.Join(errs, "; "))
 	}
@@ -98,24 +106,31 @@ func applyDNS(dnsIP string) error {
 		if err != nil {
 			return err
 		}
-		if e := exec.Command("resolvectl", "dns", link, dnsIP).Run(); e != nil {
-			return fmt.Errorf("sysconf: resolvectl dns: %w", e)
-		}
-		if e := exec.Command("resolvectl", "domain", link, "~.").Run(); e != nil {
-			return fmt.Errorf("sysconf: resolvectl domain: %w", e)
+		script := fmt.Sprintf("resolvectl dns %s %s\nresolvectl domain %s '~.'\n",
+			shellQuote(link), shellQuote(dnsIP), shellQuote(link))
+		if out, e := runElevated(script); e != nil {
+			return fmt.Errorf("sysconf: resolvectl: %s (%w)", strings.TrimSpace(string(out)), e)
 		}
 		return nil
 	}
 	// Fallback: rewrite /etc/resolv.conf
 	backup := "/etc/resolv.conf.prompt-gate.bak"
 	if _, err := os.Stat(backup); os.IsNotExist(err) {
-		data, err := os.ReadFile("/etc/resolv.conf")
-		if err == nil {
-			_ = os.WriteFile(backup, data, 0644)
-		}
+		_, _ = runElevated(fmt.Sprintf("cp /etc/resolv.conf %s\n", shellQuote(backup)))
 	}
 	content := fmt.Sprintf("# Managed by Prompt Gate. Original backed up at %s.\nnameserver %s\noptions edns0\n", backup, dnsIP)
-	return os.WriteFile("/etc/resolv.conf", []byte(content), 0644)
+	tmpf, err := os.CreateTemp("", "prompt-gate-resolv-*.conf")
+	if err != nil {
+		return fmt.Errorf("sysconf: create temp resolv.conf: %w", err)
+	}
+	_, _ = tmpf.WriteString(content)
+	tmpf.Close()
+	defer os.Remove(tmpf.Name())
+	script := fmt.Sprintf("cp %s /etc/resolv.conf\n", shellQuote(tmpf.Name()))
+	if out, err := runElevated(script); err != nil {
+		return fmt.Errorf("sysconf: write /etc/resolv.conf: %s (%w)", strings.TrimSpace(string(out)), err)
+	}
+	return nil
 }
 
 func restoreDNS() error {
@@ -124,11 +139,16 @@ func restoreDNS() error {
 		if err != nil {
 			return err
 		}
-		return exec.Command("resolvectl", "revert", link).Run()
+		if out, err := runElevated(fmt.Sprintf("resolvectl revert %s\n", shellQuote(link))); err != nil {
+			return fmt.Errorf("sysconf: resolvectl revert: %s (%w)", strings.TrimSpace(string(out)), err)
+		}
+		return nil
 	}
 	backup := "/etc/resolv.conf.prompt-gate.bak"
 	if _, err := os.Stat(backup); err == nil {
-		return os.Rename(backup, "/etc/resolv.conf")
+		if out, err := runElevated(fmt.Sprintf("mv %s /etc/resolv.conf\n", shellQuote(backup))); err != nil {
+			return fmt.Errorf("sysconf: restore resolv.conf: %s (%w)", strings.TrimSpace(string(out)), err)
+		}
 	}
 	return nil
 }
@@ -157,34 +177,55 @@ const (
 	rhelDest = "/etc/pki/ca-trust/source/anchors/prompt-gate-ca.crt"
 )
 
+// runElevated writes a shell script containing the given commands to a
+// temp file and executes it via pkexec (or directly if already root).
+// This avoids passing any user-controlled values as exec.Command
+// arguments — only the fixed temp-file path is passed to pkexec.
+func runElevated(script string) ([]byte, error) {
+	f, err := os.CreateTemp("", "prompt-gate-elevate-*.sh")
+	if err != nil {
+		return nil, fmt.Errorf("sysconf: create temp script: %w", err)
+	}
+	name := f.Name()
+	defer os.Remove(name)
+
+	if _, err := f.WriteString("#!/bin/sh\nset -e\n" + script); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("sysconf: write temp script: %w", err)
+	}
+	f.Close()
+	if err := os.Chmod(name, 0700); err != nil {
+		return nil, fmt.Errorf("sysconf: chmod temp script: %w", err)
+	}
+
+	if os.Geteuid() == 0 {
+		return exec.Command("/bin/sh", name).CombinedOutput()
+	}
+	if !hasCmd("pkexec") {
+		return nil, fmt.Errorf("sysconf: pkexec not found — run the app as root or install policykit-1")
+	}
+	return exec.Command("pkexec", "/bin/sh", name).CombinedOutput()
+}
+
+// shellQuote returns a single-quoted shell literal safe for embedding
+// in a script. Any embedded single quotes are escaped.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''" ) + "'"
+}
+
 func installCA(caPath string) error {
+	safe := shellQuote(caPath)
 	if hasCmd("update-ca-certificates") {
-		// Debian / Ubuntu
-		data, err := os.ReadFile(caPath)
-		if err != nil {
-			return fmt.Errorf("sysconf: read CA: %w", err)
-		}
-		if err := os.WriteFile(debDest, data, 0644); err != nil {
-			return fmt.Errorf("sysconf: write %s: %w", debDest, err)
-		}
-		out, err := exec.Command("update-ca-certificates").CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("sysconf: update-ca-certificates: %s (%w)", strings.TrimSpace(string(out)), err)
+		script := fmt.Sprintf("cp %s %s\nupdate-ca-certificates\n", safe, shellQuote(debDest))
+		if out, err := runElevated(script); err != nil {
+			return fmt.Errorf("sysconf: install CA (deb): %s (%w)", strings.TrimSpace(string(out)), err)
 		}
 		return nil
 	}
 	if hasCmd("update-ca-trust") {
-		// Fedora / RHEL
-		data, err := os.ReadFile(caPath)
-		if err != nil {
-			return fmt.Errorf("sysconf: read CA: %w", err)
-		}
-		if err := os.WriteFile(rhelDest, data, 0644); err != nil {
-			return fmt.Errorf("sysconf: write %s: %w", rhelDest, err)
-		}
-		out, err := exec.Command("update-ca-trust", "extract").CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("sysconf: update-ca-trust: %s (%w)", strings.TrimSpace(string(out)), err)
+		script := fmt.Sprintf("cp %s %s\nupdate-ca-trust extract\n", safe, shellQuote(rhelDest))
+		if out, err := runElevated(script); err != nil {
+			return fmt.Errorf("sysconf: install CA (rhel): %s (%w)", strings.TrimSpace(string(out)), err)
 		}
 		return nil
 	}
@@ -193,18 +234,16 @@ func installCA(caPath string) error {
 
 func removeCA(_ string) error {
 	if hasCmd("update-ca-certificates") {
-		_ = os.Remove(debDest)
-		out, err := exec.Command("update-ca-certificates", "--fresh").CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("sysconf: update-ca-certificates --fresh: %s (%w)", strings.TrimSpace(string(out)), err)
+		script := fmt.Sprintf("rm -f %s\nupdate-ca-certificates --fresh\n", shellQuote(debDest))
+		if out, err := runElevated(script); err != nil {
+			return fmt.Errorf("sysconf: remove CA (deb): %s (%w)", strings.TrimSpace(string(out)), err)
 		}
 		return nil
 	}
 	if hasCmd("update-ca-trust") {
-		_ = os.Remove(rhelDest)
-		out, err := exec.Command("update-ca-trust", "extract").CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("sysconf: update-ca-trust: %s (%w)", strings.TrimSpace(string(out)), err)
+		script := fmt.Sprintf("rm -f %s\nupdate-ca-trust extract\n", shellQuote(rhelDest))
+		if out, err := runElevated(script); err != nil {
+			return fmt.Errorf("sysconf: remove CA (rhel): %s (%w)", strings.TrimSpace(string(out)), err)
 		}
 		return nil
 	}

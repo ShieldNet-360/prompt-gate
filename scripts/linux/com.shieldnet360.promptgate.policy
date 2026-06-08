@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<!--
+  PolicyKit policy for Prompt Gate. Allows the Electron GUI app to run
+  privileged system configuration commands (CA trust install, DNS
+  redirect, system proxy) via pkexec with a single admin password prompt.
+-->
+<policyconfig>
+  <vendor>Prompt Gate</vendor>
+  <vendor_url>https://github.com/ShieldNet-360/prompt-gate</vendor_url>
+  <icon_name>prompt-gate</icon_name>
+
+  <action id="com.shieldnet360.promptgate.sysconf">
+    <description>Configure Prompt Gate system settings</description>
+    <message>Prompt Gate needs administrator permission to install the CA certificate, configure DNS, or set the system proxy.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>
