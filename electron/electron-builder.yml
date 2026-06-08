@@ -27,10 +27,6 @@ extraResources:
     to: resources/rules
     filter:
       - "**/*"
-  - from: resources/linux
-    to: resources/linux
-    filter:
-      - "**/*"
 mac:
   category: public.app-category.utilities
   hardenedRuntime: true
@@ -63,12 +59,13 @@ linux:
     Prompt Gate blocks unauthorized AI tools at the DNS layer and inspects
     content sent to approved AI tools through a layered DLP pipeline.
   desktop:
-    Name: Prompt Gate
-    Comment: Privacy-first AI DLP agent
-    Categories: Utility;Security;Network;
-    StartupWMClass: prompt-gate
-    StartupNotify: "true"
-    Terminal: "false"
+    entry:
+      Name: Prompt Gate
+      Comment: Privacy-first AI DLP agent
+      Categories: Utility;Security;Network;
+      StartupWMClass: prompt-gate
+      StartupNotify: "true"
+      Terminal: "false"
 deb:
   depends:
     - libc6
@@ -78,8 +75,6 @@ deb:
     - libxss1
     - libxtst6
     - xdg-utils
-  afterInstall: scripts/postinstall.sh
-  afterRemove: scripts/preremove.sh
 win:
   target:
     - msi
