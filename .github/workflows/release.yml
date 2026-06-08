@@ -170,6 +170,11 @@ jobs:
           fi
           rm -rf electron/resources/rules
           cp -R rules electron/resources/rules
+          # Stage Linux-specific files (PolicyKit policy) for the deb/rpm build.
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            mkdir -p electron/resources/linux
+            cp scripts/linux/com.shieldnet360.promptgate.policy electron/resources/linux/
+          fi
 
       - name: electron-builder
         working-directory: electron

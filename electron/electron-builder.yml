@@ -27,6 +27,10 @@ extraResources:
     to: resources/rules
     filter:
       - "**/*"
+  - from: resources/linux
+    to: resources/linux
+    filter:
+      - "**/*"
 mac:
   category: public.app-category.utilities
   hardenedRuntime: true
