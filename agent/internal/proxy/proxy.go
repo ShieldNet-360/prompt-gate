@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -465,7 +466,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if srv == nil {
 		return nil
 	}
-	return srv.Shutdown(ctx)
+	err := srv.Shutdown(ctx)
+	// Mark stopped immediately so callers see Running()==false without
+	// waiting for the ListenAndServe goroutine's deferred cleanup.
+	s.running.Store(false)
+	return err
 }
 
 // SetNotifier sets the notifier used to deliver OS notifications on
@@ -598,9 +603,14 @@ func decodeScanBody(req *http.Request, body []byte) string {
 		}
 		return raw
 	}
+	keys := make([]string, 0, len(vals))
+	for k := range vals {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	var sb strings.Builder
-	for _, vs := range vals {
-		for _, v := range vs {
+	for _, k := range keys {
+		for _, v := range vals[k] {
 			if sb.Len() > 0 {
 				sb.WriteByte('\n')
 			}
