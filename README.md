@@ -26,6 +26,10 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/ShieldNet-360/prompt-gate?filename=agent%2Fgo.mod)](agent/go.mod)
 [![Privacy: zero data persisted](https://img.shields.io/badge/privacy-zero%20data%20persisted-14b8a6)](./docs/PRIVACY-AUDIT.md)
 
+<p align="center">
+  <img src="docs/prompt-gate.gif" alt="Prompt Gate demo" width="444">
+</p>
+
 **Open-source, privacy-first AI Data Leakage Prevention for desktop.**
 
 Most secret scanners stop at "does this look like an AWS key." Secure
