@@ -29,7 +29,7 @@ detection works even before the first rule update.
 
 The agent looks for `config.yaml` in the following locations, in order:
 
-1. `$SECURE_EDGE_CONFIG` (env var, if set)
+1. `$PROMPT_GATE_CONFIG` (env var, if set)
 2. `$XDG_CONFIG_HOME/prompt-gate/config.yaml`
 3. `~/.config/prompt-gate/config.yaml` (Linux/macOS) or
    `%APPDATA%\prompt-gate\config.yaml` (Windows)
