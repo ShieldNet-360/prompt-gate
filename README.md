@@ -32,8 +32,8 @@
 
 **Open-source, privacy-first AI Data Leakage Prevention for desktop.**
 
-Most secret scanners stop at "does this look like an AWS key." Secure
-Edge starts there and keeps going — it normalises away the tricks a
+Most secret scanners stop at "does this look like an AWS key." Prompt Gate
+starts there and keeps going — it normalises away the tricks a
 human or LLM uses to sneak a secret past a regex, scores matches
 against where they're going, and lets the user say "never block
 this specific value again" without sending anything off-device.
