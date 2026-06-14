@@ -4,5 +4,6 @@
 .chatgpt.com
 .api.openai.com
 .claude.ai
+.api.anthropic.com
 .gemini.google.com
 .copilot.microsoft.com
