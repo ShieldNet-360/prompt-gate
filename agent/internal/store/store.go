@@ -205,6 +205,21 @@ func (s *Store) migrate(ctx context.Context) error {
 		)`,
 		`INSERT OR IGNORE INTO agent_preferences (id, block_events_enabled, block_events_consented_at)
 		 VALUES (1, 0, 0)`,
+		// Canary tripwire tokens. Each row is a user-planted fake
+		// secret; if an AI agent reads the file it lives in and the
+		// token reaches the DLP pipeline, the matching canary pattern
+		// blocks and last_triggered/trigger_count are bumped. The
+		// token is the user's own non-sensitive tripwire value (not a
+		// real secret), so storing it plainly — unlike dlp_allowlist —
+		// is intentional: the UI must show it back for copy-to-clipboard.
+		`CREATE TABLE IF NOT EXISTS dlp_canaries (
+			id             TEXT PRIMARY KEY,
+			label          TEXT NOT NULL,
+			token          TEXT UNIQUE NOT NULL,
+			created_at     INTEGER NOT NULL,
+			last_triggered INTEGER NOT NULL DEFAULT 0,
+			trigger_count  INTEGER NOT NULL DEFAULT 0
+		)`,
 	}
 	for _, q := range stmts {
 		if _, err := s.db.ExecContext(ctx, q); err != nil {

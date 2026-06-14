@@ -162,6 +162,27 @@ func runNativeMessaging(configPath string) error {
 	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
 }
 
+// loadCanaryPatterns reads the persisted canary tripwires from the
+// store, builds their DLP patterns, and registers them on the live
+// pipeline. Kept separate from Rebuild so a rule-file reload never
+// drops canaries (the pipeline holds them as an overlay). A nil store
+// or empty set is a no-op.
+func loadCanaryPatterns(ctx context.Context, s *store.Store, p *dlp.Pipeline) error {
+	if s == nil {
+		return nil
+	}
+	canaries, err := s.ListCanaries(ctx)
+	if err != nil {
+		return err
+	}
+	patterns := make([]*dlp.Pattern, 0, len(canaries))
+	for _, c := range canaries {
+		patterns = append(patterns, dlp.CanaryPattern(c.Token, c.Label))
+	}
+	p.SetCanaryPatterns(patterns)
+	return nil
+}
+
 // applyDLPRuntimeConfig copies the runtime tunables from the
 // loaded YAML config into the pipeline. Called from both daemon and
 // native-messaging paths so each transport observes the same defaults.
@@ -365,6 +386,13 @@ func run(configPath string) error {
 		pipeline.Rebuild(patterns, exclusions)
 		enableAllowlist(ctx, pipeline, s.DB())
 		apiServer.SetDLP(pipeline)
+		apiServer.SetCanaryRegistrar(pipeline)
+		// Load any persisted canary tripwires into the live pipeline so
+		// they survive restarts. Best-effort: a load failure leaves the
+		// pipeline running without canaries rather than failing startup.
+		if err := loadCanaryPatterns(ctx, s, pipeline); err != nil {
+			log.Warnf("canary load failed: %v", err)
+		}
 		log.Infof("DLP pipeline ready (patterns=%s)", cfg.DLPPatternsPath)
 
 		// Wire the local MITM proxy. The controller is constructed

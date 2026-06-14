@@ -83,6 +83,7 @@ nav:
     - Quick Start: quickstart.md
     - Install Guide: admin-guide.md
   - User Guide: user-guide.md
+  - Canary Tokens: canary-tokens.md
   - Authoring:
     - DLP Patterns: dlp-pattern-authoring-guide.md
     - Rule Contributions: rule-contribution-guide.md

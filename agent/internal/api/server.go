@@ -218,6 +218,7 @@ type Server struct {
 	Tamper       TamperReporter
 	Rules        RuleOverride
 	AgentUpdate  AgentSelfUpdater
+	Canaries     CanaryRegistrar
 	Notifier     *notify.Notifier
 	RuleFiles    []string // optional paths whose mtimes feed /api/status
 	startedAt    time.Time
@@ -281,6 +282,11 @@ func (s *Server) SetRuleFiles(paths []string) {
 // SetDLP wires a DLP scanner into the server after construction.
 // Callers may omit one for backward compatibility.
 func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
+
+// SetCanaryRegistrar wires the canary-pattern sink (the live DLP
+// pipeline) into the server. Optional; when nil the /api/dlp/canary
+// endpoints return 503.
+func (s *Server) SetCanaryRegistrar(c CanaryRegistrar) { s.Canaries = c }
 
 // SetRuleUpdater wires the rule updater into the server. Optional;
 // when nil the /api/rules/* endpoints return 503.
@@ -350,6 +356,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/dlp/allowlist", s.handleDLPAllowlistCollection)
 	mux.HandleFunc("/api/dlp/allowlist/", s.handleDLPAllowlistItem)
+	mux.HandleFunc("/api/dlp/canary", s.handleCanaryCollection)
+	mux.HandleFunc("/api/dlp/canary/", s.handleCanaryItem)
 	return withCORS(mux, s.bearerToken)
 }
 
