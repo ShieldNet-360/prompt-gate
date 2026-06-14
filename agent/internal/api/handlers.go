@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/stats"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/store"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/sysconf"
 )
 
 // osStat is a thin indirection so tests can stub the filesystem. The
@@ -849,6 +851,13 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 		writeErrorRedacted(w, http.StatusInternalServerError, "enable proxy failed", err)
 		return
 	}
+	// Best-effort: set shell env vars for CLI tools in terminals.
+	status := s.Proxy.Status()
+	if status.ListenAddr != "" {
+		if err := sysconf.ApplyShellProxy("http://" + status.ListenAddr); err != nil {
+			log.Printf("sysconf: shell proxy apply (non-fatal): %v", err)
+		}
+	}
 	writeJSON(w, http.StatusOK, proxyEnableResponse{CACertPath: caPath})
 }
 
@@ -876,6 +885,10 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 	if err := s.Proxy.Disable(r.Context(), body.RemoveCA); err != nil {
 		writeErrorRedacted(w, http.StatusInternalServerError, "disable proxy failed", err)
 		return
+	}
+	// Best-effort: unset shell env vars so CLI tools stop using the proxy.
+	if err := sysconf.RemoveShellProxy(); err != nil {
+		log.Printf("sysconf: shell proxy remove (non-fatal): %v", err)
 	}
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
 }
