@@ -103,6 +103,31 @@
       "match_type": "proximity"
     },
     {
+      "applies_to": "Base64-Encoded GCP Service Account Key",
+      "type": "dictionary",
+      "words": [
+        "example",
+        "demo-project",
+        "test-project",
+        "my-sample-project",
+        "placeholder"
+      ],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Base64-Encoded Private Key Block",
+      "type": "dictionary",
+      "words": [
+        "example",
+        "EXAMPLE",
+        "placeholder",
+        "test-key"
+      ],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
       "applies_to": "GCP OAuth Client Secret",
       "type": "dictionary",
       "words": [
