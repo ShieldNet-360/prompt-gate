@@ -23,6 +23,7 @@ import (
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dns"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/heartbeat"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/mcp"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/notify"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/policy"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
@@ -44,6 +45,8 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to YAML config file")
 	nativeMode := flag.Bool("native-messaging", false,
 		"run as a Chrome Native Messaging host on stdin/stdout instead of a daemon")
+	mcpMode := flag.Bool("mcp", false,
+		"run as a Model Context Protocol (MCP) stdio tool server instead of a daemon")
 	flag.Parse()
 
 	api.Version = version
@@ -60,6 +63,14 @@ func main() {
 	if *nativeMode {
 		if err := runNativeMessaging(*configPath); err != nil {
 			log.Errorf("agent (native): %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *mcpMode {
+		if err := runMCP(*configPath); err != nil {
+			log.Errorf("agent (mcp): %v", err)
 			os.Exit(1)
 		}
 		return
@@ -95,35 +106,69 @@ func isNativeMessagingArgv(args []string) bool {
 // skipped — Chrome spawns one host process per extension session and
 // tears it down on disconnect.
 func runNativeMessaging(configPath string) error {
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-	resolveLocalRulesDir(&cfg)
-	if cfg.DLPPatternsPath == "" {
-		return fmt.Errorf("native messaging requires dlp_patterns in config")
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	pipeline, statsStore, err := buildStdioPipeline(ctx, configPath)
+	if err != nil {
+		return err
+	}
+	if statsStore != nil {
+		defer statsStore.Close()
+	}
+	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+}
+
+// runMCP serves the Prompt Gate DLP engine as a Model Context Protocol
+// (MCP) tool server over stdio (newline-delimited JSON-RPC). Like Native
+// Messaging it is a one-shot stdio transport: DNS / API / proxy servers
+// are skipped, and the same DLP pipeline setup is reused so verdicts
+// match every other transport. Configure it as an `mcpServers` entry in
+// Claude Code / Cursor / Windsurf — see docs/mcp-integration.md.
+func runMCP(configPath string) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	pipeline, statsStore, err := buildStdioPipeline(ctx, configPath)
+	if err != nil {
+		return err
+	}
+	if statsStore != nil {
+		defer statsStore.Close()
+	}
+	return mcp.NewServer(pipeline, version).Serve(ctx, os.Stdin, os.Stdout)
+}
+
+// buildStdioPipeline loads config and assembles a DLP pipeline for the
+// stdio transports (Native Messaging and MCP). It mirrors daemon-mode
+// DLP setup so scan results match the HTTP fallback: ScoreWeights and
+// Thresholds come from the SQLite store (falling back to defaults when
+// the store has no row yet) and the same pattern / exclusion files are
+// rebuilt into the pipeline. DNS and API servers are intentionally
+// skipped. The returned store may be nil; when non-nil the caller owns
+// it and must Close it.
+func buildStdioPipeline(ctx context.Context, configPath string) (*dlp.Pipeline, *store.Store, error) {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load config: %w", err)
+	}
+	resolveLocalRulesDir(&cfg)
+	if cfg.DLPPatternsPath == "" {
+		return nil, nil, fmt.Errorf("stdio transport requires dlp_patterns in config")
+	}
+
 	weights := dlp.DefaultScoreWeights()
 	thresholds := dlp.DefaultThresholds()
-	// The store, if available, is kept open for the lifetime of the
-	// Native Messaging session so ServeNativeMessaging can bump the
-	// shared dlp_scans_total / dlp_blocks_total counters after each
-	// scan. Without this the Status page would silently undercount
-	// whenever Chrome chose the NM transport over the HTTP fallback.
 	var statsStore *store.Store
 	if cfg.DBPath != "" {
 		s, err := store.Open(cfg.DBPath)
 		if err != nil {
-			return fmt.Errorf("open store: %w", err)
+			return nil, nil, fmt.Errorf("open store: %w", err)
 		}
-		defer s.Close()
 		dlpCfg, err := s.GetDLPConfig(ctx)
 		if err != nil {
-			return fmt.Errorf("read dlp_config: %w", err)
+			s.Close()
+			return nil, nil, fmt.Errorf("read dlp_config: %w", err)
 		}
 		weights = dlp.ScoreWeights{
 			HotwordBoost:     dlpCfg.HotwordBoost,
@@ -143,13 +188,19 @@ func runNativeMessaging(configPath string) error {
 
 	patterns, err := dlp.MergePatternsFromDir(cfg.DLPPatternsPath, cfg.LocalRulesDir)
 	if err != nil {
-		return err
+		if statsStore != nil {
+			statsStore.Close()
+		}
+		return nil, nil, err
 	}
 	var exclusions []dlp.Exclusion
 	if cfg.DLPExclusionsPath != "" {
 		exclusions, err = dlp.MergeExclusionsFromDir(cfg.DLPExclusionsPath, cfg.LocalRulesDir)
 		if err != nil {
-			return err
+			if statsStore != nil {
+				statsStore.Close()
+			}
+			return nil, nil, err
 		}
 	}
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
@@ -158,8 +209,7 @@ func runNativeMessaging(configPath string) error {
 	if statsStore != nil {
 		enableAllowlist(ctx, pipeline, statsStore.DB())
 	}
-
-	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+	return pipeline, statsStore, nil
 }
 
 // applyDLPRuntimeConfig copies the runtime tunables from the
