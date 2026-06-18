@@ -13,6 +13,7 @@ const zshHook = `# >>> prompt-gate proxy hook >>>
 # Managed by Prompt Gate — do not edit this block manually.
 _prompt_gate_proxy_hook() {
   local pf="${HOME}/.config/prompt-gate/proxy-env"
+  local cf="${HOME}/.config/prompt-gate/proxy-ca"
   if [[ -r "$pf" ]]; then
     local url
     url="$(<"$pf")"
@@ -23,10 +24,21 @@ _prompt_gate_proxy_hook() {
       export HTTPS_PROXY="$url"
       export no_proxy="localhost,127.0.0.1,::1"
       export NO_PROXY="$no_proxy"
+      # CLI TLS stacks ignore the OS keychain — point them at the MITM CA.
+      if [[ -r "$cf" ]]; then
+        local ca
+        ca="$(<"$cf")"
+        if [[ -n "$ca" ]]; then
+          export NODE_EXTRA_CA_CERTS="$ca"
+          export SSL_CERT_FILE="$ca"
+          export REQUESTS_CA_BUNDLE="$ca"
+        fi
+      fi
       return
     fi
   fi
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+  unset NODE_EXTRA_CA_CERTS SSL_CERT_FILE REQUESTS_CA_BUNDLE
 }
 if (( ${precmd_functions[(I)_prompt_gate_proxy_hook]} == 0 )); then
   precmd_functions+=(_prompt_gate_proxy_hook)
@@ -38,6 +50,7 @@ const bashHook = `# >>> prompt-gate proxy hook >>>
 # Managed by Prompt Gate — do not edit this block manually.
 _prompt_gate_proxy_hook() {
   local pf="${HOME}/.config/prompt-gate/proxy-env"
+  local cf="${HOME}/.config/prompt-gate/proxy-ca"
   if [[ -r "$pf" ]]; then
     local url
     url="$(cat "$pf")"
@@ -48,10 +61,21 @@ _prompt_gate_proxy_hook() {
       export HTTPS_PROXY="$url"
       export no_proxy="localhost,127.0.0.1,::1"
       export NO_PROXY="$no_proxy"
+      # CLI TLS stacks ignore the OS keychain — point them at the MITM CA.
+      if [[ -r "$cf" ]]; then
+        local ca
+        ca="$(cat "$cf")"
+        if [[ -n "$ca" ]]; then
+          export NODE_EXTRA_CA_CERTS="$ca"
+          export SSL_CERT_FILE="$ca"
+          export REQUESTS_CA_BUNDLE="$ca"
+        fi
+      fi
       return
     fi
   fi
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+  unset NODE_EXTRA_CA_CERTS SSL_CERT_FILE REQUESTS_CA_BUNDLE
 }
 case ";${PROMPT_COMMAND};" in
   *_prompt_gate_proxy_hook*) ;;
