@@ -1325,10 +1325,10 @@ function App() {
 
   useEffect(() => {
     const off = window.secureEdge?.onNavigate?.((v) => {
-      // 'settings' intentionally omitted — keep current page so the
-      // tray icon restores whatever view the user had open last.
+      // 'proxy' navigates to Settings so the user can reach Proxy Settings.
+      // 'status' / 'settings' / anything else: just raise the window and
+      // restore whatever page the user had open last — no forced navigation.
       if (v === 'proxy') setPage('settings');
-      else if (v === 'status' || v === 'rules') setPage('dashboard');
     });
     const MAX_TOASTS = 3;
     const offEvent = window.secureEdge?.onEvent?.((evt) => {
