@@ -210,9 +210,10 @@ function DashOverviewPage() {
   const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [proxyOn, setProxyOn] = useState(false);
-  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number } | null>(null);
+  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number; dns_queries_total: number } | null>(null);
   const [events, setEvents] = useState<Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>>([]);
   const [agentVer, setAgentVer] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -248,6 +249,11 @@ function DashOverviewPage() {
     }
   }, [openAtLogin, loginBusy]);
 
+  const resetStats = useCallback(async () => {
+    setResetting(true);
+    try { await agent.resetStats(); await refresh(); } finally { setResetting(false); }
+  }, [refresh]);
+
   function timeAgo(ts: string): string {
     const diff = Date.now() - new Date(ts).getTime();
     const m = Math.floor(diff / 60000);
@@ -260,40 +266,36 @@ function DashOverviewPage() {
 
   return (
     <div className="dash-inner-page">
-      <div className={`general-hero ${proxyOn ? 'on' : 'off'}`}>
-        <div className="general-hero-main">
-          <SetupIcon size={36} />
-          <div className="general-hero-text">
-            <div className="general-hero-title">
-              {proxyOn ? "You're protected" : 'Protection off'}
-            </div>
-            <div className="general-hero-sub">
-              {proxyOn
-                ? 'Sensitive data is blocked before it leaves this device'
-                : 'Swipe right to the toggle and enable the proxy'}
-            </div>
-          </div>
+      <div className={`ov-hero ${proxyOn ? 'on' : 'off'}`}>
+        <div className={`ov-hero-status ${proxyOn ? 'on' : 'off'}`}>
+          <span className="ov-hero-dot" />
+          <span className="ov-hero-badge-text">{proxyOn ? 'Protection On' : 'Protection Off'}</span>
         </div>
-        <div className={`general-hero-badge ${proxyOn ? 'on' : 'off'}`}>
-          <span className="general-hero-dot" />
-          {proxyOn ? 'Protection On' : 'Protection Off'}
+        <SetupIcon size={44} />
+        <div className="ov-hero-title">{proxyOn ? "You're protected" : 'Protection off'}</div>
+        <div className="ov-hero-sub">
+          {proxyOn
+            ? 'Sensitive data is blocked before it leaves this device'
+            : 'Swipe right to the toggle and enable the proxy'}
         </div>
       </div>
 
-      <div className="general-stats-row">
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '\u2014'}</div>
-          <div className="general-stat-label">Prompts scanned</div>
+      <div className="ov-stats-grid">
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Prompts scanned</div>
         </div>
-        <div className="general-stat-divider" />
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '\u2014'}</div>
-          <div className="general-stat-label">Secrets blocked</div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Secrets blocked</div>
         </div>
-        <div className="general-stat-divider" />
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '\u2014'}</div>
-          <div className="general-stat-label">Sites blocked</div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Sites blocked</div>
+        </div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dns_queries_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">DNS queries</div>
         </div>
       </div>
 
@@ -305,7 +307,7 @@ function DashOverviewPage() {
               <div className={`general-activity-dot ${e.event_type}`} />
               <div className="general-activity-info">
                 <div className="general-activity-name">{e.pattern_name || e.host}</div>
-                <div className="general-activity-meta">{e.host} \u00b7 {timeAgo(e.timestamp)}</div>
+                <div className="general-activity-meta">{e.host} &middot; {timeAgo(e.timestamp)}</div>
               </div>
               <span className="general-activity-badge">Blocked</span>
             </div>
@@ -315,13 +317,30 @@ function DashOverviewPage() {
 
       {agentVer && <div className="general-agent-info">Agent v{agentVer}</div>}
 
+      {stats !== null && (
+        <div className="general-dns-row">
+          <div className="general-dns-info">
+            <span className="general-dns-label">DNS queries total</span>
+            <span className="general-dns-value">{stats.dns_queries_total?.toLocaleString() ?? '—'}</span>
+          </div>
+          <button
+            type="button"
+            className="general-reset-btn"
+            onClick={() => void resetStats()}
+            disabled={resetting}
+          >
+            {resetting ? 'Resetting…' : 'Reset counters'}
+          </button>
+        </div>
+      )}
+
       <div className="general-toggle-row">
         <div className="general-toggle-text">
           <div className="general-toggle-title">Launch at login</div>
           <div className="general-toggle-desc">Start automatically when you log in</div>
         </div>
         {openAtLogin === null ? (
-          <span className="general-toggle-loading">\u2026</span>
+          <span className="general-toggle-loading">&hellip;</span>
         ) : (
           <button
             type="button"
@@ -338,27 +357,24 @@ function DashOverviewPage() {
   );
 }
 
-/* ── Dashboard page 2: statistics — no duplicate metrics from page 1 ── */
+/* ── Dashboard page 2: block history ── */
 function DashStatsPage() {
-  const [snap, setSnap] = useState<{ reachable: boolean; version?: string; uptime?: string; dns_queries?: number } | null>(null);
+  const [reachable, setReachable] = useState(true);
   const [events, setEvents] = useState<Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>>([]);
   const [prefs, setPrefs] = useState<{ block_events_enabled: boolean } | null>(null);
-  const [resetting, setResetting] = useState(false);
   const [clearing, setClearing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [status, stats, ev, pr] = await Promise.all([
-        agent.getStatus().catch(() => null),
-        agent.getStats().catch(() => null),
+      const [ev, pr] = await Promise.all([
         agent.getBlockEvents(50).catch(() => []),
         agent.getPreferences().catch(() => null),
       ]);
-      setSnap({ reachable: status !== null, version: status?.version, uptime: status?.uptime, dns_queries: stats?.dns_queries_total });
+      setReachable(true);
       setEvents(ev as Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>);
       setPrefs(pr as { block_events_enabled: boolean } | null);
     } catch {
-      setSnap((s) => s ? { ...s, reachable: false } : { reachable: false });
+      setReachable(false);
     }
   }, []);
 
@@ -368,47 +384,34 @@ function DashStatsPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const reset = useCallback(async () => {
-    setResetting(true);
-    try { await agent.resetStats(); await load(); } finally { setResetting(false); }
-  }, [load]);
-
   const clearHistory = useCallback(async () => {
     setClearing(true);
     try { await agent.clearBlockEvents(); setEvents([]); } finally { setClearing(false); }
   }, []);
 
+  function fmtTime(ts: string) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
   return (
     <div className="dash-inner-page">
-      <div className={`status-banner status-banner-${snap?.reachable ? 'ok' : 'error'}`} role="status">
-        {snap?.reachable && snap.version
-          ? `Running \u00b7 v${snap.version} \u00b7 up ${snap.uptime}`
-          : 'Agent unreachable'}
-      </div>
-
-      {snap?.dns_queries !== undefined && (
-        <div className="dash-stat-row">
-          <span className="dash-stat-row-label">DNS queries total</span>
-          <span className="dash-stat-row-value">{snap.dns_queries.toLocaleString()}</span>
-        </div>
-      )}
-      <button
-        type="button"
-        className="reset-button"
-        style={{ marginBottom: 16 }}
-        onClick={() => void reset()}
-        disabled={resetting || !snap?.reachable}
-      >
-        {resetting ? 'Resetting\u2026' : 'Reset Counters'}
-      </button>
-
-      <div className="block-history-header">
-        <h3>Block History</h3>
+      <div className="bh-header">
+        <span className="bh-title">Block History</span>
         {events.length > 0 && (
-          <button type="button" className="clear-history-btn"
-            onClick={() => void clearHistory()} disabled={clearing || !snap?.reachable}>
+          <button
+            type="button"
+            className="clear-history-btn"
+            onClick={() => void clearHistory()}
+            disabled={clearing || !reachable}
+          >
             {clearing ? 'Clearing\u2026' : (
-              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
@@ -418,31 +421,46 @@ function DashStatsPage() {
         )}
       </div>
 
+      {events.length > 0 && (
+        <div className="bh-count">{events.length} event{events.length !== 1 ? 's' : ''}</div>
+      )}
+
       {prefs && !prefs.block_events_enabled ? (
-        <p className="page-hint">Block history is <strong>off</strong>. Enable in <strong>Settings \u2192 Privacy</strong>.</p>
+        <div className="bh-empty-state">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bh-empty-icon">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0110 0v4" />
+          </svg>
+          <p className="bh-empty-text">Block history is off</p>
+          <p className="bh-empty-sub">Enable in <strong>Settings &rarr; Privacy</strong> to see what gets blocked.</p>
+        </div>
       ) : events.length === 0 ? (
-        <p className="page-hint">No block events yet.</p>
+        <div className="bh-empty-state">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bh-empty-icon">
+            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <p className="bh-empty-text">All clear</p>
+          <p className="bh-empty-sub">No block events recorded yet.</p>
+        </div>
       ) : (
-        <div className="block-events-scroll">
-          <table className="block-events-table" aria-label="Block event history">
-            <thead><tr><th>Time</th><th>Type</th><th>Host</th><th>Detail</th></tr></thead>
-            <tbody>
-              {events.map((e) => (
-                <tr key={e.id}>
-                  <td className="block-events-time">
-                    {new Date(e.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td>
-                    <span className={`event-badge event-badge-${e.event_type}`}>
-                      {e.event_type === 'dlp' ? 'DLP' : 'Cat'}
-                    </span>
-                  </td>
-                  <td className="block-events-host">{e.host}</td>
-                  <td className="block-events-detail">{e.pattern_name}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bh-list">
+          {events.map((e) => (
+            <div key={e.id} className="bh-card">
+              <div className="bh-card-header">
+                <span className={`event-badge event-badge-${e.event_type}`}>
+                  {e.event_type === 'dlp' ? 'DLP' : 'Cat'}
+                </span>
+                <span className="bh-pattern">{e.pattern_name || '\u2014'}</span>
+              </div>
+              <div className="bh-card-meta">
+                <span className="bh-host">{e.host}</span>
+                <span className="bh-time">{fmtTime(e.timestamp)}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -510,6 +528,26 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        {pageIdx > 0 && (
+          <button type="button" className="swipe-arrow swipe-arrow-left"
+            onClick={() => setPageIdx((p) => p - 1)}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Previous page">
+            <svg className="swipe-ch swipe-ch-a" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+            <svg className="swipe-ch swipe-ch-b" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+            <svg className="swipe-ch swipe-ch-c" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+          </button>
+        )}
+        {pageIdx < PAGES - 1 && (
+          <button type="button" className="swipe-arrow swipe-arrow-right"
+            onClick={() => setPageIdx((p) => p + 1)}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Next page">
+            <svg className="swipe-ch swipe-ch-a" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+            <svg className="swipe-ch swipe-ch-b" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+            <svg className="swipe-ch swipe-ch-c" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+          </button>
+        )}
         <div
           className="dash-swipe-track"
           style={{
@@ -770,6 +808,7 @@ function OverridesPage({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<'block' | 'allow'>('block');
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [showRuleFiles, setShowRuleFiles] = useState(false);
 
   useEffect(() => {
     agent.listOverrides().then(setOverrides).catch(() => {});
@@ -891,10 +930,24 @@ function OverridesPage({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      {/* Rule files — expandable editors */}
+      {/* Rule files — collapsible section */}
       <div className="rules-files-section">
-        <div className="rules-files-heading">RULE FILES</div>
-        <Rules />
+        <button
+          type="button"
+          className="rules-files-toggle"
+          onClick={() => setShowRuleFiles((v) => !v)}
+        >
+          <span className="rules-files-heading">RULE FILES</span>
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={`rules-files-chevron ${showRuleFiles ? 'open' : ''}`}
+            aria-hidden="true"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+        {showRuleFiles && <Rules />}
       </div>
     </div>
   );
