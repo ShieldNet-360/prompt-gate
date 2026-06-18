@@ -394,7 +394,7 @@ func (p *Pipeline) scanImpl(
 	} else {
 		for pat, ms := range perPattern {
 			res := evaluatePattern(canonical, pat, ms, exclusions, weights, threshold, source, allowlist)
-			if res.Blocked && (!best.Blocked || res.Score > best.Score) {
+			if preferResult(res, best) {
 				best = res
 			}
 		}
@@ -540,11 +540,32 @@ func scanConcurrent(
 
 	best := ScanResult{}
 	for r := range results {
-		if r.Blocked && (!best.Blocked || r.Score > best.Score) {
+		if preferResult(r, best) {
 			best = r
 		}
 	}
 	return best
+}
+
+// preferResult reports whether candidate should replace best as the
+// winning verdict. A blocked result always beats a non-blocked one;
+// among blocked results the higher score wins, and ties are broken
+// deterministically by pattern name (lexicographically smallest wins)
+// so the chosen verdict never depends on map-iteration or goroutine
+// scheduling order. Without this tie-break, two equally-scored
+// patterns (e.g. "GCP Service Account Key" vs its base64 variant)
+// would race for the verdict and the result would be flaky.
+func preferResult(candidate, best ScanResult) bool {
+	if !candidate.Blocked {
+		return false
+	}
+	if !best.Blocked {
+		return true
+	}
+	if candidate.Score != best.Score {
+		return candidate.Score > best.Score
+	}
+	return candidate.PatternName < best.PatternName
 }
 
 // filterCandidates implements adaptive scanning and category
