@@ -4,6 +4,7 @@ import { SetupIcon } from './components/SetupIcon';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { agent } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
+import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
 import { Status } from './pages/Status';
 import './styles.css';
@@ -584,6 +585,12 @@ function OverridesPage({ onBack }: { onBack: () => void }) {
             </div>
           ))
         )}
+      </div>
+
+      {/* Rule files — expandable editors */}
+      <div className="rules-files-section">
+        <div className="rules-files-heading">RULE FILES</div>
+        <Rules />
       </div>
     </div>
   );

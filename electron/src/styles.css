@@ -2127,6 +2127,17 @@ input[type="checkbox"] {
   line-height: 1.6;
 }
 
+.rules-files-section {
+  margin-top: 20px;
+}
+.rules-files-heading {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--fg-muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
 /* ─── Proxy Settings step cards ─── */
 .proxy-summary-card {
   display: flex;
