@@ -317,22 +317,19 @@ function DashOverviewPage() {
 
       {agentVer && <div className="general-agent-info">Agent v{agentVer}</div>}
 
-      {stats !== null && (
-        <div className="general-dns-row">
-          <div className="general-dns-info">
-            <span className="general-dns-label">DNS queries total</span>
-            <span className="general-dns-value">{stats.dns_queries_total?.toLocaleString() ?? '—'}</span>
-          </div>
-          <button
-            type="button"
-            className="general-reset-btn"
-            onClick={() => void resetStats()}
-            disabled={resetting}
-          >
-            {resetting ? 'Resetting…' : 'Reset counters'}
-          </button>
-        </div>
-      )}
+      <button
+        type="button"
+        className="ov-reset-btn"
+        onClick={() => void resetStats()}
+        disabled={resetting}
+      >
+        <svg className={`ov-reset-icon${resetting ? ' spinning' : ''}`} viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+        {resetting ? 'Resetting…' : 'Reset all counters'}
+      </button>
 
       <div className="general-toggle-row">
         <div className="general-toggle-text">
