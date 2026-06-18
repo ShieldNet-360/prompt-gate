@@ -4,7 +4,6 @@ import { SetupIcon } from './components/SetupIcon';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { agent } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
-import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
 import { Status } from './pages/Status';
 import './styles.css';
@@ -458,15 +457,134 @@ function StatisticsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* Allow / Block overrides sub-page — wraps existing Rules page */
+/* Rules sub-page — clean allow/block domain override management */
 function OverridesPage({ onBack }: { onBack: () => void }) {
+  const [overrides, setOverrides] = useState<{ allow: string[]; block: string[] } | null>(null);
+  const [domain, setDomain] = useState('');
+  const [list, setList] = useState<'allow' | 'block'>('block');
+  const [tab, setTab] = useState<'block' | 'allow'>('block');
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    agent.listOverrides().then(setOverrides).catch(() => {});
+  }, []);
+
+  const add = useCallback(async () => {
+    const d = domain.trim().toLowerCase();
+    if (!d) return;
+    setAdding(true);
+    try {
+      const next = await agent.addOverride(d, list);
+      setOverrides(next);
+      setDomain('');
+      setTab(list);
+      setFeedback({ kind: 'success', message: `Added ${d} to ${list} list` });
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    } finally {
+      setAdding(false);
+    }
+  }, [domain, list]);
+
+  const remove = useCallback(async (d: string) => {
+    try {
+      const next = await agent.removeOverride(d);
+      setOverrides(next);
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    }
+  }, []);
+
+  const current = overrides ? (tab === 'allow' ? overrides.allow : overrides.block) : [];
+
   return (
     <div className="settings-page">
       <div className="settings-header">
         <BackButton onClick={onBack} />
-        <h1 className="settings-title">Allow / Block Sites</h1>
+        <h1 className="settings-title">Rules</h1>
       </div>
-      <Rules />
+      <p className="settings-subtitle">Allow or block individual domains</p>
+
+      {feedback && (
+        <div className={`feedback feedback-${feedback.kind}`} role="status">{feedback.message}</div>
+      )}
+
+      {/* Add domain */}
+      <div className="rules-add-form">
+        <input
+          type="text"
+          className="rules-domain-input"
+          placeholder="example.com"
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void add(); }}
+          aria-label="Domain to add"
+        />
+        <div className="rules-list-toggle">
+          <button
+            type="button"
+            className={`rules-list-btn ${list === 'block' ? 'block-active' : ''}`}
+            onClick={() => setList('block')}
+          >Block</button>
+          <button
+            type="button"
+            className={`rules-list-btn ${list === 'allow' ? 'allow-active' : ''}`}
+            onClick={() => setList('allow')}
+          >Allow</button>
+        </div>
+        <button
+          type="button"
+          className="rules-add-btn"
+          onClick={() => void add()}
+          disabled={adding || !domain.trim()}
+        >
+          {adding ? '…' : 'Add'}
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="rules-tabs">
+        <button
+          type="button"
+          className={`rules-tab ${tab === 'block' ? 'active' : ''}`}
+          onClick={() => setTab('block')}
+        >
+          Blocked{overrides ? ` (${overrides.block.length})` : ''}
+        </button>
+        <button
+          type="button"
+          className={`rules-tab ${tab === 'allow' ? 'active' : ''}`}
+          onClick={() => setTab('allow')}
+        >
+          Allowed{overrides ? ` (${overrides.allow.length})` : ''}
+        </button>
+      </div>
+
+      {/* Domain list */}
+      <div className="rules-list">
+        {overrides === null ? (
+          <div className="rules-empty">Loading…</div>
+        ) : current.length === 0 ? (
+          <div className="rules-empty">
+            No {tab === 'block' ? 'blocked' : 'allowed'} domains yet.
+            Add one above to override the default rules.
+          </div>
+        ) : (
+          current.map((d) => (
+            <div key={d} className={`rules-domain-row ${tab}`}>
+              <div className={`rules-domain-dot ${tab}`} />
+              <span className="rules-domain-name">{d}</span>
+              <button
+                type="button"
+                className="rules-remove-btn"
+                onClick={() => void remove(d)}
+                aria-label={`Remove ${d}`}
+              >×</button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -589,26 +707,58 @@ function ProxySettingsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* ── Settings page — menu list matching the design ── */
-/* ── General settings sub-page (startup toggle, etc.) ── */
+/* ── General settings sub-page — protection overview + startup toggle ── */
 function GeneralPage({ onBack }: { onBack: () => void }) {
   const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [proxyOn, setProxyOn] = useState(false);
+  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number } | null>(null);
+  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>>([]);
+  const [agentVer, setAgentVer] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [ps, sp, st, ev, status] = await Promise.all([
+        agent.getProxyStatus().catch(() => null),
+        agent.getSystemProxy().catch(() => null),
+        agent.getStats().catch(() => null),
+        agent.getBlockEvents(5).catch(() => []),
+        agent.getStatus().catch(() => null),
+      ]);
+      setProxyOn((ps?.running && sp?.active) ?? false);
+      if (st) setStats(st);
+      setEvents(ev as Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>);
+      if (status) setAgentVer(status.version);
+    } catch { /* offline */ }
+  }, []);
 
   useEffect(() => {
     void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
-  }, []);
+    void refresh();
+    const t = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(t);
+  }, [refresh]);
 
-  const toggle = useCallback(async () => {
-    if (openAtLogin === null || busy) return;
-    setBusy(true);
+  const toggleLogin = useCallback(async () => {
+    if (openAtLogin === null || loginBusy) return;
+    setLoginBusy(true);
     try {
       const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
       if (next !== undefined) setOpenAtLogin(next);
     } finally {
-      setBusy(false);
+      setLoginBusy(false);
     }
-  }, [openAtLogin, busy]);
+  }, [openAtLogin, loginBusy]);
+
+  function timeAgo(ts: string): string {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
 
   return (
     <div className="settings-page">
@@ -616,43 +766,86 @@ function GeneralPage({ onBack }: { onBack: () => void }) {
         <BackButton onClick={onBack} label="Back to settings" />
         <h1 className="settings-title">General</h1>
       </div>
-      <div className="page" style={{ paddingTop: 0 }}>
-        <section className="privacy-section">
-          <div className="privacy-row">
-            <div className="privacy-row-text">
-              <div className="privacy-row-title">Run at startup</div>
-              <div className="privacy-row-desc">
-                Automatically launch Prompt Gate when you log in so you are
-                always protected. Works on macOS, Windows, and Linux.
-              </div>
+
+      {/* Protection hero card */}
+      <div className={`general-hero ${proxyOn ? 'on' : 'off'}`}>
+        <div className="general-hero-main">
+          <SetupIcon size={36} />
+          <div className="general-hero-text">
+            <div className="general-hero-title">
+              {proxyOn ? "You're protected" : 'Protection off'}
             </div>
-            <div className="privacy-row-control">
-              {openAtLogin === null ? (
-                <span style={{ color: '#888', fontSize: '0.85rem' }}>Loading…</span>
-              ) : openAtLogin ? (
-                <button
-                  type="button"
-                  className="privacy-toggle privacy-toggle-on"
-                  onClick={() => void toggle()}
-                  disabled={busy}
-                  aria-pressed="true"
-                >
-                  On
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="privacy-toggle privacy-toggle-off"
-                  onClick={() => void toggle()}
-                  disabled={busy}
-                  aria-pressed="false"
-                >
-                  Off
-                </button>
-              )}
+            <div className="general-hero-sub">
+              {proxyOn
+                ? 'Sensitive data is blocked before it leaves this device'
+                : 'Enable the proxy from the dashboard to start protecting'}
             </div>
           </div>
-        </section>
+        </div>
+        <div className={`general-hero-badge ${proxyOn ? 'on' : 'off'}`}>
+          <span className="general-hero-dot" />
+          {proxyOn ? 'Protection On' : 'Protection Off'}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="general-stats-row">
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '—'}</div>
+          <div className="general-stat-label">Prompts scanned</div>
+        </div>
+        <div className="general-stat-divider" />
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '—'}</div>
+          <div className="general-stat-label">Secrets blocked</div>
+        </div>
+        <div className="general-stat-divider" />
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '—'}</div>
+          <div className="general-stat-label">Sites blocked</div>
+        </div>
+      </div>
+
+      {/* Recent activity — only shown when block event history is on */}
+      {events.length > 0 && (
+        <div className="general-activity">
+          <div className="general-activity-heading">RECENT ACTIVITY</div>
+          {events.map((e) => (
+            <div key={e.id} className="general-activity-row">
+              <div className={`general-activity-dot ${e.event_type}`} />
+              <div className="general-activity-info">
+                <div className="general-activity-name">{e.pattern_name || e.host}</div>
+                <div className="general-activity-meta">{e.host} · {timeAgo(e.timestamp)}</div>
+              </div>
+              <span className="general-activity-badge">Blocked</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {agentVer && (
+        <div className="general-agent-info">Agent v{agentVer}</div>
+      )}
+
+      {/* Launch at login */}
+      <div className="general-toggle-row">
+        <div className="general-toggle-text">
+          <div className="general-toggle-title">Launch at login</div>
+          <div className="general-toggle-desc">Start automatically when you log in</div>
+        </div>
+        {openAtLogin === null ? (
+          <span className="general-toggle-loading">…</span>
+        ) : (
+          <button
+            type="button"
+            className={`dash-toggle small ${openAtLogin ? 'on' : 'off'}`}
+            aria-pressed={openAtLogin}
+            onClick={() => void toggleLogin()}
+            disabled={loginBusy}
+          >
+            <span className="dash-toggle-track"><span className="dash-toggle-thumb" /></span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -707,7 +900,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
         </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('overrides')}>
           <span className="settings-menu-icon"><FilterIcon /></span>
-          <span className="settings-menu-label">Allow / Block specific sites</span>
+          <span className="settings-menu-label">Rules</span>
           <ChevronRight />
         </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('proxy')}>
@@ -912,9 +1105,10 @@ function App() {
 
   useEffect(() => {
     const off = window.secureEdge?.onNavigate?.((v) => {
-      if (v === 'status' || v === 'settings' || v === 'proxy' || v === 'rules') {
-        setPage('settings');
-      }
+      // 'settings' intentionally omitted — keep current page so the
+      // tray icon restores whatever view the user had open last.
+      if (v === 'proxy') setPage('settings');
+      else if (v === 'status' || v === 'rules') setPage('dashboard');
     });
     const MAX_TOASTS = 3;
     const offEvent = window.secureEdge?.onEvent?.((evt) => {
