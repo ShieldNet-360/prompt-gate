@@ -473,49 +473,67 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
 }) {
   const [pageIdx, setPageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const isDragRef = useRef(false);
   const [dragDx, setDragDx] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const PAGES = 3;
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    startRef.current = { x: e.clientX, y: e.clientY };
-    isDragRef.current = false;
-    // Do NOT capture or setIsDragging here — wait for threshold in onPointerMove
-    // so that child button clicks are not swallowed.
-  };
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let start: { x: number; y: number } | null = null;
+    let dragging = false;
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!startRef.current) return;
-    const dx = e.clientX - startRef.current.x;
-    const dy = e.clientY - startRef.current.y;
-    if (!isDragRef.current) {
-      // Commit to a horizontal swipe only after 8 px of predominantly-horizontal movement
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
-        isDragRef.current = true;
-        setIsDragging(true);
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    function onMove(e: PointerEvent) {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (!dragging) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          dragging = true;
+          setIsDragging(true);
+        }
+        return;
       }
-      return;
+      setDragDx(dx);
     }
-    setDragDx(dx);
-  };
 
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (!startRef.current) return;
-    if (isDragRef.current) {
-      const w = containerRef.current?.offsetWidth ?? 380;
-      const dx = e.clientX - startRef.current.x;
-      if (dx < -w * 0.2 && pageIdx < PAGES - 1) setPageIdx((p) => p + 1);
-      else if (dx > w * 0.2 && pageIdx > 0) setPageIdx((p) => p - 1);
-      setDragDx(0);
-      setIsDragging(false);
-      isDragRef.current = false;
+    function onUp(e: PointerEvent) {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (dragging && start && el) {
+        const w = el.offsetWidth;
+        const dx = e.clientX - start.x;
+        setPageIdx((p) => {
+          if (dx < -w * 0.2 && p < 3 - 1) return p + 1;
+          if (dx > w * 0.2 && p > 0) return p - 1;
+          return p;
+        });
+        setDragDx(0);
+        setIsDragging(false);
+        dragging = false;
+      }
+      start = null;
     }
-    startRef.current = null;
-  };
+
+    function onDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('.swipe-arrow')) return;
+      start = { x: e.clientX, y: e.clientY };
+      dragging = false;
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }
+
+    el.addEventListener('pointerdown', onDown);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
 
   // translateX % is relative to the track's own width (PAGES \u00d7 container)
   const basePct = -(pageIdx * 100) / PAGES;
@@ -534,10 +552,6 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
       <div
         ref={containerRef}
         className="dash-swipe-container"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
       >
         {pageIdx > 0 && (
           <button type="button" className="swipe-arrow swipe-arrow-left"
