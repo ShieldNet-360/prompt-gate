@@ -6,18 +6,24 @@ import { agent, ProxyStatus } from '../api/agent';
 // only orchestrates the lifecycle and shows install instructions.
 
 type Feedback = { kind: 'success' | 'error'; message: string };
-type BusyState =
-  | 'enable'
-  | 'install-ca'
-  | 'remove-ca'
-  | 'proxy-toggle'
-  | null;
+type BusyState = 'enable' | 'install-ca' | 'remove-ca' | 'proxy-toggle' | null;
+
+function CheckCircle() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  );
+}
 
 export function ProxySettings() {
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState<BusyState>(null);
   const [proxyOn, setProxyOn] = useState(false);
+
   const refresh = useCallback(async () => {
     try {
       const [s, sp] = await Promise.all([
@@ -30,10 +36,7 @@ export function ProxySettings() {
       const msg = String(err);
       if (msg.includes('503')) {
         setStatus(null);
-        setFeedback({
-          kind: 'error',
-          message: 'Proxy is not configured on this agent.',
-        });
+        setFeedback({ kind: 'error', message: 'Proxy is not configured on this agent.' });
       } else {
         setFeedback({ kind: 'error', message: msg });
       }
@@ -51,7 +54,7 @@ export function ProxySettings() {
     // otherwise all traffic routes to 127.0.0.1:8443 with nothing
     // listening and the user loses internet.
     if (!proxyOn && !status?.running) {
-      setFeedback({ kind: 'error', message: 'Start the proxy listener first (step 1) before enabling system proxy.' });
+      setFeedback({ kind: 'error', message: 'Complete steps 1 & 2 before enabling system proxy.' });
       return;
     }
     setBusy('proxy-toggle');
@@ -77,7 +80,7 @@ export function ProxySettings() {
     setFeedback(null);
     try {
       await agent.enableProxy();
-      setFeedback({ kind: 'success', message: 'CA certificate generated. Now install it into the OS trust store (step 2).' });
+      setFeedback({ kind: 'success', message: 'Proxy started. Now install the CA certificate (step 2).' });
       await refresh();
     } catch (err) {
       setFeedback({ kind: 'error', message: String(err) });
@@ -115,29 +118,35 @@ export function ProxySettings() {
     }
   }, [status]);
 
+  const step1Done = status?.running ?? false;
+  const step2Done = status?.ca_installed ?? false;
+  const step3Done = proxyOn;
+
   return (
     <div className="page">
-      <div className="proxy-header">
-        <div>
-          <h2>Advanced DLP (Local Proxy)</h2>
-          <p className="page-hint">
-            Inspect Tier-2 AI traffic via a local MITM proxy on{' '}
-            <code>127.0.0.1:8443</code>.
-          </p>
+      {/* Status summary card */}
+      <div className={`proxy-summary-card ${proxyOn ? 'on' : 'off'}`}>
+        <div className="proxy-summary-left">
+          <div className={`proxy-summary-dot ${proxyOn ? 'on' : 'off'}`} />
+          <div>
+            <div className="proxy-summary-title">
+              {proxyOn ? 'Proxy active' : 'Proxy inactive'}
+            </div>
+            <div className="proxy-summary-addr">
+              {status?.listen_addr ?? '127.0.0.1:8443'}
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          className={`proxy-toggle ${proxyOn ? 'proxy-toggle-on' : 'proxy-toggle-off'}`}
-          onClick={() => void toggleSystemProxy()}
-          disabled={busy !== null || (!proxyOn && !status?.running)}
-          title={!proxyOn && !status?.running ? 'Start the proxy listener first (step 1)' : undefined}
-        >
-          {busy === 'proxy-toggle'
-            ? 'Switching...'
-            : proxyOn
-              ? 'Proxy ON'
-              : 'Proxy OFF'}
-        </button>
+        <div className="proxy-summary-stats">
+          <div className="proxy-summary-stat">
+            <span className="proxy-summary-val">{status?.dlp_scans_total ?? 0}</span>
+            <span className="proxy-summary-label">Scans</span>
+          </div>
+          <div className="proxy-summary-stat">
+            <span className="proxy-summary-val">{status?.dlp_blocks_total ?? 0}</span>
+            <span className="proxy-summary-label">Blocks</span>
+          </div>
+        </div>
       </div>
 
       {feedback && (
@@ -150,67 +159,88 @@ export function ProxySettings() {
         </div>
       )}
 
-      <section className="proxy-status">
-        <h3>Status</h3>
-        <ul>
-          <li>
-            Running: <strong>{status?.running ? 'yes' : 'no'}</strong>
-          </li>
-          <li>
-            CA on disk: <strong>{status?.ca_installed ? 'yes' : 'no'}</strong>
-          </li>
-          <li>
-            System proxy: <strong>{proxyOn ? 'active' : 'off'}</strong>
-          </li>
-          <li>
-            Listen address: <code>{status?.listen_addr ?? '127.0.0.1:8443'}</code>
-          </li>
-          <li>
-            DLP scans / blocks via proxy:{' '}
-            <strong>
-              {status?.dlp_scans_total ?? 0} / {status?.dlp_blocks_total ?? 0}
-            </strong>
-          </li>
-        </ul>
-      </section>
+      {/* Step cards */}
+      <div className="proxy-steps">
+        {/* Step 1 */}
+        <div className={`proxy-step-card ${step1Done ? 'done' : 'pending'}`}>
+          <div className={`proxy-step-num ${step1Done ? 'done' : ''}`}>
+            {step1Done ? <CheckCircle /> : '1'}
+          </div>
+          <div className="proxy-step-body">
+            <div className="proxy-step-title">Start proxy listener</div>
+            <div className="proxy-step-desc">
+              Generate a CA key and start the MITM listener on port 8443
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`proxy-step-btn ${step1Done ? 'secondary' : 'primary'}`}
+            onClick={() => void enable()}
+            disabled={busy !== null}
+          >
+            {busy === 'enable' ? 'Starting…' : step1Done ? 'Regenerate' : 'Start'}
+          </button>
+        </div>
 
-      <section className="proxy-wizard">
-        <h3>Setup</h3>
-        <ol>
-          <li>
+        {/* Step 2 */}
+        <div className={`proxy-step-card ${step2Done ? 'done' : 'pending'}`}>
+          <div className={`proxy-step-num ${step2Done ? 'done' : ''}`}>
+            {step2Done ? <CheckCircle /> : '2'}
+          </div>
+          <div className="proxy-step-body">
+            <div className="proxy-step-title">Install CA certificate</div>
+            <div className="proxy-step-desc">
+              Trust the local CA in your OS keychain so HTTPS inspection works
+            </div>
+            {status?.ca_cert_path && (
+              <code className="proxy-step-path">{status.ca_cert_path}</code>
+            )}
+          </div>
+          <div className="proxy-step-actions">
             <button
               type="button"
-              onClick={() => void enable()}
-              disabled={busy !== null}
+              className={`proxy-step-btn ${step2Done ? 'secondary' : 'primary'}`}
+              onClick={() => void installCA()}
+              disabled={busy !== null || !step1Done}
+              title={!step1Done ? 'Start the proxy first' : undefined}
             >
-              {status?.running ? 'Regenerate CA' : 'Generate CA certificate'}
+              {busy === 'install-ca' ? 'Installing…' : step2Done ? 'Reinstall' : 'Install'}
             </button>
-          </li>
-          <li>
-            <span>Install the CA cert into your OS trust store:</span>
-            <div className="proxy-buttons" style={{ marginTop: 6 }}>
+            {step2Done && (
               <button
                 type="button"
-                onClick={() => void installCA()}
-                disabled={busy !== null || !status?.ca_installed}
-              >
-                {busy === 'install-ca' ? 'Installing...' : 'Install CA certificate'}
-              </button>
-              <button
-                type="button"
+                className="proxy-step-btn danger"
                 onClick={() => void removeCA()}
-                disabled={busy !== null || !status?.ca_installed}
-                style={{ marginLeft: 8 }}
+                disabled={busy !== null}
               >
-                {busy === 'remove-ca' ? 'Removing...' : 'Remove CA certificate'}
+                {busy === 'remove-ca' ? 'Removing…' : 'Remove'}
               </button>
-            </div>
-            {!status?.ca_installed && (
-              <small style={{ color: '#888' }}>Start the proxy first to generate the CA.</small>
             )}
-          </li>
-        </ol>
-      </section>
+          </div>
+        </div>
+
+        {/* Step 3 */}
+        <div className={`proxy-step-card ${step3Done ? 'done' : 'pending'}`}>
+          <div className={`proxy-step-num ${step3Done ? 'done' : ''}`}>
+            {step3Done ? <CheckCircle /> : '3'}
+          </div>
+          <div className="proxy-step-body">
+            <div className="proxy-step-title">Enable system proxy</div>
+            <div className="proxy-step-desc">
+              Route HTTPS traffic through the local proxy for DLP inspection
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`proxy-step-btn ${step3Done ? 'danger' : 'primary'}`}
+            onClick={() => void toggleSystemProxy()}
+            disabled={busy !== null || (!step3Done && !step1Done)}
+            title={!step3Done && !step1Done ? 'Complete steps 1 & 2 first' : undefined}
+          >
+            {busy === 'proxy-toggle' ? 'Switching…' : step3Done ? 'Disable' : 'Enable'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
