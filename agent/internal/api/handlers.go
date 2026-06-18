@@ -853,9 +853,11 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Best-effort: set shell env vars for CLI tools in terminals.
+	// caPath is exported too (NODE_EXTRA_CA_CERTS etc.) so CLIs that
+	// ignore the OS keychain still trust the MITM cert.
 	status := s.Proxy.Status()
 	if status.ListenAddr != "" {
-		if err := sysconf.ApplyShellProxy("http://" + status.ListenAddr); err != nil {
+		if err := sysconf.ApplyShellProxy("http://"+status.ListenAddr, caPath); err != nil {
 			log.Printf("sysconf: shell proxy apply (non-fatal): %v", err)
 		}
 	}

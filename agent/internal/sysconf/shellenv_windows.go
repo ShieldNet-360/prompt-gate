@@ -16,6 +16,9 @@ var envVarNames = []string{
 	"http_proxy", "https_proxy",
 	"HTTP_PROXY", "HTTPS_PROXY",
 	"no_proxy", "NO_PROXY",
+	// CA-trust vars exported by the PowerShell hook (cleaned up here
+	// too in case they were ever persisted).
+	"NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE",
 }
 
 // psHook is injected into the PowerShell $PROFILE. It wraps the
@@ -25,6 +28,7 @@ const psHook = `# >>> prompt-gate proxy hook >>>
 # Managed by Prompt Gate — do not edit this block manually.
 function _PromptGateProxyCheck {
     $pf = Join-Path $env:USERPROFILE '.config\prompt-gate\proxy-env'
+    $cf = Join-Path $env:USERPROFILE '.config\prompt-gate\proxy-ca'
     if (Test-Path $pf) {
         $url = (Get-Content $pf -Raw).Trim()
         if ($url) {
@@ -34,6 +38,15 @@ function _PromptGateProxyCheck {
             $env:HTTPS_PROXY = $url
             $env:no_proxy = 'localhost,127.0.0.1,::1'
             $env:NO_PROXY = $env:no_proxy
+            # CLI TLS stacks ignore the OS cert store — point them at the MITM CA.
+            if (Test-Path $cf) {
+                $ca = (Get-Content $cf -Raw).Trim()
+                if ($ca) {
+                    $env:NODE_EXTRA_CA_CERTS = $ca
+                    $env:SSL_CERT_FILE = $ca
+                    $env:REQUESTS_CA_BUNDLE = $ca
+                }
+            }
             return
         }
     }
@@ -43,6 +56,9 @@ function _PromptGateProxyCheck {
     Remove-Item Env:\HTTPS_PROXY -ErrorAction SilentlyContinue
     Remove-Item Env:\no_proxy -ErrorAction SilentlyContinue
     Remove-Item Env:\NO_PROXY -ErrorAction SilentlyContinue
+    Remove-Item Env:\NODE_EXTRA_CA_CERTS -ErrorAction SilentlyContinue
+    Remove-Item Env:\SSL_CERT_FILE -ErrorAction SilentlyContinue
+    Remove-Item Env:\REQUESTS_CA_BUNDLE -ErrorAction SilentlyContinue
 }
 # Run once on profile load.
 _PromptGateProxyCheck

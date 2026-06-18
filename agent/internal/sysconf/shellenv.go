@@ -35,6 +35,7 @@ import (
 const (
 	proxyFlagDir  = ".config/prompt-gate"
 	proxyFlagFile = "proxy-env"
+	proxyCAFile   = "proxy-ca"
 
 	hookBeginMarker = "# >>> prompt-gate proxy hook >>>"
 	hookEndMarker   = "# <<< prompt-gate proxy hook <<<"
@@ -43,6 +44,15 @@ const (
 // proxyFlagPath returns ~/.config/prompt-gate/proxy-env.
 func proxyFlagPath() string {
 	return filepath.Join(homeDir(), proxyFlagDir, proxyFlagFile)
+}
+
+// proxyCAPath returns ~/.config/prompt-gate/proxy-ca — the file
+// holding the MITM CA bundle path. CLI TLS stacks that ignore the OS
+// keychain (Node/claude, Python, Go, curl-openssl) need this exported
+// as NODE_EXTRA_CA_CERTS / SSL_CERT_FILE / REQUESTS_CA_BUNDLE, or they
+// reach the proxy and then fail the handshake on the untrusted cert.
+func proxyCAPath() string {
+	return filepath.Join(homeDir(), proxyFlagDir, proxyCAFile)
 }
 
 // homeDir returns $HOME (Unix) or %USERPROFILE% (Windows).
@@ -56,9 +66,11 @@ func homeDir() string {
 	return "~"
 }
 
-// ApplyShellProxy writes the flag file with the given proxy URL and
-// configures platform-specific shell hooks.
-func ApplyShellProxy(proxyURL string) error {
+// ApplyShellProxy writes the proxy-URL flag file (and, when caPath is
+// non-empty, the CA-bundle flag file so CLI TLS stacks trust the MITM
+// cert) and configures platform-specific shell hooks. A blank caPath
+// clears any stale CA flag so the hooks stop exporting the CA vars.
+func ApplyShellProxy(proxyURL, caPath string) error {
 	flagPath := proxyFlagPath()
 	if err := os.MkdirAll(filepath.Dir(flagPath), 0o755); err != nil {
 		return fmt.Errorf("sysconf: create proxy flag dir: %w", err)
@@ -66,23 +78,34 @@ func ApplyShellProxy(proxyURL string) error {
 	if err := os.WriteFile(flagPath, []byte(proxyURL+"\n"), 0o644); err != nil {
 		return fmt.Errorf("sysconf: write proxy flag: %w", err)
 	}
+	if caPath != "" {
+		if err := os.WriteFile(proxyCAPath(), []byte(caPath+"\n"), 0o644); err != nil {
+			return fmt.Errorf("sysconf: write CA flag: %w", err)
+		}
+	} else if err := os.Remove(proxyCAPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("sysconf: clear CA flag: %w", err)
+	}
 	return applyShellHooks(proxyURL)
 }
 
-// RemoveShellProxy deletes the flag file and performs any
+// RemoveShellProxy deletes the flag files and performs any
 // platform-specific cleanup (e.g. unsetting persistent env vars on
 // Windows). Shell hooks remain but become no-ops.
 func RemoveShellProxy() error {
 	if err := os.Remove(proxyFlagPath()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("sysconf: remove proxy flag: %w", err)
 	}
+	if err := os.Remove(proxyCAPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("sysconf: remove CA flag: %w", err)
+	}
 	return removeShellEnvVars()
 }
 
 // RemoveShellHook removes all hook blocks from shell RC/profile
-// files and deletes the flag file. Call this on full uninstall.
+// files and deletes the flag files. Call this on full uninstall.
 func RemoveShellHook() error {
 	_ = os.Remove(proxyFlagPath())
+	_ = os.Remove(proxyCAPath())
 	return removeAllShellHooks()
 }
 

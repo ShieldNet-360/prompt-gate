@@ -103,8 +103,9 @@ func TestProxyFlagFileLifecycle(t *testing.T) {
 	defer func() { _ = os.Setenv("HOME", orig) }()
 
 	proxyURL := "http://127.0.0.1:9080"
+	caPath := "/etc/prompt-gate/ca.pem"
 
-	if err := ApplyShellProxy(proxyURL); err != nil {
+	if err := ApplyShellProxy(proxyURL, caPath); err != nil {
 		t.Fatalf("ApplyShellProxy: %v", err)
 	}
 	// Flag file should exist with the URL.
@@ -115,7 +116,15 @@ func TestProxyFlagFileLifecycle(t *testing.T) {
 	if got := strings.TrimSpace(string(flagData)); got != proxyURL {
 		t.Fatalf("flag file = %q, want %q", got, proxyURL)
 	}
-	// RC files should have hooks.
+	// CA flag file should exist with the CA path.
+	caData, err := os.ReadFile(filepath.Join(dir, proxyFlagDir, proxyCAFile))
+	if err != nil {
+		t.Fatalf("read CA flag file: %v", err)
+	}
+	if got := strings.TrimSpace(string(caData)); got != caPath {
+		t.Fatalf("CA flag file = %q, want %q", got, caPath)
+	}
+	// RC files should have hooks that export the CA var.
 	for _, rc := range []string{".zshrc", ".bashrc"} {
 		data, err := os.ReadFile(filepath.Join(dir, rc))
 		if err != nil {
@@ -124,14 +133,20 @@ func TestProxyFlagFileLifecycle(t *testing.T) {
 		if !strings.Contains(string(data), hookBeginMarker) {
 			t.Fatalf("%s missing hook", rc)
 		}
+		if !strings.Contains(string(data), "NODE_EXTRA_CA_CERTS") {
+			t.Fatalf("%s hook missing CA export", rc)
+		}
 	}
 
-	// Remove proxy — flag file deleted, hooks remain.
+	// Remove proxy — both flag files deleted, hooks remain.
 	if err := RemoveShellProxy(); err != nil {
 		t.Fatalf("RemoveShellProxy: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, proxyFlagDir, proxyFlagFile)); !os.IsNotExist(err) {
 		t.Fatal("flag file should be deleted")
+	}
+	if _, err := os.Stat(filepath.Join(dir, proxyFlagDir, proxyCAFile)); !os.IsNotExist(err) {
+		t.Fatal("CA flag file should be deleted")
 	}
 	// Hooks should still be in RC files.
 	for _, rc := range []string{".zshrc", ".bashrc"} {
