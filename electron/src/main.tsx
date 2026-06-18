@@ -6,7 +6,6 @@ import { agent } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
 import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
-import { Status } from './pages/Status';
 import './styles.css';
 
 /* ── Menu icon (top-left hamburger) ── */
@@ -121,13 +120,8 @@ function HamburgerMenu({ onAbout, onGuideline, onLicense }: {
   );
 }
 
-/* ── Dashboard: large toggle + Safe Browsing indicator ── */
-function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense }: {
-  onOpenSettings: () => void;
-  onOpenAbout: () => void;
-  onOpenGuideline: () => void;
-  onOpenLicense: () => void;
-}) {
+/* ── Dashboard page 0: protection toggle ── */
+function DashTogglePage() {
   const [proxyRunning, setProxyRunning] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -186,17 +180,7 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
   }, [busy, proxyRunning, refresh]);
 
   return (
-    <div className="dashboard">
-      {/* Top bar */}
-      <div className="dash-topbar">
-        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} onLicense={onOpenLicense} />
-        <SetupIcon size={48} />
-        <button type="button" className="dash-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
-          <GearIcon />
-        </button>
-      </div>
-
-      {/* Large toggle */}
+    <div className="dash-toggle-page">
       <div className="dash-toggle-area">
         <button
           type="button"
@@ -211,14 +195,346 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
           </span>
         </button>
       </div>
-
-      {/* Status label */}
       {proxyRunning && (
         <div className="dash-status-label">
           <span className="dash-status-dot" />
           Safe Browsing
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Dashboard page 1: protection overview (moved from Settings → General) ── */
+function DashOverviewPage() {
+  const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [proxyOn, setProxyOn] = useState(false);
+  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number } | null>(null);
+  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>>([]);
+  const [agentVer, setAgentVer] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [ps, sp, st, ev, status] = await Promise.all([
+        agent.getProxyStatus().catch(() => null),
+        agent.getSystemProxy().catch(() => null),
+        agent.getStats().catch(() => null),
+        agent.getBlockEvents(5).catch(() => []),
+        agent.getStatus().catch(() => null),
+      ]);
+      setProxyOn((ps?.running && sp?.active) ?? false);
+      if (st) setStats(st);
+      setEvents(ev as Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>);
+      if (status) setAgentVer(status.version);
+    } catch { /* offline */ }
+  }, []);
+
+  useEffect(() => {
+    void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
+    void refresh();
+    const t = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  const toggleLogin = useCallback(async () => {
+    if (openAtLogin === null || loginBusy) return;
+    setLoginBusy(true);
+    try {
+      const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
+      if (next !== undefined) setOpenAtLogin(next);
+    } finally {
+      setLoginBusy(false);
+    }
+  }, [openAtLogin, loginBusy]);
+
+  function timeAgo(ts: string): string {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  return (
+    <div className="dash-inner-page">
+      <div className={`general-hero ${proxyOn ? 'on' : 'off'}`}>
+        <div className="general-hero-main">
+          <SetupIcon size={36} />
+          <div className="general-hero-text">
+            <div className="general-hero-title">
+              {proxyOn ? "You're protected" : 'Protection off'}
+            </div>
+            <div className="general-hero-sub">
+              {proxyOn
+                ? 'Sensitive data is blocked before it leaves this device'
+                : 'Swipe right to the toggle and enable the proxy'}
+            </div>
+          </div>
+        </div>
+        <div className={`general-hero-badge ${proxyOn ? 'on' : 'off'}`}>
+          <span className="general-hero-dot" />
+          {proxyOn ? 'Protection On' : 'Protection Off'}
+        </div>
+      </div>
+
+      <div className="general-stats-row">
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="general-stat-label">Prompts scanned</div>
+        </div>
+        <div className="general-stat-divider" />
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="general-stat-label">Secrets blocked</div>
+        </div>
+        <div className="general-stat-divider" />
+        <div className="general-stat">
+          <div className="general-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="general-stat-label">Sites blocked</div>
+        </div>
+      </div>
+
+      {events.length > 0 && (
+        <div className="general-activity">
+          <div className="general-activity-heading">RECENT ACTIVITY</div>
+          {events.map((e) => (
+            <div key={e.id} className="general-activity-row">
+              <div className={`general-activity-dot ${e.event_type}`} />
+              <div className="general-activity-info">
+                <div className="general-activity-name">{e.pattern_name || e.host}</div>
+                <div className="general-activity-meta">{e.host} \u00b7 {timeAgo(e.timestamp)}</div>
+              </div>
+              <span className="general-activity-badge">Blocked</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {agentVer && <div className="general-agent-info">Agent v{agentVer}</div>}
+
+      <div className="general-toggle-row">
+        <div className="general-toggle-text">
+          <div className="general-toggle-title">Launch at login</div>
+          <div className="general-toggle-desc">Start automatically when you log in</div>
+        </div>
+        {openAtLogin === null ? (
+          <span className="general-toggle-loading">\u2026</span>
+        ) : (
+          <button
+            type="button"
+            className={`dash-toggle small ${openAtLogin ? 'on' : 'off'}`}
+            aria-pressed={openAtLogin}
+            onClick={() => void toggleLogin()}
+            disabled={loginBusy}
+          >
+            <span className="dash-toggle-track"><span className="dash-toggle-thumb" /></span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Dashboard page 2: statistics — no duplicate metrics from page 1 ── */
+function DashStatsPage() {
+  const [snap, setSnap] = useState<{ reachable: boolean; version?: string; uptime?: string; dns_queries?: number } | null>(null);
+  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>>([]);
+  const [prefs, setPrefs] = useState<{ block_events_enabled: boolean } | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [status, stats, ev, pr] = await Promise.all([
+        agent.getStatus().catch(() => null),
+        agent.getStats().catch(() => null),
+        agent.getBlockEvents(50).catch(() => []),
+        agent.getPreferences().catch(() => null),
+      ]);
+      setSnap({ reachable: status !== null, version: status?.version, uptime: status?.uptime, dns_queries: stats?.dns_queries_total });
+      setEvents(ev as Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>);
+      setPrefs(pr as { block_events_enabled: boolean } | null);
+    } catch {
+      setSnap((s) => s ? { ...s, reachable: false } : { reachable: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 5000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const reset = useCallback(async () => {
+    setResetting(true);
+    try { await agent.resetStats(); await load(); } finally { setResetting(false); }
+  }, [load]);
+
+  const clearHistory = useCallback(async () => {
+    setClearing(true);
+    try { await agent.clearBlockEvents(); setEvents([]); } finally { setClearing(false); }
+  }, []);
+
+  return (
+    <div className="dash-inner-page">
+      <div className={`status-banner status-banner-${snap?.reachable ? 'ok' : 'error'}`} role="status">
+        {snap?.reachable && snap.version
+          ? `Running \u00b7 v${snap.version} \u00b7 up ${snap.uptime}`
+          : 'Agent unreachable'}
+      </div>
+
+      {snap?.dns_queries !== undefined && (
+        <div className="dash-stat-row">
+          <span className="dash-stat-row-label">DNS queries total</span>
+          <span className="dash-stat-row-value">{snap.dns_queries.toLocaleString()}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        className="reset-button"
+        style={{ marginBottom: 16 }}
+        onClick={() => void reset()}
+        disabled={resetting || !snap?.reachable}
+      >
+        {resetting ? 'Resetting\u2026' : 'Reset Counters'}
+      </button>
+
+      <div className="block-history-header">
+        <h3>Block History</h3>
+        {events.length > 0 && (
+          <button type="button" className="clear-history-btn"
+            onClick={() => void clearHistory()} disabled={clearing || !snap?.reachable}>
+            {clearing ? 'Clearing\u2026' : (
+              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg> Clear</>
+            )}
+          </button>
+        )}
+      </div>
+
+      {prefs && !prefs.block_events_enabled ? (
+        <p className="page-hint">Block history is <strong>off</strong>. Enable in <strong>Settings \u2192 Privacy</strong>.</p>
+      ) : events.length === 0 ? (
+        <p className="page-hint">No block events yet.</p>
+      ) : (
+        <div className="block-events-scroll">
+          <table className="block-events-table" aria-label="Block event history">
+            <thead><tr><th>Time</th><th>Type</th><th>Host</th><th>Detail</th></tr></thead>
+            <tbody>
+              {events.map((e) => (
+                <tr key={e.id}>
+                  <td className="block-events-time">
+                    {new Date(e.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td>
+                    <span className={`event-badge event-badge-${e.event_type}`}>
+                      {e.event_type === 'dlp' ? 'DLP' : 'Cat'}
+                    </span>
+                  </td>
+                  <td className="block-events-host">{e.host}</td>
+                  <td className="block-events-detail">{e.pattern_name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Dashboard: 3-page swipeable main screen ── */
+function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense }: {
+  onOpenSettings: () => void;
+  onOpenAbout: () => void;
+  onOpenGuideline: () => void;
+  onOpenLicense: () => void;
+}) {
+  const [pageIdx, setPageIdx] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const [dragDx, setDragDx] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const PAGES = 3;
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    startRef.current = { x: e.clientX, y: e.clientY };
+    setIsDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || !startRef.current) return;
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    if (Math.abs(dx) > Math.abs(dy)) setDragDx(dx);
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging || !startRef.current) return;
+    const w = containerRef.current?.offsetWidth ?? 380;
+    const dx = e.clientX - startRef.current.x;
+    if (dx < -w * 0.2 && pageIdx < PAGES - 1) setPageIdx((p) => p + 1);
+    else if (dx > w * 0.2 && pageIdx > 0) setPageIdx((p) => p - 1);
+    setDragDx(0);
+    setIsDragging(false);
+    startRef.current = null;
+  };
+
+  // translateX % is relative to the track's own width (PAGES \u00d7 container)
+  const basePct = -(pageIdx * 100) / PAGES;
+  const tx = isDragging && dragDx !== 0 ? `calc(${basePct}% + ${dragDx}px)` : `${basePct}%`;
+
+  return (
+    <div className="dashboard">
+      <div className="dash-topbar" style={{ padding: '18px 20px 0' }}>
+        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} onLicense={onOpenLicense} />
+        <SetupIcon size={48} />
+        <button type="button" className="dash-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
+          <GearIcon />
+        </button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="dash-swipe-container"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <div
+          className="dash-swipe-track"
+          style={{
+            width: `${PAGES * 100}%`,
+            transform: `translateX(${tx})`,
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
+          <div className="dash-swipe-page"><DashTogglePage /></div>
+          <div className="dash-swipe-page"><DashOverviewPage /></div>
+          <div className="dash-swipe-page"><DashStatsPage /></div>
+        </div>
+      </div>
+
+      <div className="dash-page-dots">
+        {Array.from({ length: PAGES }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`dash-page-dot ${pageIdx === i ? 'active' : ''}`}
+            onClick={() => setPageIdx(i)}
+            aria-label={`Page ${i + 1}`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -268,7 +584,7 @@ function GridIcon() {
 }
 
 /* ── Settings sub-pages ── */
-type SettingsSubPage = 'menu' | 'general' | 'policy' | 'statistics' | 'overrides' | 'proxy' | 'privacy';
+type SettingsSubPage = 'menu' | 'policy' | 'overrides' | 'proxy' | 'privacy';
 
 /* ── Protection presets ── */
 type ProtectionLevel = 'extra' | 'light' | 'custom';
@@ -445,18 +761,6 @@ function PolicyLevelPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* Statistics sub-page — agent status, counters, and block history */
-function StatisticsPage({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <BackButton onClick={onBack} />
-        <h1 className="settings-title">Statistics</h1>
-      </div>
-      <Status />
-    </div>
-  );
-}
 
 /* Rules sub-page — clean allow/block domain override management */
 function OverridesPage({ onBack }: { onBack: () => void }) {
@@ -714,156 +1018,10 @@ function ProxySettingsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* ── General settings sub-page — protection overview + startup toggle ── */
-function GeneralPage({ onBack }: { onBack: () => void }) {
-  const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
-  const [loginBusy, setLoginBusy] = useState(false);
-  const [proxyOn, setProxyOn] = useState(false);
-  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number } | null>(null);
-  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>>([]);
-  const [agentVer, setAgentVer] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [ps, sp, st, ev, status] = await Promise.all([
-        agent.getProxyStatus().catch(() => null),
-        agent.getSystemProxy().catch(() => null),
-        agent.getStats().catch(() => null),
-        agent.getBlockEvents(5).catch(() => []),
-        agent.getStatus().catch(() => null),
-      ]);
-      setProxyOn((ps?.running && sp?.active) ?? false);
-      if (st) setStats(st);
-      setEvents(ev as Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>);
-      if (status) setAgentVer(status.version);
-    } catch { /* offline */ }
-  }, []);
-
-  useEffect(() => {
-    void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
-    void refresh();
-    const t = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(t);
-  }, [refresh]);
-
-  const toggleLogin = useCallback(async () => {
-    if (openAtLogin === null || loginBusy) return;
-    setLoginBusy(true);
-    try {
-      const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
-      if (next !== undefined) setOpenAtLogin(next);
-    } finally {
-      setLoginBusy(false);
-    }
-  }, [openAtLogin, loginBusy]);
-
-  function timeAgo(ts: string): string {
-    const diff = Date.now() - new Date(ts).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-  }
-
-  return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <BackButton onClick={onBack} label="Back to settings" />
-        <h1 className="settings-title">General</h1>
-      </div>
-
-      {/* Protection hero card */}
-      <div className={`general-hero ${proxyOn ? 'on' : 'off'}`}>
-        <div className="general-hero-main">
-          <SetupIcon size={36} />
-          <div className="general-hero-text">
-            <div className="general-hero-title">
-              {proxyOn ? "You're protected" : 'Protection off'}
-            </div>
-            <div className="general-hero-sub">
-              {proxyOn
-                ? 'Sensitive data is blocked before it leaves this device'
-                : 'Enable the proxy from the dashboard to start protecting'}
-            </div>
-          </div>
-        </div>
-        <div className={`general-hero-badge ${proxyOn ? 'on' : 'off'}`}>
-          <span className="general-hero-dot" />
-          {proxyOn ? 'Protection On' : 'Protection Off'}
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="general-stats-row">
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '—'}</div>
-          <div className="general-stat-label">Prompts scanned</div>
-        </div>
-        <div className="general-stat-divider" />
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '—'}</div>
-          <div className="general-stat-label">Secrets blocked</div>
-        </div>
-        <div className="general-stat-divider" />
-        <div className="general-stat">
-          <div className="general-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '—'}</div>
-          <div className="general-stat-label">Sites blocked</div>
-        </div>
-      </div>
-
-      {/* Recent activity — only shown when block event history is on */}
-      {events.length > 0 && (
-        <div className="general-activity">
-          <div className="general-activity-heading">RECENT ACTIVITY</div>
-          {events.map((e) => (
-            <div key={e.id} className="general-activity-row">
-              <div className={`general-activity-dot ${e.event_type}`} />
-              <div className="general-activity-info">
-                <div className="general-activity-name">{e.pattern_name || e.host}</div>
-                <div className="general-activity-meta">{e.host} · {timeAgo(e.timestamp)}</div>
-              </div>
-              <span className="general-activity-badge">Blocked</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {agentVer && (
-        <div className="general-agent-info">Agent v{agentVer}</div>
-      )}
-
-      {/* Launch at login */}
-      <div className="general-toggle-row">
-        <div className="general-toggle-text">
-          <div className="general-toggle-title">Launch at login</div>
-          <div className="general-toggle-desc">Start automatically when you log in</div>
-        </div>
-        {openAtLogin === null ? (
-          <span className="general-toggle-loading">…</span>
-        ) : (
-          <button
-            type="button"
-            className={`dash-toggle small ${openAtLogin ? 'on' : 'off'}`}
-            aria-pressed={openAtLogin}
-            onClick={() => void toggleLogin()}
-            disabled={loginBusy}
-          >
-            <span className="dash-toggle-track"><span className="dash-toggle-thumb" /></span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function SettingsPage({ onBack }: { onBack: () => void }) {
   const [sub, setSub] = useState<SettingsSubPage>('menu');
 
-  if (sub === 'general') return <GeneralPage onBack={() => setSub('menu')} />;
   if (sub === 'policy') return <PolicyLevelPage onBack={() => setSub('menu')} />;
-  if (sub === 'statistics') return <StatisticsPage onBack={() => setSub('menu')} />;
   if (sub === 'overrides') return <OverridesPage onBack={() => setSub('menu')} />;
   if (sub === 'proxy') return <ProxySettingsPage onBack={() => setSub('menu')} />;
   if (sub === 'privacy') return <PrivacyPage onBack={() => setSub('menu')} />;
@@ -877,32 +1035,9 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
       <p className="settings-subtitle">Follow steps below to continue set up.</p>
 
       <div className="settings-menu">
-        <button type="button" className="settings-menu-item" onClick={() => setSub('general')}>
-          <span className="settings-menu-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-            </svg>
-          </span>
-          <span className="settings-menu-label">General</span>
-          <ChevronRight />
-        </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('policy')}>
           <span className="settings-menu-icon"><ShieldIcon /></span>
           <span className="settings-menu-label">Policy Level</span>
-          <ChevronRight />
-        </button>
-        <button type="button" className="settings-menu-item" onClick={() => setSub('statistics')}>
-          <span className="settings-menu-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-          </span>
-          <span className="settings-menu-label">Statistics</span>
           <ChevronRight />
         </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('overrides')}>

@@ -101,14 +101,85 @@ body::after {
 .dashboard {
   max-width: 640px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0;
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Dashboard swipeable pages ─── */
+.dash-swipe-container {
+  flex: 1;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+.dash-swipe-container:active { cursor: grabbing; }
+.dash-swipe-track {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+}
+.dash-swipe-page {
+  flex-shrink: 0;
+  width: 33.333%;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.dash-toggle-page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
+.dash-inner-page {
+  padding: 16px 20px 24px;
+  box-sizing: border-box;
+}
+.dash-page-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 14px;
+  flex-shrink: 0;
+}
+.dash-page-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: #cbd5e1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.dash-page-dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+.dash-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.dash-stat-row-label { color: var(--fg-muted); font-weight: 500; }
+.dash-stat-row-value { font-weight: 700; color: var(--fg); }
 
 /* Top bar: filter | logo | gear */
 .dash-topbar {
