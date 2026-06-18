@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -891,6 +892,65 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sysconf: shell proxy remove (non-fatal): %v", err)
 	}
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
+}
+
+// proxyListenRequest is the body of PUT /api/proxy/listen.
+type proxyListenRequest struct {
+	ListenAddr string `json:"listen_addr"`
+}
+
+// handleProxyListen handles GET/PUT /api/proxy/listen.
+//
+//	GET  → current listen address from status snapshot.
+//	PUT  → update listen address; validates loopback-only; if the proxy
+//	       is running it stops and restarts on the new address. The new
+//	       address is also persisted to the config file via ConfigPatcher.
+func (s *Server) handleProxyListen(w http.ResponseWriter, r *http.Request) {
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]string{"listen_addr": s.Proxy.Status().ListenAddr})
+	case http.MethodPut:
+		var body proxyListenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		host, portStr, err := net.SplitHostPort(body.ListenAddr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "listen_addr must be host:port (e.g. 127.0.0.1:8443)")
+			return
+		}
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			writeError(w, http.StatusBadRequest, "only loopback addresses are supported (127.x.x.x or ::1)")
+			return
+		}
+		portNum, _ := strconv.Atoi(portStr)
+		if portNum < 1024 || portNum > 65535 {
+			writeError(w, http.StatusBadRequest, "port must be between 1024 and 65535")
+			return
+		}
+		if err := s.Proxy.SetListenAddr(r.Context(), body.ListenAddr); err != nil {
+			writeErrorRedacted(w, http.StatusInternalServerError, "set listen addr failed", err)
+			return
+		}
+		if s.ConfigPatcher != nil {
+			if err := s.ConfigPatcher(body.ListenAddr); err != nil {
+				writeJSON(w, http.StatusOK, map[string]interface{}{
+					"listen_addr": body.ListenAddr,
+					"warning":     "in-memory change applied; config persist failed: " + err.Error(),
+				})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"listen_addr": body.ListenAddr})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 // handleProxyStatus returns the current proxy lifecycle snapshot.

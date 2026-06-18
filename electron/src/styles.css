@@ -2486,6 +2486,96 @@ input[type="checkbox"] {
   margin-top: 3px;
 }
 
+/* ─── Proxy listen address editor ─── */
+.proxy-listen-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.proxy-listen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.proxy-listen-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.proxy-listen-toggle {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+}
+.proxy-listen-toggle:hover:not(:disabled) { background: rgba(59,130,246,0.08); }
+.proxy-listen-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+.proxy-listen-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.proxy-listen-ip {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.proxy-listen-ip:focus { border-color: var(--accent); }
+.proxy-listen-sep {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+.proxy-listen-port {
+  width: 72px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+.proxy-listen-port:focus { border-color: var(--accent); }
+.proxy-listen-apply {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.proxy-listen-apply:hover:not(:disabled) { background: #2563eb; }
+.proxy-listen-apply:disabled { opacity: 0.45; cursor: not-allowed; }
+
 .proxy-steps {
   display: flex;
   flex-direction: column;

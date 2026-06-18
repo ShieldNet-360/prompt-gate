@@ -147,6 +147,11 @@ type ProxyController interface {
 	Enable(ctx context.Context) (caCertPath string, err error)
 	Disable(ctx context.Context, removeCA bool) error
 	Status() ProxyStatus
+	// SetListenAddr updates the proxy listen address at runtime.
+	// If the listener is running it is stopped and restarted on the
+	// new address. If stopped only the address is recorded for the
+	// next Enable call.
+	SetListenAddr(ctx context.Context, addr string) error
 	// Upstream CA bundle management (proxy_upstream_ca_bundle):
 	SetUpstreamCA(pem []byte) (subjects []string, err error)
 	ClearUpstreamCA() error
@@ -217,10 +222,11 @@ type Server struct {
 	ProfileApply profile.PolicyStore
 	Tamper       TamperReporter
 	Rules        RuleOverride
-	AgentUpdate  AgentSelfUpdater
-	Notifier     *notify.Notifier
-	RuleFiles    []string // optional paths whose mtimes feed /api/status
-	startedAt    time.Time
+	AgentUpdate   AgentSelfUpdater
+	Notifier      *notify.Notifier
+	RuleFiles     []string // optional paths whose mtimes feed /api/status
+	ConfigPatcher func(listenAddr string) error // optional: persists proxy addr to YAML
+	startedAt     time.Time
 	scanLimiter  *rateLimiter
 	bearerToken  string
 	once         sync.Once
@@ -290,6 +296,12 @@ func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
 // Optional; when nil the /api/proxy/* endpoints return 503.
 func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
 
+// SetConfigPatcher registers a callback that persists a new proxy
+// listen address to the YAML config file after an in-memory change.
+func (s *Server) SetConfigPatcher(fn func(listenAddr string) error) {
+	s.ConfigPatcher = fn
+}
+
 // SetProfile wires a profile holder into the server. When the
 // holder's current profile reports Managed=true, policy mutation
 // endpoints (PUT /api/policies/:category, PUT /api/dlp/config) return
@@ -327,6 +339,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/proxy/enable", s.handleProxyEnable)
 	mux.HandleFunc("/api/proxy/disable", s.handleProxyDisable)
 	mux.HandleFunc("/api/proxy/status", s.handleProxyStatus)
+	mux.HandleFunc("/api/proxy/listen", s.handleProxyListen)
 	mux.HandleFunc("/api/proxy/upstream-ca", s.handleProxyUpstreamCA)
 	mux.HandleFunc("/api/profile", s.handleProfileGet)
 	mux.HandleFunc("/api/profile/import", s.handleProfileImport)

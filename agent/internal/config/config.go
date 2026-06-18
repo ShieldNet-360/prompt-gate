@@ -397,3 +397,25 @@ func validateLoopback(name, addr string) error {
 	}
 	return nil
 }
+
+// UpdateProxyListen reads the YAML config at path, sets proxy_listen to
+// addr, and writes the file back. If the file does not exist a minimal
+// file containing only the changed key is created. Callers must validate
+// addr before calling this function.
+func UpdateProxyListen(path, addr string) error {
+	raw := make(map[string]interface{})
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("parse config: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("read config: %w", err)
+	}
+	raw["proxy_listen"] = addr
+	out, err := yaml.Marshal(raw)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	return os.WriteFile(path, out, 0o644)
+}

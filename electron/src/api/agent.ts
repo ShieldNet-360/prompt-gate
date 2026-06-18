@@ -219,6 +219,15 @@ export const agent = {
       body: JSON.stringify({ remove_ca: removeCA }),
     });
   },
+  async getProxyListenAddr(): Promise<{ listen_addr: string }> {
+    return http<{ listen_addr: string }>('/api/proxy/listen');
+  },
+  async setProxyListenAddr(listenAddr: string): Promise<{ listen_addr: string; warning?: string }> {
+    return http<{ listen_addr: string; warning?: string }>('/api/proxy/listen', {
+      method: 'PUT',
+      body: JSON.stringify({ listen_addr: listenAddr }),
+    });
+  },
   async getUpstreamCA(): Promise<UpstreamCAStatus> {
     return http<UpstreamCAStatus>('/api/proxy/upstream-ca');
   },
