@@ -474,6 +474,7 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
   const [pageIdx, setPageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
+  const isDragRef = useRef(false);
   const [dragDx, setDragDx] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const PAGES = 3;
@@ -481,25 +482,38 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     startRef.current = { x: e.clientX, y: e.clientY };
-    setIsDragging(true);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    isDragRef.current = false;
+    // Do NOT capture or setIsDragging here — wait for threshold in onPointerMove
+    // so that child button clicks are not swallowed.
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !startRef.current) return;
+    if (!startRef.current) return;
     const dx = e.clientX - startRef.current.x;
     const dy = e.clientY - startRef.current.y;
-    if (Math.abs(dx) > Math.abs(dy)) setDragDx(dx);
+    if (!isDragRef.current) {
+      // Commit to a horizontal swipe only after 8 px of predominantly-horizontal movement
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        isDragRef.current = true;
+        setIsDragging(true);
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+    setDragDx(dx);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
-    if (!isDragging || !startRef.current) return;
-    const w = containerRef.current?.offsetWidth ?? 380;
-    const dx = e.clientX - startRef.current.x;
-    if (dx < -w * 0.2 && pageIdx < PAGES - 1) setPageIdx((p) => p + 1);
-    else if (dx > w * 0.2 && pageIdx > 0) setPageIdx((p) => p - 1);
-    setDragDx(0);
-    setIsDragging(false);
+    if (!startRef.current) return;
+    if (isDragRef.current) {
+      const w = containerRef.current?.offsetWidth ?? 380;
+      const dx = e.clientX - startRef.current.x;
+      if (dx < -w * 0.2 && pageIdx < PAGES - 1) setPageIdx((p) => p + 1);
+      else if (dx > w * 0.2 && pageIdx > 0) setPageIdx((p) => p - 1);
+      setDragDx(0);
+      setIsDragging(false);
+      isDragRef.current = false;
+    }
     startRef.current = null;
   };
 
