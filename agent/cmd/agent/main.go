@@ -460,6 +460,9 @@ func run(configPath string) error {
 		}
 		log.Debugf("proxy controller created (listen=%s)", cfg.ProxyListen)
 		apiServer.SetProxyController(&proxyAdapter{c: controller})
+		apiServer.SetConfigPatcher(func(addr string) error {
+			return config.UpdateProxyListen(configPath, addr)
+		})
 		if cfg.ProxyEnabled {
 			log.Infof("auto-enabling proxy on %s", cfg.ProxyListen)
 			if _, err := controller.Enable(ctx); err != nil {
@@ -822,6 +825,10 @@ func (p *proxyAdapter) Status() api.ProxyStatus {
 		DLPScansTotal:   snap.DLPScansTotal,
 		DLPBlocksTotal:  snap.DLPBlocksTotal,
 	}
+}
+
+func (p *proxyAdapter) SetListenAddr(ctx context.Context, addr string) error {
+	return p.c.SetListenAddr(ctx, addr)
 }
 
 func (p *proxyAdapter) SetUpstreamCA(pem []byte) ([]string, error) {

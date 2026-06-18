@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { agent, ProxyStatus } from '../api/agent';
 
 // ProxySettings drives the "Advanced DLP" wizard. The actual MITM
@@ -6,7 +6,7 @@ import { agent, ProxyStatus } from '../api/agent';
 // only orchestrates the lifecycle and shows install instructions.
 
 type Feedback = { kind: 'success' | 'error'; message: string };
-type BusyState = 'enable' | 'install-ca' | 'remove-ca' | 'proxy-toggle' | null;
+type BusyState = 'enable' | 'install-ca' | 'remove-ca' | 'proxy-toggle' | 'listen-addr' | null;
 
 function CheckCircle() {
   return (
@@ -23,6 +23,10 @@ export function ProxySettings() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState<BusyState>(null);
   const [proxyOn, setProxyOn] = useState(false);
+  const [editingAddr, setEditingAddr] = useState(false);
+  const [listenHost, setListenHost] = useState('127.0.0.1');
+  const [listenPort, setListenPort] = useState('8443');
+  const addrInitialized = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -32,6 +36,12 @@ export function ProxySettings() {
       ]);
       setStatus(s);
       if (sp) setProxyOn(sp.active);
+      if (!addrInitialized.current && s.listen_addr) {
+        const lastColon = s.listen_addr.lastIndexOf(':');
+        setListenHost(s.listen_addr.slice(0, lastColon));
+        setListenPort(s.listen_addr.slice(lastColon + 1));
+        addrInitialized.current = true;
+      }
     } catch (err) {
       const msg = String(err);
       if (msg.includes('503')) {
@@ -118,6 +128,29 @@ export function ProxySettings() {
     }
   }, [status]);
 
+  const applyListenAddr = useCallback(async () => {
+    const addr = `${listenHost.trim()}:${listenPort.trim()}`;
+    setBusy('listen-addr');
+    setFeedback(null);
+    try {
+      const res = await agent.setProxyListenAddr(addr);
+      const restarted = status?.running ? ' Proxy listener restarted.' : '';
+      setFeedback({
+        kind: 'success',
+        message: res.warning
+          ? `Address set. Warning: ${res.warning}`
+          : `Listen address updated to ${res.listen_addr}.${restarted}`,
+      });
+      setEditingAddr(false);
+      addrInitialized.current = false;
+      await refresh();
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    } finally {
+      setBusy(null);
+    }
+  }, [listenHost, listenPort, status, refresh]);
+
   const step1Done = status?.running ?? false;
   const step2Done = status?.ca_installed ?? false;
   const step3Done = proxyOn;
@@ -158,6 +191,53 @@ export function ProxySettings() {
           {feedback.message}
         </div>
       )}
+
+      {/* Listen address configuration */}
+      <div className="proxy-listen-section">
+        <div className="proxy-listen-header">
+          <span className="proxy-listen-label">Listen Address</span>
+          <button
+            type="button"
+            className="proxy-listen-toggle"
+            onClick={() => setEditingAddr((v) => !v)}
+            disabled={busy !== null}
+          >
+            {editingAddr ? 'Cancel' : 'Change'}
+          </button>
+        </div>
+        {editingAddr && (
+          <div className="proxy-listen-form">
+            <input
+              type="text"
+              className="proxy-listen-ip"
+              value={listenHost}
+              onChange={(e) => setListenHost(e.target.value)}
+              placeholder="127.0.0.1"
+              aria-label="Proxy host"
+              spellCheck={false}
+            />
+            <span className="proxy-listen-sep">:</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="proxy-listen-port"
+              value={listenPort}
+              onChange={(e) => setListenPort(e.target.value.replace(/\D/g, ''))}
+              placeholder="8443"
+              maxLength={5}
+              aria-label="Proxy port"
+            />
+            <button
+              type="button"
+              className="proxy-listen-apply"
+              onClick={() => void applyListenAddr()}
+              disabled={busy !== null || !listenHost.trim() || !listenPort.trim()}
+            >
+              {busy === 'listen-addr' ? 'Saving…' : 'Apply'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Step cards */}
       <div className="proxy-steps">

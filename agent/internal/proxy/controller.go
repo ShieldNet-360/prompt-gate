@@ -86,6 +86,34 @@ func NewController(cfg ControllerConfig) (*Controller, error) {
 	return &Controller{cfg: cfg}, nil
 }
 
+// buildServer constructs a new proxy Server from the controller config.
+// Caller must hold c.mu and c.ca must be non-nil.
+func (c *Controller) buildServer() (*Server, error) {
+	srv, err := New(c.ca, c.cfg.Policy, c.cfg.Scanner, c.cfg.Stats)
+	if err != nil {
+		return nil, err
+	}
+	if c.cfg.Notifier != nil {
+		srv.SetNotifier(c.cfg.Notifier)
+	}
+	if c.cfg.Recorder != nil {
+		srv.SetRecorder(c.cfg.Recorder)
+	}
+	// Apply the upstream CA bundle from config, or a previously
+	// imported one persisted at the managed path (so it survives
+	// agent restarts without a config edit).
+	bundle := c.cfg.UpstreamCABundle
+	if bundle == "" {
+		if p := c.upstreamCAPath(); fileExists(p) {
+			bundle = p
+		}
+	}
+	if err := srv.SetUpstreamCABundle(bundle); err != nil {
+		return nil, err
+	}
+	return srv, nil
+}
+
 // Enable generates the CA if it does not already exist, constructs
 // the proxy server if not already constructed, and starts the
 // listener if not already running. Returns the CA cert path so the
@@ -102,26 +130,8 @@ func (c *Controller) Enable(ctx context.Context) (string, error) {
 		c.ca = ca
 	}
 	if c.server == nil {
-		srv, err := New(c.ca, c.cfg.Policy, c.cfg.Scanner, c.cfg.Stats)
+		srv, err := c.buildServer()
 		if err != nil {
-			return "", err
-		}
-		if c.cfg.Notifier != nil {
-			srv.SetNotifier(c.cfg.Notifier)
-		}
-		if c.cfg.Recorder != nil {
-			srv.SetRecorder(c.cfg.Recorder)
-		}
-		// Apply the upstream CA bundle from config, or a previously
-		// imported one persisted at the managed path (so it survives
-		// agent restarts without a config edit).
-		bundle := c.cfg.UpstreamCABundle
-		if bundle == "" {
-			if p := c.upstreamCAPath(); fileExists(p) {
-				bundle = p
-			}
-		}
-		if err := srv.SetUpstreamCABundle(bundle); err != nil {
 			return "", err
 		}
 		c.server = srv
@@ -132,6 +142,36 @@ func (c *Controller) Enable(ctx context.Context) (string, error) {
 		}
 	}
 	return c.ca.CertPath(), nil
+}
+
+// SetListenAddr updates the proxy listen address. If the listener is
+// currently running it is stopped, the address is updated, and the
+// listener is restarted on the new address. If the proxy is stopped
+// only the address is updated; the next Enable() will use it.
+func (c *Controller) SetListenAddr(ctx context.Context, addr string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	wasRunning := c.server != nil && c.server.Running()
+	if wasRunning {
+		if err := c.server.Shutdown(ctx); err != nil {
+			return fmt.Errorf("proxy: shutdown for addr change: %w", err)
+		}
+	}
+	c.server = nil // rebuild on next Enable or below
+	c.cfg.ListenAddr = addr
+
+	if wasRunning && c.ca != nil {
+		srv, err := c.buildServer()
+		if err != nil {
+			return err
+		}
+		if err := srv.ListenAndServe(c.cfg.ListenAddr); err != nil {
+			return fmt.Errorf("proxy: restart on %s: %w", addr, err)
+		}
+		c.server = srv
+	}
+	return nil
 }
 
 // Disable stops the listener if running. When removeCA is true the
