@@ -37,6 +37,12 @@ import (
 // version is set at link time via -ldflags "-X main.version=...".
 var version = "dev"
 
+// stdout/stderr are indirected so tests can capture command output.
+var (
+	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
+)
+
 func main() {
 	if len(os.Args) < 2 {
 		usage(os.Stderr)
@@ -45,6 +51,8 @@ func main() {
 	switch os.Args[1] {
 	case "scan":
 		os.Exit(cmdScan(os.Args[2:]))
+	case "policy":
+		os.Exit(cmdPolicy(os.Args[2:]))
 	case "version", "-v", "--version":
 		fmt.Println("prompt-gate", version)
 		os.Exit(0)
@@ -63,6 +71,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prompt-gate scan [flags] [file]")
+	fmt.Fprintln(w, "  prompt-gate policy export|diff <file>|apply <file>")
 	fmt.Fprintln(w, "  prompt-gate version")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "If [file] is omitted or '-', content is read from stdin.")
