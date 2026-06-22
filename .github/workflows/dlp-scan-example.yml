@@ -5,10 +5,7 @@
 name: Prompt Gate DLP Scan (example)
 
 on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:   # example only — run manually; copy into your own repo to gate PRs
 
 permissions:
   contents: read
