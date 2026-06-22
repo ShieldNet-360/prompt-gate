@@ -175,6 +175,21 @@ type TamperReporter interface {
 	Status() TamperStatus
 }
 
+// AlertStatus is the body returned by GET /api/alerter/status —
+// aggregate, counters-only.
+type AlertStatus struct {
+	Enabled         bool  `json:"enabled"`
+	ThresholdBlocks int64 `json:"threshold_blocks"`
+	LastFiredAt     int64 `json:"last_fired_at"`
+	FiresTotal      int64 `json:"fires_total"`
+}
+
+// AlertReporter is the subset of alerter.Alerter the API needs. Wired
+// in SetAlertReporter; nil means /api/alerter/status returns 503.
+type AlertReporter interface {
+	AlertStatus() AlertStatus
+}
+
 // RuleOverride is the subset of rules.OverrideStore the API needs.
 // Wired in SetRuleOverride; nil means the override endpoints return
 // 503.
@@ -212,24 +227,25 @@ type AgentSelfUpdater interface {
 
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store        *store.Store
-	Policy       PolicyEngine
-	Stats        StatsView
-	DLP          DLPScanner
-	RuleUpdater  RuleUpdater
-	Proxy        ProxyController
-	Profile      *profile.Holder
-	ProfileApply profile.PolicyStore
-	Tamper       TamperReporter
-	Rules        RuleOverride
+	Store         *store.Store
+	Policy        PolicyEngine
+	Stats         StatsView
+	DLP           DLPScanner
+	RuleUpdater   RuleUpdater
+	Proxy         ProxyController
+	Profile       *profile.Holder
+	ProfileApply  profile.PolicyStore
+	Tamper        TamperReporter
+	Alert         AlertReporter
+	Rules         RuleOverride
 	AgentUpdate   AgentSelfUpdater
 	Notifier      *notify.Notifier
-	RuleFiles     []string // optional paths whose mtimes feed /api/status
+	RuleFiles     []string                      // optional paths whose mtimes feed /api/status
 	ConfigPatcher func(listenAddr string) error // optional: persists proxy addr to YAML
 	startedAt     time.Time
-	scanLimiter  *rateLimiter
-	bearerToken  string
-	once         sync.Once
+	scanLimiter   *rateLimiter
+	bearerToken   string
+	once          sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -314,6 +330,10 @@ func (s *Server) SetProfile(h *profile.Holder, ps profile.PolicyStore) {
 // SetTamperReporter wires the tamper detector into the server.
 func (s *Server) SetTamperReporter(t TamperReporter) { s.Tamper = t }
 
+// SetAlertReporter wires the webhook alerter into the server. Optional;
+// nil means /api/alerter/status returns 503.
+func (s *Server) SetAlertReporter(a AlertReporter) { s.Alert = a }
+
 // SetRuleOverride wires the admin allow/block override store into
 // the server.
 func (s *Server) SetRuleOverride(o RuleOverride) { s.Rules = o }
@@ -344,6 +364,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/profile", s.handleProfileGet)
 	mux.HandleFunc("/api/profile/import", s.handleProfileImport)
 	mux.HandleFunc("/api/tamper/status", s.handleTamperStatus)
+	mux.HandleFunc("/api/alerter/status", s.handleAlertStatus)
 	mux.HandleFunc("/api/stats/export", s.handleStatsExport)
 	mux.HandleFunc("/api/rules/files", s.handleRuleFiles)
 	mux.HandleFunc("/api/rules/files/", s.handleRuleFileItem)

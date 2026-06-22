@@ -1133,6 +1133,19 @@ func (s *Server) handleTamperStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.Tamper.Status())
 }
 
+// handleAlertStatus surfaces the webhook alerter's aggregate status.
+func (s *Server) handleAlertStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Alert == nil {
+		writeError(w, http.StatusServiceUnavailable, "alerter not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Alert.AlertStatus())
+}
+
 // statsExportResponse adds the human / runtime context that turns a
 // raw counter dump into a usable export. Nothing sensitive is added
 // — only the build/OS metadata an admin needs to correlate the
