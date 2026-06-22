@@ -21,6 +21,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -28,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -37,6 +39,12 @@ import (
 // version is set at link time via -ldflags "-X main.version=...".
 var version = "dev"
 
+// stdout/stderr are indirected so tests can capture command output.
+var (
+	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
+)
+
 func main() {
 	if len(os.Args) < 2 {
 		usage(os.Stderr)
@@ -45,6 +53,8 @@ func main() {
 	switch os.Args[1] {
 	case "scan":
 		os.Exit(cmdScan(os.Args[2:]))
+	case "git-hook":
+		os.Exit(cmdGitHook(os.Args[2:]))
 	case "version", "-v", "--version":
 		fmt.Println("prompt-gate", version)
 		os.Exit(0)
@@ -63,6 +73,9 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prompt-gate scan [flags] [file]")
+	fmt.Fprintln(w, "  prompt-gate scan --staged              scan the git staged diff")
+	fmt.Fprintln(w, "  prompt-gate scan --diff < changes.diff scan a unified diff (added lines)")
+	fmt.Fprintln(w, "  prompt-gate git-hook install|uninstall|status")
 	fmt.Fprintln(w, "  prompt-gate version")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "If [file] is omitted or '-', content is read from stdin.")
@@ -75,6 +88,8 @@ func cmdScan(args []string) int {
 	patternsPath := fs.String("patterns", "", "path to dlp_patterns.json (default: bundled rules/)")
 	exclusionsPath := fs.String("exclusions", "", "path to dlp_exclusions.json (default: bundled rules/)")
 	quiet := fs.Bool("quiet", false, "exit 1 on block, 0 on allow, no output")
+	staged := fs.Bool("staged", false, "scan the git staged diff (runs 'git diff --cached')")
+	diff := fs.Bool("diff", false, "scan a unified diff read from stdin/file (added lines only)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -89,6 +104,26 @@ func cmdScan(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "prompt-gate:", err)
 		return 2
+	}
+
+	// Diff modes scan only the added lines of changed files, reporting
+	// per-file findings — the natural shape for pre-commit hooks and CI.
+	if *staged {
+		out, err := exec.Command("git", "diff", "--cached", "--unified=0", "--no-color", "--diff-filter=ACM").Output()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "prompt-gate: git diff failed (run inside a git repo):", err)
+			return 2
+		}
+		return scanDiff(pipeline, bytes.NewReader(out), *quiet)
+	}
+	if *diff {
+		r, err := openContent(fs.Arg(0))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "prompt-gate:", err)
+			return 2
+		}
+		defer r.Close()
+		return scanDiff(pipeline, r, *quiet)
 	}
 
 	content, err := readContent(fs.Arg(0))
@@ -195,4 +230,17 @@ func readContent(arg string) (string, error) {
 		return "", fmt.Errorf("read %s: %w", arg, err)
 	}
 	return string(data), nil
+}
+
+// openContent returns a reader for a unified-diff source: stdin when
+// arg is empty or "-", otherwise the named file. The caller closes it.
+func openContent(arg string) (io.ReadCloser, error) {
+	if arg == "" || arg == "-" {
+		return io.NopCloser(os.Stdin), nil
+	}
+	f, err := os.Open(arg)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", arg, err)
+	}
+	return f, nil
 }
