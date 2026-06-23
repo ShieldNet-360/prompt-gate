@@ -19,6 +19,11 @@ import { autoUpdater } from 'electron-updater';
 
 const AGENT_PORT = Number(process.env.SECURE_EDGE_AGENT_PORT ?? 9191);
 const AGENT_HOST = process.env.SECURE_EDGE_AGENT_HOST ?? '127.0.0.1';
+// The MITM proxy listen port. Must match proxy_listen in writeManagedConfig.
+// A stale prompt-gate-agent left holding this port makes POST
+// /api/proxy/enable fail with 409 "address already in use"; clearStaleProxy
+// frees it so the toggle can retry.
+const PROXY_PORT = Number(process.env.SECURE_EDGE_PROXY_PORT ?? 8443);
 const HEALTH_INTERVAL_MS = 10_000;
 
 // Old agentBinDir / spawnAgent / killAgent removed — replaced by the
@@ -596,14 +601,22 @@ function agentConfigured(): Promise<boolean> {
 // Only kills processes whose command line is a prompt-gate-agent, never
 // arbitrary port owners. POSIX only; best-effort.
 function killStaleAgents(): void {
+  killStaleAgentsOnPort(AGENT_PORT);
+}
+
+// Kill any prompt-gate-agent listening on `port`, except `exceptPid` (our
+// own managed agent). Used to free the API port (stale instance) and the
+// proxy port (a leftover agent still holding 8443 → enable returns 409).
+function killStaleAgentsOnPort(port: number, exceptPid?: number): void {
   if (process.platform === 'win32') return;
   try {
-    const pids = execSync(`lsof -ti tcp:${AGENT_PORT} -sTCP:LISTEN`, {
+    const pids = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).toString().trim();
     for (const pid of pids.split('\n')) {
       const p = pid.trim();
       if (!p) continue;
+      if (exceptPid && Number(p) === exceptPid) continue;
       let cmd = '';
       try {
         cmd = execSync(`ps -p ${p} -o command=`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
@@ -852,6 +865,14 @@ app.whenReady().then(async () => {
     } catch {
       return null;
     }
+  });
+
+  // Free the proxy port from a stale prompt-gate-agent (not our own) so the
+  // renderer can retry POST /api/proxy/enable after a 409 "address already
+  // in use". Only kills prompt-gate-agent processes, never arbitrary owners.
+  ipcMain.handle('prompt-gate:clear-stale-proxy', () => {
+    killStaleAgentsOnPort(PROXY_PORT, agentProcess?.pid ?? undefined);
+    return true;
   });
 
   // Open a URL in the user's default browser. Restricted to http(s) so a
