@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -466,14 +467,25 @@ func run(configPath string) error {
 		if cfg.ProxyEnabled {
 			log.Infof("auto-enabling proxy on %s", cfg.ProxyListen)
 			if _, err := controller.Enable(ctx); err != nil {
-				return fmt.Errorf("auto-enable proxy: %w", err)
+				// A port conflict on the proxy listener (a stale or
+				// duplicate agent still holding the address) must NOT
+				// abort the whole agent — DNS, the API surface, and the
+				// DLP scan endpoint are all still useful. Log an
+				// actionable warning and keep running; the caller can
+				// retry POST /api/proxy/enable once the conflict clears.
+				if errors.Is(err, proxy.ErrAddrInUse) {
+					log.Warnf("auto-enable proxy skipped: %v", err)
+				} else {
+					return fmt.Errorf("auto-enable proxy: %w", err)
+				}
+			} else {
+				log.Info("proxy enabled successfully")
+				defer func() {
+					shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
+					defer c()
+					_ = controller.Disable(shutdownCtx, false)
+				}()
 			}
-			log.Info("proxy enabled successfully")
-			defer func() {
-				shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
-				defer c()
-				_ = controller.Disable(shutdownCtx, false)
-			}()
 		}
 
 		// Recover from a prior non-graceful exit: if the system proxy was

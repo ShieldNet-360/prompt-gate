@@ -36,6 +36,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/elazarl/goproxy"
@@ -48,6 +49,13 @@ import (
 // route its TLS through us and trip the DLP pipeline on third-party
 // traffic.
 const DefaultListenAddr = "127.0.0.1:8443"
+
+// ErrAddrInUse is returned (wrapped) by ListenAndServe / Enable when the
+// proxy listen address is already bound by another process — typically a
+// stale or duplicate prompt-gate agent. It is matchable with errors.Is so
+// callers can distinguish a recoverable port conflict (don't kill the whole
+// agent; surface an actionable message) from a genuine startup failure.
+var ErrAddrInUse = errors.New("proxy: listen address already in use")
 
 // maxScanBytes mirrors the cap on POST /api/dlp/scan. It bounds the
 // amount of *extracted text* fed to the DLP pipeline — after a body is
@@ -457,6 +465,13 @@ func (s *Server) ListenAndServe(addr string) error {
 			s.listenOn = ""
 		}
 		s.mu.Unlock()
+		if errors.Is(err, syscall.EADDRINUSE) {
+			// Surface a matchable, actionable error so callers can keep
+			// the rest of the agent alive and tell the user the real
+			// cause (another instance is holding the port) instead of an
+			// opaque "enable proxy failed".
+			return fmt.Errorf("%w: %s (another prompt-gate agent may already be running): %v", ErrAddrInUse, addr, err)
+		}
 		return err
 	case <-time.After(100 * time.Millisecond):
 	}
