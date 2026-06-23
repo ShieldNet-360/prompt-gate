@@ -172,6 +172,20 @@ func loginKeychain() string {
 }
 
 func installCA(caPath string) error {
+	// Prefer the privileged helper: it trusts the CA in the SYSTEM
+	// keychain as root over the Unix socket — zero password prompts.
+	// This is the common case once the helper is installed, and it
+	// removes the login-keychain trust dialog that would otherwise be a
+	// second prompt on top of the one-time helper install. Fall back to
+	// the login-keychain path below only when no helper is present.
+	if helperAvailable() {
+		if err := helperCmd("TRUST_CA " + caPath); err == nil {
+			return nil
+		}
+		// Helper failed (stale socket, race) — fall through to the
+		// user-domain login-keychain trust so the install still works.
+	}
+
 	kc := loginKeychain()
 
 	// 1. Clean up old duplicates from the login keychain (no prompt).
@@ -215,6 +229,14 @@ func installCA(caPath string) error {
 }
 
 func removeCA(caPath string) error {
+	// Prefer the privileged helper: it removes the system-keychain trust
+	// as root over the socket (zero prompts), matching the install path.
+	// We still scrub the login keychain below (no admin needed) in case a
+	// prior version trusted the CA there.
+	if helperAvailable() {
+		_ = helperCmd("REMOVE_CA " + caPath)
+	}
+
 	kc := loginKeychain()
 
 	// Clean login keychain (no admin needed).
