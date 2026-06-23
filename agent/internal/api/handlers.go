@@ -18,6 +18,7 @@ import (
 
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/proxy"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/stats"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/store"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/sysconf"
@@ -849,6 +850,15 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 	}
 	caPath, err := s.Proxy.Enable(r.Context())
 	if err != nil {
+		// A port conflict is operator-actionable and leaks nothing
+		// sensitive, so return the real reason instead of the opaque
+		// redacted message — the tray can tell the user another agent is
+		// already holding the proxy port.
+		if errors.Is(err, proxy.ErrAddrInUse) {
+			fmt.Fprintf(os.Stderr, "api: enable proxy failed: %v\n", err)
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeErrorRedacted(w, http.StatusInternalServerError, "enable proxy failed", err)
 		return
 	}
