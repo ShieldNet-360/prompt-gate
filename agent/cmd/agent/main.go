@@ -569,6 +569,20 @@ func run(configPath string) error {
 	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
 		log.Errorf("profile load failed: %v", err)
 	}
+	// Optional enterprise-profile auto-refresh: re-fetch + re-apply the
+	// profile from profile_url on an interval, with an ETag/Last-Modified
+	// delta check, so fleet policy changes propagate without a restart.
+	if cfg.ProfileURL != "" && cfg.ProfileUpdateInterval > 0 {
+		refresher := profile.NewRefresher(holder, cfg.ProfileURL, cfg.ProfileUpdateInterval,
+			func(ctx context.Context, p *profile.Profile) error {
+				if err := p.Apply(ctx, profileApplyOptions(applyStore, engine, pipeline)); err != nil {
+					return err
+				}
+				return holder.Set(p)
+			})
+		go refresher.Start(ctx, func(format string, args ...interface{}) { log.Infof(format, args...) })
+		log.Infof("enterprise profile auto-refresh enabled (every %s)", cfg.ProfileUpdateInterval)
+	}
 
 	// Tamper detector goroutine.
 	if cfg.DNSListen != "" {
@@ -997,12 +1011,19 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 	if err != nil {
 		return err
 	}
+	if err := p.Apply(ctx, profileApplyOptions(ps, engine, pipeline)); err != nil {
+		return err
+	}
+	return h.Set(p)
+}
+
+// profileApplyOptions builds the ApplyOptions used to apply an
+// enterprise profile, including the DLPSink that pushes merged
+// thresholds/weights into the live pipeline so a profile takes effect
+// without a restart. Shared by startup and the auto-refresher.
+func profileApplyOptions(ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) profile.ApplyOptions {
 	opts := profile.ApplyOptions{PolicyStore: ps, Reloader: engine}
 	if pipeline != nil {
-		// Push the merged DLP snapshot into the live pipeline so a
-		// profile that ships stricter thresholds takes effect on
-		// the same boot, not the next one. Without this hook the
-		// pipeline keeps the values it was constructed with above.
 		opts.DLPSink = func(c profile.DLPConfigSnapshot) {
 			pipeline.Threshold().Set(dlp.Thresholds{
 				Critical: c.ThresholdCritical,
@@ -1019,10 +1040,7 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 			})
 		}
 	}
-	if err := p.Apply(ctx, opts); err != nil {
-		return err
-	}
-	return h.Set(p)
+	return opts
 }
 
 // splitHostPort returns the host portion of an addr like "127.0.0.1:53".

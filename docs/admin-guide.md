@@ -76,6 +76,23 @@ the profile over HTTPS. Validation runs on every load — a malformed profile
 falls back to the last good profile and logs a single line to the agent log
 (no profile body is logged).
 
+### Auto-refresh (central fleet management)
+
+Set `profile_update_interval` (e.g. `15m`) alongside `profile_url` to have the
+agent **periodically re-fetch and re-apply** the profile without a restart:
+
+```yaml
+profile_url: "https://mdm.example.com/profiles/prompt-gate.yaml"
+profile_update_interval: 15m   # 0 (default) = fetch once at startup only
+```
+
+Edit the one JSON on your server and every agent picks it up within the
+interval — MDM-style central management. The fetch uses HTTP conditional
+requests (`If-None-Match` / `If-Modified-Since`), so an unchanged profile is a
+zero-work `304 Not Modified` no-op. A failed fetch keeps the last applied
+profile (the agent never reverts to an empty policy). The same SSRF guard as
+the startup fetch applies. `GET /api/profile` reflects the active version.
+
 When `managed: true`, the Electron tray UI hides the category toggles and the
 Settings page shows a read-only banner with the profile ID + version.
 
