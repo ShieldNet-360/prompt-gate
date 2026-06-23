@@ -691,6 +691,9 @@ func deniedResponse(req *http.Request, hostname string) *http.Response {
 	}
 	resp.Header.Set("Content-Type", "text/html; charset=utf-8")
 	resp.Header.Set("Cache-Control", "no-store")
+	// Let a cross-origin caller read the 403 so the injected overlay can
+	// show the block page (same reasoning as the 451 path).
+	setBlockCORS(resp.Header, req)
 	return resp
 }
 
@@ -810,8 +813,34 @@ func blockedResponse(req *http.Request, result dlp.ScanResult) *http.Response {
 	// Expose pattern name so the injected interceptor script can
 	// read it from fetch/XHR responses without parsing the HTML body.
 	resp.Header.Set("X-SE-Pattern", patternName)
-	resp.Header.Set("Access-Control-Expose-Headers", "X-SE-Pattern")
+	// File uploads are almost always a cross-origin fetch/XHR (the page
+	// on chat.example.com POSTing to an upload/API host). Without CORS
+	// headers the browser turns our 451 into an opaque network error, so
+	// the page's JS — and our injected overlay's `status===451` check —
+	// never sees it: the upload silently fails with no block page. Echo
+	// the request Origin so the response is readable to the caller.
+	setBlockCORS(resp.Header, req)
 	return resp
+}
+
+// setBlockCORS makes a block response readable to a cross-origin
+// fetch/XHR caller so the injected interceptor can surface the block
+// page. The Origin is echoed (with credentials) when present — `*` is
+// invalid alongside credentialed requests — falling back to `*` for
+// origin-less callers. Also exposes X-SE-Pattern to scripts.
+func setBlockCORS(h http.Header, req *http.Request) {
+	origin := ""
+	if req != nil {
+		origin = req.Header.Get("Origin")
+	}
+	if origin != "" {
+		h.Set("Access-Control-Allow-Origin", origin)
+		h.Set("Access-Control-Allow-Credentials", "true")
+		h.Add("Vary", "Origin")
+	} else {
+		h.Set("Access-Control-Allow-Origin", "*")
+	}
+	h.Set("Access-Control-Expose-Headers", "X-SE-Pattern")
 }
 
 func blockedHTML(patternName, host string) string {

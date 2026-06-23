@@ -108,6 +108,54 @@ func TestIntegration_RealDLP_FileUploadVariantsBlocked(t *testing.T) {
 	}
 }
 
+// TestIntegration_BlockedUploadIsReadableCrossOrigin proves the 451 block
+// response carries CORS headers echoing the request Origin. Without them a
+// cross-origin upload fetch/XHR (the normal shape: a chat page POSTing to
+// an upload host) sees an opaque network error and the injected overlay's
+// status===451 check never fires — so no block page appears even though the
+// upload was stopped. The X-SE-Pattern header must also be exposed so the
+// overlay can name the policy.
+func TestIntegration_BlockedUploadIsReadableCrossOrigin(t *testing.T) {
+	const leak = "aws access_key for deploy: " + realKey
+	const origin = "https://claude.ai"
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer upstream.Close()
+
+	policy := PolicyCheckerFunc(func(string) PolicyAction { return PolicyAllowDLP })
+	srv, _ := newServer(t, policy, buildProdPipeline(t), &fakeStats{})
+	proxySrv := httptest.NewServer(srv.Handler())
+	defer proxySrv.Close()
+
+	body, ct := multipartFile(t, "file", "creds.txt", []byte(leak))
+	client := proxyClient(t, proxySrv.URL, nil)
+	req, _ := http.NewRequest(http.MethodPost, upstream.URL+"/v1/files", bytes.NewReader(body))
+	req.Header.Set("Content-Type", ct)
+	req.Header.Set("Origin", origin)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusUnavailableForLegalReasons {
+		t.Fatalf("status = %d, want 451", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != origin {
+		t.Errorf("Access-Control-Allow-Origin = %q, want %q (browser can't read the block otherwise)", got, origin)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("Access-Control-Allow-Credentials = %q, want \"true\"", got)
+	}
+	if got := resp.Header.Get("Access-Control-Expose-Headers"); got != "X-SE-Pattern" {
+		t.Errorf("Access-Control-Expose-Headers = %q, want X-SE-Pattern", got)
+	}
+	if resp.Header.Get("X-SE-Pattern") == "" {
+		t.Error("X-SE-Pattern header missing — overlay can't name the policy")
+	}
+}
+
 // TestIntegration_RealDLP_AllowlistedExampleKeyPasses is the negative
 // control: the canonical documentation key is allowlisted, so an upload
 // containing it must NOT be blocked — proving the upload scanner reuses
