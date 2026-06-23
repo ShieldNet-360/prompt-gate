@@ -49,11 +49,19 @@ import (
 // traffic.
 const DefaultListenAddr = "127.0.0.1:8443"
 
-// maxScanBytes mirrors the cap on POST /api/dlp/scan. Larger request
-// bodies are forwarded verbatim and counted, but only the first
-// maxScanBytes go through the DLP pipeline so a multi-MB upload
-// can't blow up agent memory.
-const maxScanBytes = 4 * 1024 * 1024
+// maxScanBytes mirrors the cap on POST /api/dlp/scan. It bounds the
+// amount of *extracted text* fed to the DLP pipeline — after a body is
+// decompressed and unwrapped (multipart, base64), at most this many
+// bytes are scanned so a large upload can't blow up agent memory or
+// the regex engine.
+const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
+
+// maxFileBytes bounds the raw request body buffered for inspection.
+// File uploads (multipart, gzipped, base64-encoded) need the whole
+// payload captured before they can be decoded, so this is larger than
+// maxScanBytes. Bodies beyond this size are forwarded verbatim but only
+// the first maxFileBytes are decoded/scanned.
+const maxFileBytes = 40 * 1024 * 1024 // 40 MiB
 
 // PolicyAction is the resolved policy decision for a proxy CONNECT target.
 type PolicyAction string
@@ -518,7 +526,7 @@ func (s *Server) bumpStats(ctx context.Context, blocked bool) {
 	_ = s.stats.BumpDLP(ctx, blocked)
 }
 
-// readScanBody drains up to maxScanBytes from req.Body. It returns
+// readScanBody drains up to maxFileBytes from req.Body. It returns
 // the captured bytes plus a replacement io.ReadCloser that the
 // downstream goproxy machinery can use to forward the request body
 // to the upstream server unchanged. Returns nil bytes and a nil
@@ -536,12 +544,12 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 	for {
 		n, err := body.Read(tmp)
 		if n > 0 {
-			if len(buf)+n > maxScanBytes {
+			if len(buf)+n > maxFileBytes {
 				// Trim to the cap and keep reading so the upstream
 				// still receives the entire body — we just don't
 				// scan past the limit. Concatenating the rest into
 				// an io.Reader chain is enough to forward it.
-				keep := maxScanBytes - len(buf)
+				keep := maxFileBytes - len(buf)
 				if keep < 0 {
 					keep = 0
 				}
@@ -584,43 +592,68 @@ func combineReaders(parts ...[]byte) io.Reader {
 // match the actual text. For all other content types the raw bytes
 // are returned as-is.
 func decodeScanBody(req *http.Request, body []byte) string {
-	ct := ""
+	ct, enc := "", ""
 	if req != nil {
 		ct = req.Header.Get("Content-Type")
+		enc = req.Header.Get("Content-Encoding")
 	}
+
+	// Undo transport compression so the scanner sees plaintext. Returns
+	// the original bytes unchanged when the body isn't actually gzip/
+	// deflate compressed.
+	body = decompressForScan(enc, body)
+
+	// multipart/form-data carries file uploads — the OpenAI / xAI /
+	// Anthropic Files APIs and browser attachment posts. Pull out the
+	// filenames and the text content of each part (decoding base64 parts).
+	if strings.Contains(ct, "multipart/form-data") {
+		if text := extractMultipart(ct, body); text != "" {
+			return capScanText(text)
+		}
+		// Boundary parsing failed — fall through to raw handling.
+	}
+
 	raw := bytesToString(body)
-	if !strings.Contains(ct, "application/x-www-form-urlencoded") {
-		return raw
-	}
-	// Parse form values and concatenate all decoded values separated
-	// by newlines. This preserves every user-supplied string while
-	// stripping the key= framing and percent encoding.
-	vals, err := url.ParseQuery(raw)
-	if err != nil {
-		// Fall back to a simple percent-decode of the entire body.
-		if decoded, e := url.QueryUnescape(raw); e == nil {
-			return decoded
-		}
-		return raw
-	}
-	keys := make([]string, 0, len(vals))
-	for k := range vals {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var sb strings.Builder
-	for _, k := range keys {
-		for _, v := range vals[k] {
-			if sb.Len() > 0 {
-				sb.WriteByte('\n')
+
+	// application/x-www-form-urlencoded (Gemini / ChatGPT SPA front-ends):
+	// decode the percent-encoded values so the patterns match real text.
+	if strings.Contains(ct, "application/x-www-form-urlencoded") {
+		vals, err := url.ParseQuery(raw)
+		if err != nil {
+			// Fall back to a simple percent-decode of the entire body.
+			if decoded, e := url.QueryUnescape(raw); e == nil {
+				return capScanText(decoded)
 			}
-			sb.WriteString(v)
+			return capScanText(raw)
 		}
+		keys := make([]string, 0, len(vals))
+		for k := range vals {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var sb strings.Builder
+		for _, k := range keys {
+			for _, v := range vals[k] {
+				if sb.Len() > 0 {
+					sb.WriteByte('\n')
+				}
+				sb.WriteString(v)
+			}
+		}
+		if sb.Len() == 0 {
+			return capScanText(raw)
+		}
+		return capScanText(sb.String())
 	}
-	if sb.Len() == 0 {
-		return raw
+
+	// JSON, plain text, octet-stream, or unknown: scan the raw text plus
+	// any base64-encoded text embedded in it (inline file data such as
+	// {"source":{"data":"<base64>"}}, or a base64-encoded text file sent
+	// as the whole body).
+	if decoded := decodeBase64Text(raw); decoded != "" {
+		return capScanText(raw + "\n" + decoded)
 	}
-	return sb.String()
+	return capScanText(raw)
 }
 
 // deniedResponse builds an HTTP 403 reply for domains blocked by
