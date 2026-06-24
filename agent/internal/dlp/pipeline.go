@@ -359,12 +359,7 @@ func (p *Pipeline) scanImpl(
 		canonical, _ = correlator.Combine(sessionID, canonical)
 	}
 
-	// Step 1: classify content — currently used to short-circuit
-	// scans of obviously-empty input and to label the result for
-	// future per-class pattern subsets.
-	_ = ClassifyContent(canonical)
-
-	// Step 2: Aho-Corasick prefix scan.
+	// Aho-Corasick prefix scan.
 	candidates := auto.Scan(canonical)
 
 	// Adaptive scanning + category filter: drop candidates whose
