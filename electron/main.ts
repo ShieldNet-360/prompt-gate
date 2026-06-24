@@ -41,6 +41,15 @@ let lastTrayState: TrayState | null = null;
 let updateAvailable = false;
 let proxyRunning: boolean | null = null;
 let lastTamperDetections: number | null = null;
+// Agent supervision. agentStopping is set while we deliberately stop the
+// agent (quit / restart) so the exit handler doesn't treat it as a crash.
+// The crash-window fields back off respawns so a binary that crashes on
+// startup can't spin in a tight loop.
+let agentStopping = false;
+let restarting = false;
+let recentCrashes: number[] = []; // timestamps (ms) of unexpected exits
+const CRASH_WINDOW_MS = 60_000;
+const CRASH_BURST_LIMIT = 5;
 
 function rendererPath(): string {
   // In production main.ts is compiled to dist/main.js and the renderer
@@ -303,6 +312,15 @@ function pingTamper(): Promise<number | null> {
 async function tickHealth() {
   const [ok, proxyOk, tamper] = await Promise.all([pingAgent(), pingProxy(), pingTamper()]);
   updateTrayIcon(ok ? (proxyOk ? 'on' : 'off') : 'error');
+  // Recovery net: the agent is unreachable and we hold no live child
+  // handle (its exit fired without us, or we attached to an external
+  // agent that has since died). Bring it back. The exit-handler path
+  // covers the common crash; this covers the rest. `restarting` guards
+  // against double-spawns.
+  if (!ok && !agentProcess && !agentStopping && !restarting) {
+    console.error('health: agent unreachable with no live process — restarting');
+    void restartManagedAgent();
+  }
   if (proxyOk !== proxyRunning) {
     proxyRunning = proxyOk;
     refreshTrayMenu();
@@ -721,9 +739,10 @@ async function startManagedAgent(): Promise<void> {
     if (process.platform === 'darwin') {
       try { execSync(`xattr -rd com.apple.quarantine "${path.dirname(bin)}"`, { stdio: 'ignore' }); } catch { /* best-effort */ }
     }
+    agentStopping = false; // we are bringing it up; future exits are crashes
     agentProcess = spawn(bin, ['-config', cfg], { stdio: 'ignore', detached: false });
-    agentProcess.on('exit', () => { agentProcess = null; });
-    agentProcess.on('error', (err) => { console.error('managed agent spawn error:', err); agentProcess = null; });
+    agentProcess.on('exit', () => { agentProcess = null; onAgentExit(); });
+    agentProcess.on('error', (err) => { console.error('managed agent spawn error:', err); agentProcess = null; onAgentExit(); });
   } catch (err) {
     console.error('managed agent: failed to start:', err);
     return;
@@ -735,6 +754,68 @@ async function startManagedAgent(): Promise<void> {
     await new Promise<void>((r) => setTimeout(r, 300));
   }
   console.error('managed agent: did not become configured within timeout');
+}
+
+// onAgentExit handles an UNEXPECTED agent exit (a crash). It is the
+// counterpart to the privileged helper's watchdog: the helper fails the
+// network open within ~30s if we don't recover, while this respawns the
+// agent so the app (and protection) come back on their own. We
+// deliberately do NOT auto-re-enable the proxy after a crash — the
+// respawned agent's startup reconcile restores connectivity (fail-open)
+// and the user re-arms protection — so a crash-on-block bug can't loop
+// the user between blackout and restart.
+function onAgentExit(): void {
+  if (agentStopping) return; // intentional stop (quit / restart teardown)
+
+  const now = Date.now();
+  recentCrashes = recentCrashes.filter((t) => now - t < CRASH_WINDOW_MS);
+  recentCrashes.push(now);
+  updateTrayIcon('error');
+
+  if (recentCrashes.length > CRASH_BURST_LIMIT) {
+    console.error(`managed agent crashed ${recentCrashes.length}x in ${CRASH_WINDOW_MS / 1000}s — backing off`);
+    notifyAgentDown(true);
+    return; // stop the loop; the helper watchdog still guarantees internet
+  }
+
+  console.error(`managed agent exited unexpectedly (crash #${recentCrashes.length}) — restarting`);
+  notifyAgentDown(false);
+  // Backoff grows with consecutive crashes (1s, 2s, 3s …, capped).
+  const delay = Math.min(recentCrashes.length * 1000, 5000);
+  setTimeout(() => { void restartManagedAgent(); }, delay);
+}
+
+// restartManagedAgent brings the agent back up after a crash (or on
+// demand). Guarded by `restarting` so overlapping triggers (exit handler
+// + health poll) don't spawn duplicates.
+async function restartManagedAgent(): Promise<void> {
+  if (restarting) return;
+  if (agentProcess) return; // already running again
+  restarting = true;
+  try {
+    await startManagedAgent();
+  } finally {
+    restarting = false;
+  }
+}
+
+// notifyAgentDown surfaces a clear, actionable message. `fatal` means we
+// stopped auto-restarting after a crash burst.
+function notifyAgentDown(fatal: boolean): void {
+  const body = fatal
+    ? 'Prompt Gate stopped after repeated crashes. Your internet is restored (protection is OFF). Reopen the app to try again.'
+    : 'Prompt Gate is restarting after an unexpected stop. Your internet is unaffected.';
+  if (Notification.isSupported()) {
+    new Notification({ title: 'Prompt Gate', body, silent: true }).show();
+  }
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('prompt-gate:event', {
+      type: 'agent_down',
+      title: 'Prompt Gate',
+      body,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 // ensureHelperInstalled waits for the agent to be ready (it was just spawned),
@@ -796,6 +877,9 @@ async function ensureHelperInstalled(): Promise<void> {
 
 // Stop the agent we spawned (no-op if we attached to an external one).
 function stopManagedAgent(): void {
+  // Mark the stop as intentional so onAgentExit() doesn't treat it as a
+  // crash and respawn the agent we just asked to quit.
+  agentStopping = true;
   if (!agentProcess || agentProcess.killed) { agentProcess = null; return; }
   const pid = agentProcess.pid;
   try { agentProcess.kill('SIGTERM'); } catch { /* already gone */ }
