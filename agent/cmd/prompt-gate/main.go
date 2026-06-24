@@ -21,6 +21,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -28,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -53,6 +55,8 @@ func main() {
 		os.Exit(cmdScan(os.Args[2:]))
 	case "policy":
 		os.Exit(cmdPolicy(os.Args[2:]))
+	case "git-hook":
+		os.Exit(cmdGitHook(os.Args[2:]))
 	case "version", "-v", "--version":
 		fmt.Println("prompt-gate", version)
 		os.Exit(0)
@@ -72,6 +76,11 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prompt-gate scan [flags] [file]")
 	fmt.Fprintln(w, "  prompt-gate policy export|diff <file>|apply <file>")
+	fmt.Fprintln(w, "  prompt-gate scan --dir .               recursively scan a directory")
+	fmt.Fprintln(w, "  prompt-gate scan --dir . --sarif       emit SARIF for GitHub Code Scanning")
+	fmt.Fprintln(w, "  prompt-gate scan --staged              scan the git staged diff")
+	fmt.Fprintln(w, "  prompt-gate scan --diff < changes.diff scan a unified diff (added lines)")
+	fmt.Fprintln(w, "  prompt-gate git-hook install|uninstall|status")
 	fmt.Fprintln(w, "  prompt-gate version")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "If [file] is omitted or '-', content is read from stdin.")
@@ -84,6 +93,10 @@ func cmdScan(args []string) int {
 	patternsPath := fs.String("patterns", "", "path to dlp_patterns.json (default: bundled rules/)")
 	exclusionsPath := fs.String("exclusions", "", "path to dlp_exclusions.json (default: bundled rules/)")
 	quiet := fs.Bool("quiet", false, "exit 1 on block, 0 on allow, no output")
+	dir := fs.String("dir", "", "recursively scan all text files under this directory")
+	sarif := fs.Bool("sarif", false, "emit SARIF 2.1.0 (for GitHub Code Scanning)")
+	staged := fs.Bool("staged", false, "scan the git staged diff (runs 'git diff --cached')")
+	diff := fs.Bool("diff", false, "scan a unified diff read from stdin/file (added lines only)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -100,6 +113,30 @@ func cmdScan(args []string) int {
 		return 2
 	}
 
+	// Directory mode: recursively scan a tree (CI / SARIF use-case).
+	if *dir != "" {
+		return scanDir(pipeline, *dir, *sarif, *quiet)
+	}
+	// Diff modes scan only the added lines of changed files, reporting
+	// per-file findings — the natural shape for pre-commit hooks and CI.
+	if *staged {
+		out, err := exec.Command("git", "diff", "--cached", "--unified=0", "--no-color", "--diff-filter=ACM").Output()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "prompt-gate: git diff failed (run inside a git repo):", err)
+			return 2
+		}
+		return scanDiff(pipeline, bytes.NewReader(out), *quiet)
+	}
+	if *diff {
+		r, err := openContent(fs.Arg(0))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "prompt-gate:", err)
+			return 2
+		}
+		defer r.Close()
+		return scanDiff(pipeline, r, *quiet)
+	}
+
 	content, err := readContent(fs.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "prompt-gate:", err)
@@ -114,12 +151,34 @@ func cmdScan(args []string) int {
 		return 0
 	}
 
+	if *sarif {
+		var fr []fileResult
+		if result.Blocked {
+			fr = []fileResult{{File: scanArgName(fs.Arg(0)), Blocked: true, PatternName: result.PatternName, Score: result.Score}}
+		}
+		out, _ := json.MarshalIndent(buildSARIF(fr, version), "", "  ")
+		fmt.Fprintln(stdout, string(out))
+		if result.Blocked {
+			return 1
+		}
+		return 0
+	}
+
 	out, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Println(string(out))
 	if result.Blocked {
 		return 1
 	}
 	return 0
+}
+
+// scanArgName returns a SARIF-friendly artifact URI for single-file or
+// stdin scans.
+func scanArgName(arg string) string {
+	if arg == "" || arg == "-" {
+		return "<stdin>"
+	}
+	return filepath.ToSlash(arg)
 }
 
 func resolveRulePaths(patFlag, excFlag string) (string, string, error) {
@@ -204,4 +263,17 @@ func readContent(arg string) (string, error) {
 		return "", fmt.Errorf("read %s: %w", arg, err)
 	}
 	return string(data), nil
+}
+
+// openContent returns a reader for a unified-diff source: stdin when
+// arg is empty or "-", otherwise the named file. The caller closes it.
+func openContent(arg string) (io.ReadCloser, error) {
+	if arg == "" || arg == "-" {
+		return io.NopCloser(os.Stdin), nil
+	}
+	f, err := os.Open(arg)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", arg, err)
+	}
+	return f, nil
 }

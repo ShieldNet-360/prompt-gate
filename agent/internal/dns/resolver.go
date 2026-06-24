@@ -18,6 +18,7 @@ import (
 
 	mdns "github.com/miekg/dns"
 
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/policy"
 )
 
@@ -145,6 +146,11 @@ func (r *Resolver) HandleQuery(req *mdns.Msg) *mdns.Msg {
 }
 
 func (r *Resolver) handle(w mdns.ResponseWriter, req *mdns.Msg) {
+	// miekg/dns serves each query in its own goroutine and does NOT
+	// recover panics — an unhandled panic here (malformed message,
+	// upstream edge case) would crash the whole agent and take DNS +
+	// proxy down with it. Contain it to the single query.
+	defer logging.Recover("dns.handle")
 	resp := r.respond(req)
 	if resp == nil {
 		return

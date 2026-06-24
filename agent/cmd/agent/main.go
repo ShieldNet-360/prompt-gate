@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -309,7 +310,7 @@ func run(configPath string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go counter.Run(ctx, cfg.StatsFlushInterval)
+	logging.Go("stats-flush", func() { counter.Run(ctx, cfg.StatsFlushInterval) })
 
 	log.Debugf("starting DNS resolver on %s (upstream %s)", cfg.DNSListen, cfg.UpstreamDNS)
 	forwarder := &dns.MiekgForwarder{Upstream: cfg.UpstreamDNS, Timeout: 3 * time.Second}
@@ -466,14 +467,25 @@ func run(configPath string) error {
 		if cfg.ProxyEnabled {
 			log.Infof("auto-enabling proxy on %s", cfg.ProxyListen)
 			if _, err := controller.Enable(ctx); err != nil {
-				return fmt.Errorf("auto-enable proxy: %w", err)
+				// A port conflict on the proxy listener (a stale or
+				// duplicate agent still holding the address) must NOT
+				// abort the whole agent — DNS, the API surface, and the
+				// DLP scan endpoint are all still useful. Log an
+				// actionable warning and keep running; the caller can
+				// retry POST /api/proxy/enable once the conflict clears.
+				if errors.Is(err, proxy.ErrAddrInUse) {
+					log.Warnf("auto-enable proxy skipped: %v", err)
+				} else {
+					return fmt.Errorf("auto-enable proxy: %w", err)
+				}
+			} else {
+				log.Info("proxy enabled successfully")
+				defer func() {
+					shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
+					defer c()
+					_ = controller.Disable(shutdownCtx, false)
+				}()
 			}
-			log.Info("proxy enabled successfully")
-			defer func() {
-				shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
-				defer c()
-				_ = controller.Disable(shutdownCtx, false)
-			}()
 		}
 
 		// Recover from a prior non-graceful exit: if the system proxy was
@@ -538,7 +550,7 @@ func run(configPath string) error {
 				return fmt.Errorf("build updater: %w", err)
 			}
 			apiServer.SetRuleUpdater(updater)
-			go updater.Start(ctx)
+			logging.Go("rule-updater", func() { updater.Start(ctx) })
 		}
 	}
 
@@ -588,7 +600,7 @@ func run(configPath string) error {
 			Reporter:          counter,
 		})
 		apiServer.SetTamperReporter(tamperAdapter{detector: detector})
-		go detector.Start(ctx)
+		logging.Go("tamper-detector", func() { detector.Start(ctx) })
 	}
 
 	// Optional heartbeat. URL=="" disables it.
@@ -602,8 +614,10 @@ func run(configPath string) error {
 		return fmt.Errorf("init heartbeat: %w", err)
 	}
 	if hb != nil {
-		go hb.Start(ctx, func(format string, args ...interface{}) {
-			log.Infof(format, args...)
+		logging.Go("heartbeat", func() {
+			hb.Start(ctx, func(format string, args ...interface{}) {
+				log.Infof(format, args...)
+			})
 		})
 	}
 

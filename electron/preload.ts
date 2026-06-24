@@ -24,6 +24,7 @@ export interface PromptGateBridge {
   pickUpstreamCA(): Promise<{ name: string; pem: string } | null>;
   getOpenAtLogin(): Promise<boolean>;
   setOpenAtLogin(enabled: boolean): Promise<boolean>;
+  clearStaleProxy(): Promise<boolean>;
 }
 
 const bridge: PromptGateBridge = {
@@ -45,6 +46,7 @@ const bridge: PromptGateBridge = {
   pickUpstreamCA: () => ipcRenderer.invoke('prompt-gate:pick-upstream-ca'),
   getOpenAtLogin: () => ipcRenderer.invoke('prompt-gate:get-open-at-login'),
   setOpenAtLogin: (enabled: boolean) => ipcRenderer.invoke('prompt-gate:set-open-at-login', enabled),
+  clearStaleProxy: () => ipcRenderer.invoke('prompt-gate:clear-stale-proxy'),
 };
 
 contextBridge.exposeInMainWorld('secureEdge', bridge);

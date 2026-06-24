@@ -328,6 +328,7 @@ func (s *Server) SetAgentUpdater(u AgentSelfUpdater) { s.AgentUpdate = u }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/status", s.handleStatus)
+	mux.HandleFunc("/api/attestation", s.handleAttestation)
 	mux.HandleFunc("/api/policies", s.handlePoliciesCollection)
 	mux.HandleFunc("/api/policies/", s.handlePolicyItem)
 	mux.HandleFunc("/api/stats", s.handleStats)
