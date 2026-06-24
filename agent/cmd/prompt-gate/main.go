@@ -53,6 +53,8 @@ func main() {
 	switch os.Args[1] {
 	case "scan":
 		os.Exit(cmdScan(os.Args[2:]))
+	case "policy":
+		os.Exit(cmdPolicy(os.Args[2:]))
 	case "git-hook":
 		os.Exit(cmdGitHook(os.Args[2:]))
 	case "version", "-v", "--version":
@@ -73,6 +75,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prompt-gate scan [flags] [file]")
+	fmt.Fprintln(w, "  prompt-gate policy export|diff <file>|apply <file>")
 	fmt.Fprintln(w, "  prompt-gate scan --dir .               recursively scan a directory")
 	fmt.Fprintln(w, "  prompt-gate scan --dir . --sarif       emit SARIF for GitHub Code Scanning")
 	fmt.Fprintln(w, "  prompt-gate scan --staged              scan the git staged diff")
