@@ -70,29 +70,42 @@ func watchdog() {
 	strikes := 0
 	for {
 		time.Sleep(watchdogInterval)
-		addr, ok := currentLoopbackProxyAddr()
-		if !ok {
-			strikes = 0
-			continue
-		}
-		if proxyListening(addr) {
-			strikes = 0
-			continue
-		}
-		strikes++
-		if strikes < watchdogStrikes {
-			continue
-		}
-		fmt.Fprintf(os.Stderr,
-			"proxy-helper: watchdog — system proxy %s is set but not listening; "+
-				"restoring network (fail-open)\n", addr)
-		if r := runRemoveProxy(); strings.HasPrefix(r, "ERR") {
-			fmt.Fprintf(os.Stderr, "proxy-helper: watchdog restore failed: %s\n", r)
-			// Keep trying on the next tick rather than giving up.
-			continue
-		}
-		strikes = 0
+		// Guard each tick: a panic (e.g. a quirky networksetup output)
+		// must not silently kill the watchdog — the one thing keeping the
+		// user from being stranded offline.
+		strikes = watchdogTick(strikes)
 	}
+}
+
+// watchdogTick performs one watchdog check and returns the updated strike
+// count. Recovers from any panic so the loop survives.
+func watchdogTick(strikes int) (next int) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "proxy-helper: watchdog tick recovered from panic: %v\n", r)
+			next = 0
+		}
+	}()
+	addr, ok := currentLoopbackProxyAddr()
+	if !ok {
+		return 0
+	}
+	if proxyListening(addr) {
+		return 0
+	}
+	strikes++
+	if strikes < watchdogStrikes {
+		return strikes
+	}
+	fmt.Fprintf(os.Stderr,
+		"proxy-helper: watchdog — system proxy %s is set but not listening; "+
+			"restoring network (fail-open)\n", addr)
+	if r := runRemoveProxy(); strings.HasPrefix(r, "ERR") {
+		fmt.Fprintf(os.Stderr, "proxy-helper: watchdog restore failed: %s\n", r)
+		// Keep the strikes maxed so we retry on the next tick.
+		return strikes
+	}
+	return 0
 }
 
 // currentLoopbackProxyAddr returns the host:port of an ENABLED secure-web

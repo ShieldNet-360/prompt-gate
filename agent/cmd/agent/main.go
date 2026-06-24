@@ -310,7 +310,7 @@ func run(configPath string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go counter.Run(ctx, cfg.StatsFlushInterval)
+	logging.Go("stats-flush", func() { counter.Run(ctx, cfg.StatsFlushInterval) })
 
 	log.Debugf("starting DNS resolver on %s (upstream %s)", cfg.DNSListen, cfg.UpstreamDNS)
 	forwarder := &dns.MiekgForwarder{Upstream: cfg.UpstreamDNS, Timeout: 3 * time.Second}
@@ -550,7 +550,7 @@ func run(configPath string) error {
 				return fmt.Errorf("build updater: %w", err)
 			}
 			apiServer.SetRuleUpdater(updater)
-			go updater.Start(ctx)
+			logging.Go("rule-updater", func() { updater.Start(ctx) })
 		}
 	}
 
@@ -600,7 +600,7 @@ func run(configPath string) error {
 			Reporter:          counter,
 		})
 		apiServer.SetTamperReporter(tamperAdapter{detector: detector})
-		go detector.Start(ctx)
+		logging.Go("tamper-detector", func() { detector.Start(ctx) })
 	}
 
 	// Optional heartbeat. URL=="" disables it.
@@ -614,8 +614,10 @@ func run(configPath string) error {
 		return fmt.Errorf("init heartbeat: %w", err)
 	}
 	if hb != nil {
-		go hb.Start(ctx, func(format string, args ...interface{}) {
-			log.Infof(format, args...)
+		logging.Go("heartbeat", func() {
+			hb.Start(ctx, func(format string, args ...interface{}) {
+				log.Infof(format, args...)
+			})
 		})
 	}
 

@@ -285,6 +285,11 @@ func ReconcileSysConfOnStartup(proxyServing bool) {
 	// Restore off the startup path so a password prompt (networksetup
 	// needs admin) doesn't block the rest of daemon init.
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("sysconf: startup reconcile panic recovered: %v", r)
+			}
+		}()
 		sysConfMu.Lock()
 		defer sysConfMu.Unlock()
 		if err := sysconf.RestoreProxy(); err != nil {
