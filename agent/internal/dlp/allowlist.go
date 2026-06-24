@@ -38,6 +38,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
 )
 
 // AllowlistScopeAny is the scope value meaning "any destination".
@@ -291,6 +293,7 @@ func (a *Allowlist) reload(ctx context.Context) error {
 func (a *Allowlist) touchAsync(key string, now int64) {
 	db := a.db
 	go func() {
+		defer logging.Recover("dlp.allowlist.touchAsync")
 		_, _ = db.ExecContext(context.Background(),
 			`UPDATE dlp_allowlist SET last_hit = ? WHERE salted_hash = ?`,
 			now, key)

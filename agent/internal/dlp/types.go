@@ -13,22 +13,6 @@ package dlp
 
 import "regexp"
 
-// ContentType is the coarse classification produced by ClassifyContent.
-// It is used to narrow the active pattern set for the rest of the
-// pipeline.
-type ContentType string
-
-const (
-	// CodeContent is source code (imports / function / class lines).
-	CodeContent ContentType = "code"
-	// StructuredData is JSON, CSV, key-value blocks.
-	StructuredData ContentType = "structured"
-	// CredentialsBlock is a block of key=value or key: value secrets.
-	CredentialsBlock ContentType = "credentials"
-	// NaturalLanguage is prose-like text.
-	NaturalLanguage ContentType = "natural"
-)
-
 // Severity is the per-pattern severity level. Each severity has its
 // own configurable threshold in the dlp_config SQLite table.
 type Severity string
