@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/alerter"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/api"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/config"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
@@ -621,6 +622,24 @@ func run(configPath string) error {
 		})
 	}
 
+	// Optional threshold webhook alerter. URL=="" disables it.
+	al, err := alerter.New(alerter.Options{
+		URL:             cfg.AlertWebhookURL,
+		AgentVersion:    version,
+		ThresholdBlocks: int64(cfg.AlertThresholdBlocks),
+		Interval:        cfg.AlertInterval,
+		Stats:           counter,
+	})
+	if err != nil {
+		return fmt.Errorf("init alerter: %w", err)
+	}
+	if al != nil {
+		apiServer.SetAlertReporter(alertAdapter{a: al})
+		go al.Start(ctx, func(format string, args ...interface{}) {
+			log.Infof(format, args...)
+		})
+	}
+
 	httpServer, err := apiServer.ListenAndServe(cfg.APIListen)
 	if err != nil {
 		return fmt.Errorf("start API: %w", err)
@@ -979,6 +998,18 @@ func (a *profileApplyAdapter) SetDLPConfig(ctx context.Context, c profile.DLPCon
 
 // tamperAdapter bridges the *tamper.Detector to the api.TamperReporter
 // interface, mapping tamper.Status field-for-field to api.TamperStatus.
+type alertAdapter struct{ a *alerter.Alerter }
+
+func (x alertAdapter) AlertStatus() api.AlertStatus {
+	st := x.a.Status()
+	return api.AlertStatus{
+		Enabled:         st.Enabled,
+		ThresholdBlocks: st.ThresholdBlocks,
+		LastFiredAt:     st.LastFiredAt,
+		FiresTotal:      st.FiresTotal,
+	}
+}
+
 type tamperAdapter struct{ detector *tamper.Detector }
 
 func (a tamperAdapter) Status() api.TamperStatus {

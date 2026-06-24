@@ -147,6 +147,38 @@ The heartbeat carries only aggregate counters — no domain names, no URLs, no
 user identifiers. The receiving endpoint should reply 200 OK; non-200 responses
 are retried with exponential backoff. See `agent/internal/heartbeat/`.
 
+## 7b. Threshold alerting (SIEM / Slack webhooks)
+
+Where the heartbeat is a *scheduled* aggregate push for dashboards, the alerter
+is an *event-driven* push for incident response: it fires a webhook the moment
+DLP blocks spike. Enable it in `config.yaml` (or an enterprise profile):
+
+```yaml
+alert_webhook_url: "https://hooks.slack.com/services/…"   # blank = disabled
+alert_threshold_blocks: 10   # new blocks within a window that trigger an alert (min 5)
+alert_interval: 5m           # polling cadence
+```
+
+When the number of new DLP blocks since the last alert reaches the threshold,
+the agent POSTs:
+
+```json
+{
+  "alert_type": "dlp_block_threshold",
+  "agent_version": "1.0.1",
+  "os_type": "darwin",
+  "os_arch": "arm64",
+  "blocks_in_window": 12,
+  "exported_at": 1750000000
+}
+```
+
+The payload is **counters-only** — no domain names, URLs, IPs, matched values,
+or pattern names ever leave the device (same privacy invariant as the
+heartbeat, enforced by a test). `GET /api/alerter/status` reports
+`{enabled, threshold_blocks, last_fired_at, fires_total}`. HTTPS-only;
+private/loopback hosts are rejected. See `agent/internal/alerter/`.
+
 ## 8. Troubleshooting
 
 | Symptom | Likely cause | Fix |

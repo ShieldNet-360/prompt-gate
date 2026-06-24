@@ -97,6 +97,19 @@ type Config struct {
 	// when HeartbeatURL is non-empty. Defaults to 1h.
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
 
+	// AlertWebhookURL is the URL the agent POSTs a threshold alert to
+	// when DLP blocks spike. Empty (default) disables alerting. The
+	// payload is counters-only — no access data leaves the device.
+	AlertWebhookURL string `yaml:"alert_webhook_url"`
+
+	// AlertThresholdBlocks is the number of new DLP blocks within a
+	// window that triggers an alert. Defaults to 10 (min 5).
+	AlertThresholdBlocks int `yaml:"alert_threshold_blocks"`
+
+	// AlertInterval is the polling cadence for the alert threshold
+	// when AlertWebhookURL is non-empty. Defaults to 5m.
+	AlertInterval time.Duration `yaml:"alert_interval"`
+
 	// LocalRulesDir is the override directory for admin-managed
 	// allow/block lists and DLP overrides. Defaults to RulesDir/local
 	// when blank. Files in this directory are merged on top of the
@@ -163,6 +176,8 @@ func Default() Config {
 		ProxyListen:           "127.0.0.1:8443",
 		ProxyEnabled:          false,
 		HeartbeatInterval:     time.Hour,
+		AlertThresholdBlocks:  10,
+		AlertInterval:         5 * time.Minute,
 		LargeContentThreshold: 50 * 1024,
 		DLPCacheTTLSeconds:    5,
 		DLPCacheCapacity:      1024,
