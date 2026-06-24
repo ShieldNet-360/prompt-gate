@@ -514,7 +514,10 @@ func (s *Server) notifyBlock(patternName, host string) {
 	n := s.notifier
 	s.mu.Unlock()
 	if n != nil {
-		go n.NotifyBlock(patternName, host)
+		go func() {
+			defer recoverGoroutine("notifyBlock")
+			n.NotifyBlock(patternName, host)
+		}()
 	}
 }
 
@@ -532,7 +535,21 @@ func (s *Server) recordEvent(ctx context.Context, eventType, host, patternName s
 	if r != nil {
 		// Fire-and-forget in a goroutine so a slow DB write
 		// doesn't block the proxy hot path.
-		go r.RecordBlockEvent(ctx, eventType, host, patternName)
+		go func() {
+			defer recoverGoroutine("recordEvent")
+			_ = r.RecordBlockEvent(ctx, eventType, host, patternName)
+		}()
+	}
+}
+
+// recoverGoroutine is the panic backstop for the proxy's fire-and-forget
+// goroutines. A panic in a bare `go` goroutine terminates the whole
+// process (only net/http recovers its request goroutines), which would
+// black-hole every user's traffic — contain it here. Kept local to match
+// this package's stderr-only logging (no per-request metadata).
+func recoverGoroutine(label string) {
+	if rec := recover(); rec != nil {
+		fmt.Fprintf(os.Stderr, "proxy: recovered from panic in %s goroutine: %v\n", label, rec)
 	}
 }
 
