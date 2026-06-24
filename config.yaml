@@ -27,3 +27,12 @@ proxy_enabled: false
 heartbeat_interval: 1h
 stats_flush_interval: 60s
 rule_update_interval: 6h
+
+# Threshold webhook alerting (off by default). When alert_webhook_url is set,
+# the agent POSTs a counters-only alert when DLP blocks spike past the
+# threshold within a polling window. No domain names, URLs, IPs, matched
+# values, or pattern names are ever sent. Point it at Slack / PagerDuty / a
+# SIEM collector. Status at GET /api/alerter/status.
+# alert_webhook_url: "https://hooks.example.com/prompt-gate"
+alert_threshold_blocks: 10   # min 5
+alert_interval: 5m

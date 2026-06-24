@@ -1,0 +1,49 @@
+name: 'Prompt Gate DLP Scan'
+description: 'Scan files for secrets & PII with the on-device Prompt Gate DLP engine, emitting SARIF for GitHub Code Scanning.'
+branding:
+  icon: 'shield'
+  color: 'blue'
+inputs:
+  path:
+    description: 'Directory to scan recursively'
+    required: false
+    default: '.'
+  sarif-file:
+    description: 'Path to write the SARIF report'
+    required: false
+    default: 'prompt-gate.sarif'
+outputs:
+  blocked:
+    description: 'true if any file matched a DLP rule'
+    value: ${{ steps.scan.outputs.blocked }}
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+    - id: scan
+      shell: bash
+      env:
+        REF: ${{ github.action_ref || 'main' }}
+      run: |
+        set -euo pipefail
+        go install "github.com/ShieldNet-360/prompt-gate/agent/cmd/prompt-gate@${REF}"
+        BIN="$(go env GOPATH)/bin/prompt-gate"
+        RULES="$(mktemp -d)"
+        base="https://raw.githubusercontent.com/ShieldNet-360/prompt-gate/${REF}/rules"
+        curl -fsSL "$base/dlp_patterns.json"   -o "$RULES/dlp_patterns.json"
+        curl -fsSL "$base/dlp_exclusions.json" -o "$RULES/dlp_exclusions.json"
+        code=0
+        "$BIN" scan --dir "${{ inputs.path }}" --sarif \
+          --patterns "$RULES/dlp_patterns.json" \
+          --exclusions "$RULES/dlp_exclusions.json" \
+          > "${{ inputs.sarif-file }}" || code=$?
+        if [ "$code" -eq 1 ]; then
+          echo "blocked=true"  >> "$GITHUB_OUTPUT"
+        elif [ "$code" -eq 0 ]; then
+          echo "blocked=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "::error::prompt-gate scan failed (exit $code)"; exit "$code"
+        fi
+        echo "Wrote ${{ inputs.sarif-file }} (blocked=$([ $code -eq 1 ] && echo true || echo false))"

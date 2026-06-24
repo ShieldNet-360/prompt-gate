@@ -1,0 +1,17 @@
+# Prompt Gate — pre-commit framework integration (https://pre-commit.com).
+# Add to your repo's .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/ShieldNet-360/prompt-gate
+#       rev: v1.0.1
+#       hooks:
+#         - id: prompt-gate
+#
+# Then: pre-commit install
+- id: prompt-gate
+  name: Prompt Gate — scan staged changes for secrets & PII
+  description: Runs the on-device Prompt Gate DLP engine over staged changes.
+  language: golang
+  entry: prompt-gate scan --staged
+  pass_filenames: false
+  stages: [pre-commit]

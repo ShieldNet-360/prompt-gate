@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
 )
 
 // LargeContentThreshold is the byte threshold above which Pipeline
@@ -357,12 +359,7 @@ func (p *Pipeline) scanImpl(
 		canonical, _ = correlator.Combine(sessionID, canonical)
 	}
 
-	// Step 1: classify content — currently used to short-circuit
-	// scans of obviously-empty input and to label the result for
-	// future per-class pattern subsets.
-	_ = ClassifyContent(canonical)
-
-	// Step 2: Aho-Corasick prefix scan.
+	// Aho-Corasick prefix scan.
 	candidates := auto.Scan(canonical)
 
 	// Adaptive scanning + category filter: drop candidates whose
@@ -418,6 +415,37 @@ func (p *Pipeline) scanImpl(
 // after the public-example/placeholder short-circuits and BEFORE scoring. A hit drops
 // the match silently — same effect as the user clicking "never
 // block this" on the toast.
+// evaluatePatternSafe wraps evaluatePattern with a panic recover so a bug
+// hit on one pattern (over untrusted scan content) can't crash the agent.
+// The workers run in their own goroutines, where a panic would otherwise
+// terminate the whole process — taking the proxy and everyone's traffic
+// with it. On panic it returns an empty (non-blocking) result, failing
+// open and still emitting exactly one result per job so the collector
+// never deadlocks.
+func evaluatePatternSafe(
+	content string,
+	pat *Pattern,
+	ms []Match,
+	exclusions []Exclusion,
+	weights ScoreWeights,
+	threshold *ThresholdEngine,
+	source SourceContext,
+	allowlist *Allowlist,
+) (res ScanResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			name := "?"
+			if pat != nil {
+				name = pat.Name
+			}
+			logging.Log.WithField("pattern", name).
+				Errorf("dlp: recovered from panic evaluating pattern (failing open): %v", r)
+			res = ScanResult{}
+		}
+	}()
+	return evaluatePattern(content, pat, ms, exclusions, weights, threshold, source, allowlist)
+}
+
 func evaluatePattern(
 	content string,
 	pat *Pattern,
@@ -530,8 +558,9 @@ func scanConcurrent(
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
+			defer logging.Recover("dlp.scanWorker")
 			for j := range jobCh {
-				results <- evaluatePattern(content, j.pat, j.ms, exclusions, weights, threshold, source, allowlist)
+				results <- evaluatePatternSafe(content, j.pat, j.ms, exclusions, weights, threshold, source, allowlist)
 			}
 		}()
 	}

@@ -21,6 +21,7 @@ export interface PromptGateBridge {
   pickUpstreamCA?(): Promise<{ name: string; pem: string } | null>;
   getOpenAtLogin?(): Promise<boolean>;
   setOpenAtLogin?(enabled: boolean): Promise<boolean>;
+  clearStaleProxy?(): Promise<boolean>;
 }
 
 declare global {
