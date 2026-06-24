@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"net"
 	"path/filepath"
 	"testing"
@@ -137,6 +138,35 @@ func TestController_EnableIsIdempotent(t *testing.T) {
 	}
 	if !c.Status().Running {
 		t.Fatal("Running should remain true after duplicate Enable")
+	}
+}
+
+// When the proxy listen address is already held by another process,
+// Enable must report a matchable ErrAddrInUse (so the agent surfaces an
+// actionable message and keeps the rest of itself alive) rather than an
+// opaque generic error — and it must NOT leave the CA unwritten.
+func TestController_EnableReportsAddrInUse(t *testing.T) {
+	// Occupy a port, then point the controller at it.
+	blocker, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen blocker: %v", err)
+	}
+	defer blocker.Close()
+	addr := blocker.Addr().String()
+
+	c := newTestController(t, addr)
+	_, err = c.Enable(context.Background())
+	if err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = c.Disable(ctx, false)
+		t.Fatal("Enable should fail when the listen address is already in use")
+	}
+	if !errors.Is(err, ErrAddrInUse) {
+		t.Fatalf("error = %v, want errors.Is(err, ErrAddrInUse)", err)
+	}
+	if c.Status().Running {
+		t.Error("Running should be false after a failed Enable")
 	}
 }
 

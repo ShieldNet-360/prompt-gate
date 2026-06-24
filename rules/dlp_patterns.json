@@ -229,6 +229,47 @@
       "category": "cloud"
     },
     {
+      "name": "Base64-Encoded GCP Service Account Key",
+      "regex": "eyJ0eXBlIjo(?:gInNlcnZpY2VfYWNjb3VudCI|ic2VydmljZV9hY2NvdW50Ig)[A-Za-z0-9+/=\\s]{20,}",
+      "prefix": "eyJ0eXBlIjo",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "gcp",
+        "google",
+        "service_account",
+        "credentials",
+        "base64",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "_json_key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "Base64-Encoded Private Key Block",
+      "regex": "LS0tLS1CRUdJTi(?:BQUklWQVRFI|BSU0EgUFJJV|BFQyBQUklWQ|BEU0EgUFJJV|BPUEVOU1NII|BFTkNSWVBURUQ)[A-Za-z0-9+/=\\s]{20,}",
+      "prefix": "LS0tLS1CRUdJTi",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [
+        "private_key",
+        "key",
+        "pem",
+        "certificate",
+        "base64",
+        "credentials"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "infra_secret"
+    },
+    {
       "name": "GCP OAuth Client Secret",
       "regex": "GOCSPX-[A-Za-z0-9_\\-]{28}",
       "prefix": "GOCSPX-",
@@ -3141,6 +3182,45 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "productivity"
+    },
+    {
+      "name": "Prompt Injection - Instruction Override",
+      "regex": "(?i)ignore\\s+(all\\s+|the\\s+|any\\s+)?(previous|prior|above|earlier|preceding)\\s+(instruction|instructions|prompt|prompts|context|message|messages|rule|rules)",
+      "prefix": "ignore",
+      "severity": "high",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "prompt_injection"
+    },
+    {
+      "name": "Prompt Injection - System Prompt Delimiter",
+      "regex": "(?i)<\\|im_start\\|>\\s*system",
+      "prefix": "<|im_start|>",
+      "severity": "high",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "prompt_injection"
+    },
+    {
+      "name": "Prompt Injection - Jailbreak Persona",
+      "regex": "(?i)you\\s+are\\s+now\\s+(dan\\b|an?\\s+(unrestricted|unfiltered|uncensored|jailbroken))",
+      "prefix": "you are now",
+      "severity": "high",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "prompt_injection"
     }
   ]
 }

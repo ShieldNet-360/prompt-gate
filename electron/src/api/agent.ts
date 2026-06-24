@@ -211,12 +211,33 @@ export const agent = {
     return http<ProxyStatus>('/api/proxy/status');
   },
   async enableProxy(): Promise<ProxyEnableResponse> {
-    return http<ProxyEnableResponse>('/api/proxy/enable', { method: 'POST' });
+    try {
+      return await http<ProxyEnableResponse>('/api/proxy/enable', { method: 'POST' });
+    } catch (err) {
+      // 409 = the proxy port is held by a stale prompt-gate-agent (a
+      // leftover/duplicate instance). Ask the main process to free it,
+      // then retry once. Any other error propagates unchanged.
+      const inUse = /Agent 409:|address already in use/i.test(String(err));
+      const clear = typeof window !== 'undefined' ? window.secureEdge?.clearStaleProxy : undefined;
+      if (!inUse || !clear) throw err;
+      await clear();
+      await new Promise((r) => setTimeout(r, 600));
+      return http<ProxyEnableResponse>('/api/proxy/enable', { method: 'POST' });
+    }
   },
   async disableProxy(removeCA: boolean): Promise<ProxyStatus> {
     return http<ProxyStatus>('/api/proxy/disable', {
       method: 'POST',
       body: JSON.stringify({ remove_ca: removeCA }),
+    });
+  },
+  async getProxyListenAddr(): Promise<{ listen_addr: string }> {
+    return http<{ listen_addr: string }>('/api/proxy/listen');
+  },
+  async setProxyListenAddr(listenAddr: string): Promise<{ listen_addr: string; warning?: string }> {
+    return http<{ listen_addr: string; warning?: string }>('/api/proxy/listen', {
+      method: 'PUT',
+      body: JSON.stringify({ listen_addr: listenAddr }),
     });
   },
   async getUpstreamCA(): Promise<UpstreamCAStatus> {

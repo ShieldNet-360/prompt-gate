@@ -663,6 +663,11 @@ func (f *fakeProxyController) Disable(_ context.Context, removeCA bool) error {
 
 func (f *fakeProxyController) Status() ProxyStatus { return f.statusSnap }
 
+func (f *fakeProxyController) SetListenAddr(_ context.Context, addr string) error {
+	f.statusSnap.ListenAddr = addr
+	return nil
+}
+
 func TestProxyEnable_WithoutControllerReturns503(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	rec := httptest.NewRecorder()

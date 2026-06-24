@@ -1067,7 +1067,7 @@ new version. Counters are atomically incremented in-memory and flushed to SQLite
 | Transparent redirect (opt) | `iptables -t nat -A OUTPUT -p tcp --dport 443 -j REDIRECT --to-port 8443` | Yes (root) |
 | CA trust (opt) | Copy to `/usr/local/share/ca-certificates/` + `update-ca-certificates` | Yes (root) |
 | Auto-start | systemd unit file | Yes (root) |
-| Installer | `.deb` + `.rpm` via `nfpm` | Standard |
+| Installer | `.deb` + `.rpm` + `AppImage` via electron-builder | Standard |
 
 ### 9. Communication Diagram
 

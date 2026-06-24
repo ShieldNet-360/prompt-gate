@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -17,12 +18,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/alerter"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/api"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/config"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dns"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/heartbeat"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/mcp"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/notify"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/policy"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
@@ -44,6 +47,8 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to YAML config file")
 	nativeMode := flag.Bool("native-messaging", false,
 		"run as a Chrome Native Messaging host on stdin/stdout instead of a daemon")
+	mcpMode := flag.Bool("mcp", false,
+		"run as a Model Context Protocol (MCP) stdio tool server instead of a daemon")
 	flag.Parse()
 
 	api.Version = version
@@ -60,6 +65,14 @@ func main() {
 	if *nativeMode {
 		if err := runNativeMessaging(*configPath); err != nil {
 			log.Errorf("agent (native): %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *mcpMode {
+		if err := runMCP(*configPath); err != nil {
+			log.Errorf("agent (mcp): %v", err)
 			os.Exit(1)
 		}
 		return
@@ -95,35 +108,69 @@ func isNativeMessagingArgv(args []string) bool {
 // skipped — Chrome spawns one host process per extension session and
 // tears it down on disconnect.
 func runNativeMessaging(configPath string) error {
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-	resolveLocalRulesDir(&cfg)
-	if cfg.DLPPatternsPath == "" {
-		return fmt.Errorf("native messaging requires dlp_patterns in config")
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	pipeline, statsStore, err := buildStdioPipeline(ctx, configPath)
+	if err != nil {
+		return err
+	}
+	if statsStore != nil {
+		defer statsStore.Close()
+	}
+	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+}
+
+// runMCP serves the Prompt Gate DLP engine as a Model Context Protocol
+// (MCP) tool server over stdio (newline-delimited JSON-RPC). Like Native
+// Messaging it is a one-shot stdio transport: DNS / API / proxy servers
+// are skipped, and the same DLP pipeline setup is reused so verdicts
+// match every other transport. Configure it as an `mcpServers` entry in
+// Claude Code / Cursor / Windsurf — see docs/mcp-integration.md.
+func runMCP(configPath string) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	pipeline, statsStore, err := buildStdioPipeline(ctx, configPath)
+	if err != nil {
+		return err
+	}
+	if statsStore != nil {
+		defer statsStore.Close()
+	}
+	return mcp.NewServer(pipeline, version).Serve(ctx, os.Stdin, os.Stdout)
+}
+
+// buildStdioPipeline loads config and assembles a DLP pipeline for the
+// stdio transports (Native Messaging and MCP). It mirrors daemon-mode
+// DLP setup so scan results match the HTTP fallback: ScoreWeights and
+// Thresholds come from the SQLite store (falling back to defaults when
+// the store has no row yet) and the same pattern / exclusion files are
+// rebuilt into the pipeline. DNS and API servers are intentionally
+// skipped. The returned store may be nil; when non-nil the caller owns
+// it and must Close it.
+func buildStdioPipeline(ctx context.Context, configPath string) (*dlp.Pipeline, *store.Store, error) {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load config: %w", err)
+	}
+	resolveLocalRulesDir(&cfg)
+	if cfg.DLPPatternsPath == "" {
+		return nil, nil, fmt.Errorf("stdio transport requires dlp_patterns in config")
+	}
+
 	weights := dlp.DefaultScoreWeights()
 	thresholds := dlp.DefaultThresholds()
-	// The store, if available, is kept open for the lifetime of the
-	// Native Messaging session so ServeNativeMessaging can bump the
-	// shared dlp_scans_total / dlp_blocks_total counters after each
-	// scan. Without this the Status page would silently undercount
-	// whenever Chrome chose the NM transport over the HTTP fallback.
 	var statsStore *store.Store
 	if cfg.DBPath != "" {
 		s, err := store.Open(cfg.DBPath)
 		if err != nil {
-			return fmt.Errorf("open store: %w", err)
+			return nil, nil, fmt.Errorf("open store: %w", err)
 		}
-		defer s.Close()
 		dlpCfg, err := s.GetDLPConfig(ctx)
 		if err != nil {
-			return fmt.Errorf("read dlp_config: %w", err)
+			s.Close()
+			return nil, nil, fmt.Errorf("read dlp_config: %w", err)
 		}
 		weights = dlp.ScoreWeights{
 			HotwordBoost:     dlpCfg.HotwordBoost,
@@ -143,13 +190,19 @@ func runNativeMessaging(configPath string) error {
 
 	patterns, err := dlp.MergePatternsFromDir(cfg.DLPPatternsPath, cfg.LocalRulesDir)
 	if err != nil {
-		return err
+		if statsStore != nil {
+			statsStore.Close()
+		}
+		return nil, nil, err
 	}
 	var exclusions []dlp.Exclusion
 	if cfg.DLPExclusionsPath != "" {
 		exclusions, err = dlp.MergeExclusionsFromDir(cfg.DLPExclusionsPath, cfg.LocalRulesDir)
 		if err != nil {
-			return err
+			if statsStore != nil {
+				statsStore.Close()
+			}
+			return nil, nil, err
 		}
 	}
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
@@ -158,8 +211,7 @@ func runNativeMessaging(configPath string) error {
 	if statsStore != nil {
 		enableAllowlist(ctx, pipeline, statsStore.DB())
 	}
-
-	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+	return pipeline, statsStore, nil
 }
 
 // loadCanaryPatterns reads the persisted canary tripwires from the
@@ -280,7 +332,7 @@ func run(configPath string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go counter.Run(ctx, cfg.StatsFlushInterval)
+	logging.Go("stats-flush", func() { counter.Run(ctx, cfg.StatsFlushInterval) })
 
 	log.Debugf("starting DNS resolver on %s (upstream %s)", cfg.DNSListen, cfg.UpstreamDNS)
 	forwarder := &dns.MiekgForwarder{Upstream: cfg.UpstreamDNS, Timeout: 3 * time.Second}
@@ -438,17 +490,31 @@ func run(configPath string) error {
 		}
 		log.Debugf("proxy controller created (listen=%s)", cfg.ProxyListen)
 		apiServer.SetProxyController(&proxyAdapter{c: controller})
+		apiServer.SetConfigPatcher(func(addr string) error {
+			return config.UpdateProxyListen(configPath, addr)
+		})
 		if cfg.ProxyEnabled {
 			log.Infof("auto-enabling proxy on %s", cfg.ProxyListen)
 			if _, err := controller.Enable(ctx); err != nil {
-				return fmt.Errorf("auto-enable proxy: %w", err)
+				// A port conflict on the proxy listener (a stale or
+				// duplicate agent still holding the address) must NOT
+				// abort the whole agent — DNS, the API surface, and the
+				// DLP scan endpoint are all still useful. Log an
+				// actionable warning and keep running; the caller can
+				// retry POST /api/proxy/enable once the conflict clears.
+				if errors.Is(err, proxy.ErrAddrInUse) {
+					log.Warnf("auto-enable proxy skipped: %v", err)
+				} else {
+					return fmt.Errorf("auto-enable proxy: %w", err)
+				}
+			} else {
+				log.Info("proxy enabled successfully")
+				defer func() {
+					shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
+					defer c()
+					_ = controller.Disable(shutdownCtx, false)
+				}()
 			}
-			log.Info("proxy enabled successfully")
-			defer func() {
-				shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
-				defer c()
-				_ = controller.Disable(shutdownCtx, false)
-			}()
 		}
 
 		// Recover from a prior non-graceful exit: if the system proxy was
@@ -513,7 +579,7 @@ func run(configPath string) error {
 				return fmt.Errorf("build updater: %w", err)
 			}
 			apiServer.SetRuleUpdater(updater)
-			go updater.Start(ctx)
+			logging.Go("rule-updater", func() { updater.Start(ctx) })
 		}
 	}
 
@@ -544,6 +610,20 @@ func run(configPath string) error {
 	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
 		log.Errorf("profile load failed: %v", err)
 	}
+	// Optional enterprise-profile auto-refresh: re-fetch + re-apply the
+	// profile from profile_url on an interval, with an ETag/Last-Modified
+	// delta check, so fleet policy changes propagate without a restart.
+	if cfg.ProfileURL != "" && cfg.ProfileUpdateInterval > 0 {
+		refresher := profile.NewRefresher(holder, cfg.ProfileURL, cfg.ProfileUpdateInterval,
+			func(ctx context.Context, p *profile.Profile) error {
+				if err := p.Apply(ctx, profileApplyOptions(applyStore, engine, pipeline)); err != nil {
+					return err
+				}
+				return holder.Set(p)
+			})
+		go refresher.Start(ctx, func(format string, args ...interface{}) { log.Infof(format, args...) })
+		log.Infof("enterprise profile auto-refresh enabled (every %s)", cfg.ProfileUpdateInterval)
+	}
 
 	// Tamper detector goroutine.
 	if cfg.DNSListen != "" {
@@ -563,7 +643,7 @@ func run(configPath string) error {
 			Reporter:          counter,
 		})
 		apiServer.SetTamperReporter(tamperAdapter{detector: detector})
-		go detector.Start(ctx)
+		logging.Go("tamper-detector", func() { detector.Start(ctx) })
 	}
 
 	// Optional heartbeat. URL=="" disables it.
@@ -577,7 +657,27 @@ func run(configPath string) error {
 		return fmt.Errorf("init heartbeat: %w", err)
 	}
 	if hb != nil {
-		go hb.Start(ctx, func(format string, args ...interface{}) {
+		logging.Go("heartbeat", func() {
+			hb.Start(ctx, func(format string, args ...interface{}) {
+				log.Infof(format, args...)
+			})
+		})
+	}
+
+	// Optional threshold webhook alerter. URL=="" disables it.
+	al, err := alerter.New(alerter.Options{
+		URL:             cfg.AlertWebhookURL,
+		AgentVersion:    version,
+		ThresholdBlocks: int64(cfg.AlertThresholdBlocks),
+		Interval:        cfg.AlertInterval,
+		Stats:           counter,
+	})
+	if err != nil {
+		return fmt.Errorf("init alerter: %w", err)
+	}
+	if al != nil {
+		apiServer.SetAlertReporter(alertAdapter{a: al})
+		go al.Start(ctx, func(format string, args ...interface{}) {
 			log.Infof(format, args...)
 		})
 	}
@@ -802,6 +902,10 @@ func (p *proxyAdapter) Status() api.ProxyStatus {
 	}
 }
 
+func (p *proxyAdapter) SetListenAddr(ctx context.Context, addr string) error {
+	return p.c.SetListenAddr(ctx, addr)
+}
+
 func (p *proxyAdapter) SetUpstreamCA(pem []byte) ([]string, error) {
 	return p.c.SetUpstreamCA(pem)
 }
@@ -936,6 +1040,18 @@ func (a *profileApplyAdapter) SetDLPConfig(ctx context.Context, c profile.DLPCon
 
 // tamperAdapter bridges the *tamper.Detector to the api.TamperReporter
 // interface, mapping tamper.Status field-for-field to api.TamperStatus.
+type alertAdapter struct{ a *alerter.Alerter }
+
+func (x alertAdapter) AlertStatus() api.AlertStatus {
+	st := x.a.Status()
+	return api.AlertStatus{
+		Enabled:         st.Enabled,
+		ThresholdBlocks: st.ThresholdBlocks,
+		LastFiredAt:     st.LastFiredAt,
+		FiresTotal:      st.FiresTotal,
+	}
+}
+
 type tamperAdapter struct{ detector *tamper.Detector }
 
 func (a tamperAdapter) Status() api.TamperStatus {
@@ -968,12 +1084,19 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 	if err != nil {
 		return err
 	}
+	if err := p.Apply(ctx, profileApplyOptions(ps, engine, pipeline)); err != nil {
+		return err
+	}
+	return h.Set(p)
+}
+
+// profileApplyOptions builds the ApplyOptions used to apply an
+// enterprise profile, including the DLPSink that pushes merged
+// thresholds/weights into the live pipeline so a profile takes effect
+// without a restart. Shared by startup and the auto-refresher.
+func profileApplyOptions(ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) profile.ApplyOptions {
 	opts := profile.ApplyOptions{PolicyStore: ps, Reloader: engine}
 	if pipeline != nil {
-		// Push the merged DLP snapshot into the live pipeline so a
-		// profile that ships stricter thresholds takes effect on
-		// the same boot, not the next one. Without this hook the
-		// pipeline keeps the values it was constructed with above.
 		opts.DLPSink = func(c profile.DLPConfigSnapshot) {
 			pipeline.Threshold().Set(dlp.Thresholds{
 				Critical: c.ThresholdCritical,
@@ -990,10 +1113,7 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 			})
 		}
 	}
-	if err := p.Apply(ctx, opts); err != nil {
-		return err
-	}
-	return h.Set(p)
+	return opts
 }
 
 // splitHostPort returns the host portion of an addr like "127.0.0.1:53".

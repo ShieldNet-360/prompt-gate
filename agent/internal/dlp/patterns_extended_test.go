@@ -488,6 +488,20 @@ func TestExtendedPatterns_TruePositives(t *testing.T) {
 			},
 		},
 
+		// -- Base64-encoded secrets -------------------
+		{
+			label: "base64-encoded GCP service account key (spaced JSON)",
+			content: "Set GOOGLE_APPLICATION_CREDENTIALS to the following value:\n" +
+				"eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsICJwcm9qZWN0X2lkIjogInByb2QtYW5hbHl0aWNzLTQyIiwgInByaXZhdGVfa2V5X2lkIjogImExYjJjM2Q0ZTVmNmExYjJjM2Q0ZTVmNmExYjJjM2Q0ZTVmNmExYjIi",
+			allowedPatterns: []string{"Base64-Encoded GCP Service Account Key"},
+		},
+		{
+			label: "base64-encoded RSA private key (standalone PEM)",
+			content: "Paste the credentials below:\n" +
+				"LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBMFozVlM1SkpjZHMzeGZueWdXZXA0UEF0R29SQmgxRlpzQXlKUG51",
+			allowedPatterns: []string{"Base64-Encoded Private Key Block"},
+		},
+
 		// -- Secret-manager response pastes -----------
 		{
 			label: "AWS Secrets Manager GetSecretValue paste",

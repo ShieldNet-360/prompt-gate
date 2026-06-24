@@ -35,6 +35,29 @@ func (f *fakeScanner) Scan(_ context.Context, content string) dlp.ScanResult {
 	return dlp.ScanResult{}
 }
 
+// panicScanner panics on every Scan, simulating a parser blowing up on a
+// malformed upload. scanBodySafely must absorb it and fail open.
+type panicScanner struct{}
+
+func (panicScanner) Scan(context.Context, string) dlp.ScanResult {
+	panic("simulated scan/parse panic on untrusted upload")
+}
+
+// A panic in the scan/extract path must not crash the agent (which would
+// black-hole all traffic). scanBodySafely recovers and fails open
+// (Blocked=false → request forwarded unscanned).
+func TestScanBodySafely_FailsOpenOnPanic(t *testing.T) {
+	srv, err := New(newTestCA(t), PolicyCheckerFunc(func(string) PolicyAction { return PolicyAllowDLP }), panicScanner{}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, "https://api.example.com/v1/files", nil)
+	result := scanBodySafely(srv, req, []byte("anything"))
+	if result.Blocked {
+		t.Error("scanBodySafely should fail OPEN (Blocked=false) when the scanner panics")
+	}
+}
+
 // fakeStats counts calls so tests can verify aggregate counters
 // flow through.
 type fakeStats struct {

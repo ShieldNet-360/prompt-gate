@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,8 +18,10 @@ import (
 
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/proxy"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/stats"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/store"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/sysconf"
 )
 
 // osStat is a thin indirection so tests can stub the filesystem. The
@@ -848,8 +852,26 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 	}
 	caPath, err := s.Proxy.Enable(r.Context())
 	if err != nil {
+		// A port conflict is operator-actionable and leaks nothing
+		// sensitive, so return the real reason instead of the opaque
+		// redacted message — the tray can tell the user another agent is
+		// already holding the proxy port.
+		if errors.Is(err, proxy.ErrAddrInUse) {
+			fmt.Fprintf(os.Stderr, "api: enable proxy failed: %v\n", err)
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeErrorRedacted(w, http.StatusInternalServerError, "enable proxy failed", err)
 		return
+	}
+	// Best-effort: set shell env vars for CLI tools in terminals.
+	// caPath is exported too (NODE_EXTRA_CA_CERTS etc.) so CLIs that
+	// ignore the OS keychain still trust the MITM cert.
+	status := s.Proxy.Status()
+	if status.ListenAddr != "" {
+		if err := sysconf.ApplyShellProxy("http://"+status.ListenAddr, caPath); err != nil {
+			log.Printf("sysconf: shell proxy apply (non-fatal): %v", err)
+		}
 	}
 	writeJSON(w, http.StatusOK, proxyEnableResponse{CACertPath: caPath})
 }
@@ -879,7 +901,70 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 		writeErrorRedacted(w, http.StatusInternalServerError, "disable proxy failed", err)
 		return
 	}
+	// Best-effort: unset shell env vars so CLI tools stop using the proxy.
+	if err := sysconf.RemoveShellProxy(); err != nil {
+		log.Printf("sysconf: shell proxy remove (non-fatal): %v", err)
+	}
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
+}
+
+// proxyListenRequest is the body of PUT /api/proxy/listen.
+type proxyListenRequest struct {
+	ListenAddr string `json:"listen_addr"`
+}
+
+// handleProxyListen handles GET/PUT /api/proxy/listen.
+//
+//	GET  → current listen address from status snapshot.
+//	PUT  → update listen address; validates loopback-only; if the proxy
+//	       is running it stops and restarts on the new address. The new
+//	       address is also persisted to the config file via ConfigPatcher.
+func (s *Server) handleProxyListen(w http.ResponseWriter, r *http.Request) {
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]string{"listen_addr": s.Proxy.Status().ListenAddr})
+	case http.MethodPut:
+		var body proxyListenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		host, portStr, err := net.SplitHostPort(body.ListenAddr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "listen_addr must be host:port (e.g. 127.0.0.1:8443)")
+			return
+		}
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			writeError(w, http.StatusBadRequest, "only loopback addresses are supported (127.x.x.x or ::1)")
+			return
+		}
+		portNum, _ := strconv.Atoi(portStr)
+		if portNum < 1024 || portNum > 65535 {
+			writeError(w, http.StatusBadRequest, "port must be between 1024 and 65535")
+			return
+		}
+		if err := s.Proxy.SetListenAddr(r.Context(), body.ListenAddr); err != nil {
+			writeErrorRedacted(w, http.StatusInternalServerError, "set listen addr failed", err)
+			return
+		}
+		if s.ConfigPatcher != nil {
+			if err := s.ConfigPatcher(body.ListenAddr); err != nil {
+				writeJSON(w, http.StatusOK, map[string]interface{}{
+					"listen_addr": body.ListenAddr,
+					"warning":     "in-memory change applied; config persist failed: " + err.Error(),
+				})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"listen_addr": body.ListenAddr})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 // handleProxyStatus returns the current proxy lifecycle snapshot.
@@ -1058,6 +1143,19 @@ func (s *Server) handleTamperStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.Tamper.Status())
+}
+
+// handleAlertStatus surfaces the webhook alerter's aggregate status.
+func (s *Server) handleAlertStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Alert == nil {
+		writeError(w, http.StatusServiceUnavailable, "alerter not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Alert.AlertStatus())
 }
 
 // statsExportResponse adds the human / runtime context that turns a

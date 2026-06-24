@@ -6,7 +6,6 @@ import { agent } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
 import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
-import { Status } from './pages/Status';
 import './styles.css';
 
 /* ── Menu icon (top-left hamburger) ── */
@@ -121,13 +120,8 @@ function HamburgerMenu({ onAbout, onGuideline, onLicense }: {
   );
 }
 
-/* ── Dashboard: large toggle + Safe Browsing indicator ── */
-function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense }: {
-  onOpenSettings: () => void;
-  onOpenAbout: () => void;
-  onOpenGuideline: () => void;
-  onOpenLicense: () => void;
-}) {
+/* ── Dashboard page 0: protection toggle ── */
+function DashTogglePage() {
   const [proxyRunning, setProxyRunning] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -186,17 +180,7 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
   }, [busy, proxyRunning, refresh]);
 
   return (
-    <div className="dashboard">
-      {/* Top bar */}
-      <div className="dash-topbar">
-        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} onLicense={onOpenLicense} />
-        <SetupIcon size={48} />
-        <button type="button" className="dash-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
-          <GearIcon />
-        </button>
-      </div>
-
-      {/* Large toggle */}
+    <div className="dash-toggle-page">
       <div className="dash-toggle-area">
         <button
           type="button"
@@ -211,14 +195,409 @@ function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense
           </span>
         </button>
       </div>
-
-      {/* Status label */}
       {proxyRunning && (
         <div className="dash-status-label">
           <span className="dash-status-dot" />
           Safe Browsing
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Dashboard page 1: protection overview (moved from Settings → General) ── */
+function DashOverviewPage() {
+  const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [proxyOn, setProxyOn] = useState(false);
+  const [stats, setStats] = useState<{ dns_blocks_total: number; dlp_scans_total: number; dlp_blocks_total: number; dns_queries_total: number } | null>(null);
+  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>>([]);
+  const [agentVer, setAgentVer] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [ps, sp, st, ev, status] = await Promise.all([
+        agent.getProxyStatus().catch(() => null),
+        agent.getSystemProxy().catch(() => null),
+        agent.getStats().catch(() => null),
+        agent.getBlockEvents(5).catch(() => []),
+        agent.getStatus().catch(() => null),
+      ]);
+      setProxyOn((ps?.running && sp?.active) ?? false);
+      if (st) setStats(st);
+      setEvents(ev as Array<{ id: number; timestamp: string; host: string; pattern_name: string; event_type: string }>);
+      if (status) setAgentVer(status.version);
+    } catch { /* offline */ }
+  }, []);
+
+  useEffect(() => {
+    void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
+    void refresh();
+    const t = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  const toggleLogin = useCallback(async () => {
+    if (openAtLogin === null || loginBusy) return;
+    setLoginBusy(true);
+    try {
+      const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
+      if (next !== undefined) setOpenAtLogin(next);
+    } finally {
+      setLoginBusy(false);
+    }
+  }, [openAtLogin, loginBusy]);
+
+  const resetStats = useCallback(async () => {
+    setResetting(true);
+    try { await agent.resetStats(); await refresh(); } finally { setResetting(false); }
+  }, [refresh]);
+
+  function timeAgo(ts: string): string {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  return (
+    <div className="dash-inner-page">
+      <div className={`ov-hero ${proxyOn ? 'on' : 'off'}`}>
+        <div className={`ov-hero-status ${proxyOn ? 'on' : 'off'}`}>
+          <span className="ov-hero-dot" />
+          <span className="ov-hero-badge-text">{proxyOn ? 'Protection On' : 'Protection Off'}</span>
+        </div>
+        <SetupIcon size={44} />
+        <div className="ov-hero-title">{proxyOn ? "You're protected" : 'Protection off'}</div>
+        <div className="ov-hero-sub">
+          {proxyOn
+            ? 'Sensitive data is blocked before it leaves this device'
+            : 'Swipe right to the toggle and enable the proxy'}
+        </div>
+      </div>
+
+      <div className="ov-stats-grid">
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dlp_scans_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Prompts scanned</div>
+        </div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dlp_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Secrets blocked</div>
+        </div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dns_blocks_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">Sites blocked</div>
+        </div>
+        <div className="ov-stat">
+          <div className="ov-stat-value">{stats?.dns_queries_total?.toLocaleString() ?? '\u2014'}</div>
+          <div className="ov-stat-label">DNS queries</div>
+        </div>
+      </div>
+
+      {events.length > 0 && (
+        <div className="general-activity">
+          <div className="general-activity-heading">RECENT ACTIVITY</div>
+          {events.map((e) => (
+            <div key={e.id} className="general-activity-row">
+              <div className={`general-activity-dot ${e.event_type}`} />
+              <div className="general-activity-info">
+                <div className="general-activity-name">{e.pattern_name || e.host}</div>
+                <div className="general-activity-meta">{e.host} &middot; {timeAgo(e.timestamp)}</div>
+              </div>
+              <span className="general-activity-badge">Blocked</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {agentVer && <div className="general-agent-info">Agent v{agentVer}</div>}
+
+      <button
+        type="button"
+        className="ov-reset-btn"
+        onClick={() => void resetStats()}
+        disabled={resetting}
+      >
+        <svg className={`ov-reset-icon${resetting ? ' spinning' : ''}`} viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+        {resetting ? 'Resetting…' : 'Reset all counters'}
+      </button>
+
+      <div className="general-toggle-row">
+        <div className="general-toggle-text">
+          <div className="general-toggle-title">Launch at login</div>
+          <div className="general-toggle-desc">Start automatically when you log in</div>
+        </div>
+        {openAtLogin === null ? (
+          <span className="general-toggle-loading">&hellip;</span>
+        ) : (
+          <button
+            type="button"
+            className={`dash-toggle small ${openAtLogin ? 'on' : 'off'}`}
+            aria-pressed={openAtLogin}
+            onClick={() => void toggleLogin()}
+            disabled={loginBusy}
+          >
+            <span className="dash-toggle-track"><span className="dash-toggle-thumb" /></span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Dashboard page 2: block history ── */
+function DashStatsPage() {
+  const [reachable, setReachable] = useState(true);
+  const [events, setEvents] = useState<Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>>([]);
+  const [prefs, setPrefs] = useState<{ block_events_enabled: boolean } | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [ev, pr] = await Promise.all([
+        agent.getBlockEvents(50).catch(() => []),
+        agent.getPreferences().catch(() => null),
+      ]);
+      setReachable(true);
+      setEvents(ev as Array<{ id: number; timestamp: string; event_type: string; host: string; pattern_name: string }>);
+      setPrefs(pr as { block_events_enabled: boolean } | null);
+    } catch {
+      setReachable(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 5000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const clearHistory = useCallback(async () => {
+    setClearing(true);
+    try { await agent.clearBlockEvents(); setEvents([]); } finally { setClearing(false); }
+  }, []);
+
+  function fmtTime(ts: string) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  return (
+    <div className="dash-inner-page">
+      <div className="bh-header">
+        <span className="bh-title">Block History</span>
+        {events.length > 0 && (
+          <button
+            type="button"
+            className="clear-history-btn"
+            onClick={() => void clearHistory()}
+            disabled={clearing || !reachable}
+          >
+            {clearing ? 'Clearing\u2026' : (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg> Clear</>
+            )}
+          </button>
+        )}
+      </div>
+
+      {events.length > 0 && (
+        <div className="bh-count">{events.length} event{events.length !== 1 ? 's' : ''}</div>
+      )}
+
+      {prefs && !prefs.block_events_enabled ? (
+        <div className="bh-empty-state">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bh-empty-icon">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0110 0v4" />
+          </svg>
+          <p className="bh-empty-text">Block history is off</p>
+          <p className="bh-empty-sub">Enable in <strong>Settings &rarr; Privacy</strong> to see what gets blocked.</p>
+        </div>
+      ) : events.length === 0 ? (
+        <div className="bh-empty-state">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bh-empty-icon">
+            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <p className="bh-empty-text">All clear</p>
+          <p className="bh-empty-sub">No block events recorded yet.</p>
+        </div>
+      ) : (
+        <div className="bh-list">
+          {events.map((e) => (
+            <div key={e.id} className="bh-card">
+              <div className="bh-card-header">
+                <span className={`event-badge event-badge-${e.event_type}`}>
+                  {e.event_type === 'dlp' ? 'DLP' : 'Cat'}
+                </span>
+                <span className="bh-pattern">{e.pattern_name || '\u2014'}</span>
+              </div>
+              <div className="bh-card-meta">
+                <span className="bh-host">{e.host}</span>
+                <span className="bh-time">{fmtTime(e.timestamp)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Dashboard: 3-page swipeable main screen ── */
+function Dashboard({ onOpenSettings, onOpenAbout, onOpenGuideline, onOpenLicense }: {
+  onOpenSettings: () => void;
+  onOpenAbout: () => void;
+  onOpenGuideline: () => void;
+  onOpenLicense: () => void;
+}) {
+  const [pageIdx, setPageIdx] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dragDx, setDragDx] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const PAGES = 3;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let start: { x: number; y: number } | null = null;
+    let dragging = false;
+
+    function onMove(e: PointerEvent) {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (!dragging) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          dragging = true;
+          setIsDragging(true);
+        }
+        return;
+      }
+      setDragDx(dx);
+    }
+
+    function onUp(e: PointerEvent) {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (dragging && start && el) {
+        const w = el.offsetWidth;
+        const dx = e.clientX - start.x;
+        setPageIdx((p) => {
+          if (dx < -w * 0.2 && p < 3 - 1) return p + 1;
+          if (dx > w * 0.2 && p > 0) return p - 1;
+          return p;
+        });
+        setDragDx(0);
+        setIsDragging(false);
+        dragging = false;
+      }
+      start = null;
+    }
+
+    function onDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('.swipe-arrow')) return;
+      start = { x: e.clientX, y: e.clientY };
+      dragging = false;
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }
+
+    el.addEventListener('pointerdown', onDown);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
+
+  // translateX % is relative to the track's own width (PAGES \u00d7 container)
+  const basePct = -(pageIdx * 100) / PAGES;
+  const tx = isDragging && dragDx !== 0 ? `calc(${basePct}% + ${dragDx}px)` : `${basePct}%`;
+
+  return (
+    <div className="dashboard">
+      <div className="dash-topbar" style={{ padding: '18px 20px 0' }}>
+        <HamburgerMenu onAbout={onOpenAbout} onGuideline={onOpenGuideline} onLicense={onOpenLicense} />
+        <SetupIcon size={48} />
+        <button type="button" className="dash-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
+          <GearIcon />
+        </button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="dash-swipe-container"
+      >
+        {pageIdx > 0 && (
+          <button type="button" className="swipe-arrow swipe-arrow-left"
+            onClick={() => setPageIdx((p) => p - 1)}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Previous page">
+            <svg className="swipe-ch swipe-ch-a" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+            <svg className="swipe-ch swipe-ch-b" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+            <svg className="swipe-ch swipe-ch-c" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 4 4 12 12 20"/></svg>
+          </button>
+        )}
+        {pageIdx < PAGES - 1 && (
+          <button type="button" className="swipe-arrow swipe-arrow-right"
+            onClick={() => setPageIdx((p) => p + 1)}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Next page">
+            <svg className="swipe-ch swipe-ch-a" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+            <svg className="swipe-ch swipe-ch-b" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+            <svg className="swipe-ch swipe-ch-c" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 4 12 12 4 20"/></svg>
+          </button>
+        )}
+        <div
+          className="dash-swipe-track"
+          style={{
+            width: `${PAGES * 100}%`,
+            transform: `translateX(${tx})`,
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
+          <div className="dash-swipe-page"><DashTogglePage /></div>
+          <div className="dash-swipe-page"><DashOverviewPage /></div>
+          <div className="dash-swipe-page"><DashStatsPage /></div>
+        </div>
+      </div>
+
+      <div className="dash-page-dots">
+        {Array.from({ length: PAGES }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`dash-page-dot ${pageIdx === i ? 'active' : ''}`}
+            onClick={() => setPageIdx(i)}
+            aria-label={`Page ${i + 1}`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -268,7 +647,7 @@ function GridIcon() {
 }
 
 /* ── Settings sub-pages ── */
-type SettingsSubPage = 'menu' | 'general' | 'policy' | 'statistics' | 'overrides' | 'proxy' | 'privacy';
+type SettingsSubPage = 'menu' | 'policy' | 'overrides' | 'proxy' | 'privacy';
 
 /* ── Protection presets ── */
 type ProtectionLevel = 'extra' | 'light' | 'custom';
@@ -445,28 +824,156 @@ function PolicyLevelPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* Statistics sub-page — agent status, counters, and block history */
-function StatisticsPage({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <BackButton onClick={onBack} />
-        <h1 className="settings-title">Statistics</h1>
-      </div>
-      <Status />
-    </div>
-  );
-}
 
-/* Allow / Block overrides sub-page — wraps existing Rules page */
+/* Rules sub-page — clean allow/block domain override management */
 function OverridesPage({ onBack }: { onBack: () => void }) {
+  const [overrides, setOverrides] = useState<{ allow: string[]; block: string[] } | null>(null);
+  const [domain, setDomain] = useState('');
+  const [list, setList] = useState<'allow' | 'block'>('block');
+  const [tab, setTab] = useState<'block' | 'allow'>('block');
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [showRuleFiles, setShowRuleFiles] = useState(false);
+
+  useEffect(() => {
+    agent.listOverrides().then(setOverrides).catch(() => {});
+  }, []);
+
+  const add = useCallback(async () => {
+    const d = domain.trim().toLowerCase();
+    if (!d) return;
+    setAdding(true);
+    try {
+      const next = await agent.addOverride(d, list);
+      setOverrides(next);
+      setDomain('');
+      setTab(list);
+      setFeedback({ kind: 'success', message: `Added ${d} to ${list} list` });
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    } finally {
+      setAdding(false);
+    }
+  }, [domain, list]);
+
+  const remove = useCallback(async (d: string) => {
+    try {
+      const next = await agent.removeOverride(d);
+      setOverrides(next);
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    }
+  }, []);
+
+  const current = overrides ? (tab === 'allow' ? overrides.allow : overrides.block) : [];
+
   return (
     <div className="settings-page">
       <div className="settings-header">
         <BackButton onClick={onBack} />
-        <h1 className="settings-title">Allow / Block Sites</h1>
+        <h1 className="settings-title">Rules</h1>
       </div>
-      <Rules />
+      <p className="settings-subtitle">Allow or block individual domains</p>
+
+      {feedback && (
+        <div className={`feedback feedback-${feedback.kind}`} role="status">{feedback.message}</div>
+      )}
+
+      {/* Add domain */}
+      <div className="rules-add-form">
+        <input
+          type="text"
+          className="rules-domain-input"
+          placeholder="example.com"
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void add(); }}
+          aria-label="Domain to add"
+        />
+        <div className="rules-list-toggle">
+          <button
+            type="button"
+            className={`rules-list-btn ${list === 'block' ? 'block-active' : ''}`}
+            onClick={() => setList('block')}
+          >Block</button>
+          <button
+            type="button"
+            className={`rules-list-btn ${list === 'allow' ? 'allow-active' : ''}`}
+            onClick={() => setList('allow')}
+          >Allow</button>
+        </div>
+        <button
+          type="button"
+          className="rules-add-btn"
+          onClick={() => void add()}
+          disabled={adding || !domain.trim()}
+        >
+          {adding ? '…' : 'Add'}
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="rules-tabs">
+        <button
+          type="button"
+          className={`rules-tab ${tab === 'block' ? 'active' : ''}`}
+          onClick={() => setTab('block')}
+        >
+          Blocked{overrides ? ` (${overrides.block.length})` : ''}
+        </button>
+        <button
+          type="button"
+          className={`rules-tab ${tab === 'allow' ? 'active' : ''}`}
+          onClick={() => setTab('allow')}
+        >
+          Allowed{overrides ? ` (${overrides.allow.length})` : ''}
+        </button>
+      </div>
+
+      {/* Domain list */}
+      <div className="rules-list">
+        {overrides === null ? (
+          <div className="rules-empty">Loading…</div>
+        ) : current.length === 0 ? (
+          <div className="rules-empty">
+            No {tab === 'block' ? 'blocked' : 'allowed'} domains yet.
+            Add one above to override the default rules.
+          </div>
+        ) : (
+          current.map((d) => (
+            <div key={d} className={`rules-domain-row ${tab}`}>
+              <div className={`rules-domain-dot ${tab}`} />
+              <span className="rules-domain-name">{d}</span>
+              <button
+                type="button"
+                className="rules-remove-btn"
+                onClick={() => void remove(d)}
+                aria-label={`Remove ${d}`}
+              >×</button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Rule files — collapsible section */}
+      <div className="rules-files-section">
+        <button
+          type="button"
+          className="rules-files-toggle"
+          onClick={() => setShowRuleFiles((v) => !v)}
+        >
+          <span className="rules-files-heading">RULE FILES</span>
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={`rules-files-chevron ${showRuleFiles ? 'open' : ''}`}
+            aria-hidden="true"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+        {showRuleFiles && <Rules />}
+      </div>
     </div>
   );
 }
@@ -589,81 +1096,10 @@ function ProxySettingsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* ── Settings page — menu list matching the design ── */
-/* ── General settings sub-page (startup toggle, etc.) ── */
-function GeneralPage({ onBack }: { onBack: () => void }) {
-  const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    void window.secureEdge?.getOpenAtLogin?.().then((v) => setOpenAtLogin(v));
-  }, []);
-
-  const toggle = useCallback(async () => {
-    if (openAtLogin === null || busy) return;
-    setBusy(true);
-    try {
-      const next = await window.secureEdge?.setOpenAtLogin?.(!openAtLogin);
-      if (next !== undefined) setOpenAtLogin(next);
-    } finally {
-      setBusy(false);
-    }
-  }, [openAtLogin, busy]);
-
-  return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <BackButton onClick={onBack} label="Back to settings" />
-        <h1 className="settings-title">General</h1>
-      </div>
-      <div className="page" style={{ paddingTop: 0 }}>
-        <section className="privacy-section">
-          <div className="privacy-row">
-            <div className="privacy-row-text">
-              <div className="privacy-row-title">Run at startup</div>
-              <div className="privacy-row-desc">
-                Automatically launch Prompt Gate when you log in so you are
-                always protected. Works on macOS, Windows, and Linux.
-              </div>
-            </div>
-            <div className="privacy-row-control">
-              {openAtLogin === null ? (
-                <span style={{ color: '#888', fontSize: '0.85rem' }}>Loading…</span>
-              ) : openAtLogin ? (
-                <button
-                  type="button"
-                  className="privacy-toggle privacy-toggle-on"
-                  onClick={() => void toggle()}
-                  disabled={busy}
-                  aria-pressed="true"
-                >
-                  On
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="privacy-toggle privacy-toggle-off"
-                  onClick={() => void toggle()}
-                  disabled={busy}
-                  aria-pressed="false"
-                >
-                  Off
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
 function SettingsPage({ onBack }: { onBack: () => void }) {
   const [sub, setSub] = useState<SettingsSubPage>('menu');
 
-  if (sub === 'general') return <GeneralPage onBack={() => setSub('menu')} />;
   if (sub === 'policy') return <PolicyLevelPage onBack={() => setSub('menu')} />;
-  if (sub === 'statistics') return <StatisticsPage onBack={() => setSub('menu')} />;
   if (sub === 'overrides') return <OverridesPage onBack={() => setSub('menu')} />;
   if (sub === 'proxy') return <ProxySettingsPage onBack={() => setSub('menu')} />;
   if (sub === 'privacy') return <PrivacyPage onBack={() => setSub('menu')} />;
@@ -677,37 +1113,14 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
       <p className="settings-subtitle">Follow steps below to continue set up.</p>
 
       <div className="settings-menu">
-        <button type="button" className="settings-menu-item" onClick={() => setSub('general')}>
-          <span className="settings-menu-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-            </svg>
-          </span>
-          <span className="settings-menu-label">General</span>
-          <ChevronRight />
-        </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('policy')}>
           <span className="settings-menu-icon"><ShieldIcon /></span>
           <span className="settings-menu-label">Policy Level</span>
           <ChevronRight />
         </button>
-        <button type="button" className="settings-menu-item" onClick={() => setSub('statistics')}>
-          <span className="settings-menu-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-          </span>
-          <span className="settings-menu-label">Statistics</span>
-          <ChevronRight />
-        </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('overrides')}>
           <span className="settings-menu-icon"><FilterIcon /></span>
-          <span className="settings-menu-label">Allow / Block specific sites</span>
+          <span className="settings-menu-label">Rules</span>
           <ChevronRight />
         </button>
         <button type="button" className="settings-menu-item" onClick={() => setSub('proxy')}>
@@ -912,9 +1325,10 @@ function App() {
 
   useEffect(() => {
     const off = window.secureEdge?.onNavigate?.((v) => {
-      if (v === 'status' || v === 'settings' || v === 'proxy' || v === 'rules') {
-        setPage('settings');
-      }
+      // 'proxy' navigates to Settings so the user can reach Proxy Settings.
+      // 'status' / 'settings' / anything else: just raise the window and
+      // restore whatever page the user had open last — no forced navigation.
+      if (v === 'proxy') setPage('settings');
     });
     const MAX_TOASTS = 3;
     const offEvent = window.secureEdge?.onEvent?.((evt) => {

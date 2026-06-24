@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,6 +19,17 @@ const (
 	caCommonName   = "Prompt Gate Local CA"
 	pfAnchor       = "com.prompt-gate"
 	pfRulesFile    = "/tmp/prompt-gate-pf.conf"
+)
+
+const (
+	// watchdogInterval is how often the fail-open watchdog checks that
+	// the loopback proxy we point system traffic at is actually alive.
+	watchdogInterval = 10 * time.Second
+	// watchdogStrikes is how many consecutive dead checks before we
+	// restore the network. ~30s of confirmed-dead at 10s spacing — long
+	// enough to ride out an agent restart, short enough that the user
+	// isn't stranded offline.
+	watchdogStrikes = 3
 )
 
 func run() {
@@ -32,6 +44,13 @@ func run() {
 	}
 	defer ln.Close()
 
+	// Fail-open watchdog. The helper is a root LaunchDaemon with
+	// KeepAlive, so it outlives a crash of the agent OR the Electron app
+	// — making it the only component that can rescue the user when the
+	// system proxy is left pointing at a dead 127.0.0.1:8443 (TCP 443
+	// black-holed AND QUIC firewall-blocked = no internet, no recovery).
+	go watchdog()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -39,6 +58,114 @@ func run() {
 		}
 		go handle(conn)
 	}
+}
+
+// watchdog periodically verifies that, whenever the system secure-web
+// proxy points at a loopback address (our MITM proxy), something is
+// actually listening there. If the listener is gone for watchdogStrikes
+// consecutive checks, it restores the network (fail-open) so the user
+// regains connectivity even with the agent and tray both dead. It keys
+// off live system state, so it works correctly across its own restarts.
+func watchdog() {
+	strikes := 0
+	for {
+		time.Sleep(watchdogInterval)
+		// Guard each tick: a panic (e.g. a quirky networksetup output)
+		// must not silently kill the watchdog — the one thing keeping the
+		// user from being stranded offline.
+		strikes = watchdogTick(strikes)
+	}
+}
+
+// watchdogTick performs one watchdog check and returns the updated strike
+// count. Recovers from any panic so the loop survives.
+func watchdogTick(strikes int) (next int) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "proxy-helper: watchdog tick recovered from panic: %v\n", r)
+			next = 0
+		}
+	}()
+	addr, ok := currentLoopbackProxyAddr()
+	if !ok {
+		return 0
+	}
+	if proxyListening(addr) {
+		return 0
+	}
+	strikes++
+	if strikes < watchdogStrikes {
+		return strikes
+	}
+	fmt.Fprintf(os.Stderr,
+		"proxy-helper: watchdog — system proxy %s is set but not listening; "+
+			"restoring network (fail-open)\n", addr)
+	if r := runRemoveProxy(); strings.HasPrefix(r, "ERR") {
+		fmt.Fprintf(os.Stderr, "proxy-helper: watchdog restore failed: %s\n", r)
+		// Keep the strikes maxed so we retry on the next tick.
+		return strikes
+	}
+	return 0
+}
+
+// currentLoopbackProxyAddr returns the host:port of an ENABLED secure-web
+// proxy that points at a loopback address, scanning active network
+// services. The second return is false when no such proxy is set (so the
+// watchdog stays idle when protection is off or a non-loopback proxy is
+// configured by the user / their org).
+func currentLoopbackProxyAddr() (string, bool) {
+	svcs, err := listServices()
+	if err != nil {
+		return "", false
+	}
+	for _, svc := range svcs {
+		out, err := exec.Command("/usr/sbin/networksetup", "-getsecurewebproxy", svc).Output()
+		if err != nil {
+			continue
+		}
+		server, port, enabled := parseSecureWebProxy(out)
+		if enabled && isLoopback(server) && port != "" {
+			return net.JoinHostPort(server, port), true
+		}
+	}
+	return "", false
+}
+
+// parseSecureWebProxy extracts the Server / Port / Enabled fields from the
+// output of `networksetup -getsecurewebproxy <service>`.
+func parseSecureWebProxy(out []byte) (server, port string, enabled bool) {
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "Enabled:"):
+			enabled = strings.Contains(line, "Yes")
+		case strings.HasPrefix(line, "Server:"):
+			server = strings.TrimSpace(strings.TrimPrefix(line, "Server:"))
+		case strings.HasPrefix(line, "Port:"):
+			port = strings.TrimSpace(strings.TrimPrefix(line, "Port:"))
+		}
+	}
+	return server, port, enabled
+}
+
+// isLoopback reports whether host is a loopback address — the marker that
+// a proxy is ours (or another local MITM), never a remote corporate proxy.
+func isLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// proxyListening reports whether a TCP listener is accepting on addr.
+func proxyListening(addr string) bool {
+	c, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
 }
 
 func handle(conn net.Conn) {

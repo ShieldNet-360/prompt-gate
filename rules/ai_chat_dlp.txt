@@ -1,8 +1,34 @@
 # AI tools requiring DLP inspection (Tier 2).
-# These are forwarded; DLP inspection is applied downstream.
+# These are forwarded; DLP inspection is applied downstream — including
+# file uploads (multipart, gzipped, base64), not just chat prompts.
+# Entries are domain suffixes (leading dot = match host and subdomains),
+# covering both the browser app and the CLI/SDK/API endpoints, plus the
+# separate storage/upload hosts each web app PUTs files to.
+
+# ChatGPT / OpenAI / Codex (web, API, CLI)
 .chat.openai.com
 .chatgpt.com
 .api.openai.com
+.openai.com
+.oaiusercontent.com
+
+# Claude / Anthropic (web, API, claude CLI)
 .claude.ai
+.api.anthropic.com
+
+# Gemini / Google (web, API/SDK, web upload push host)
 .gemini.google.com
+.generativelanguage.googleapis.com
+.clients6.google.com
+
+# Grok / xAI (web, API)
+.grok.com
+.api.x.ai
+
+# Cursor (codebase indexing / chat — NOTE: payloads are client-side
+# encrypted, so DLP can monitor traffic but cannot inspect content)
+.cursor.sh
+.cursor.com
+
+# GitHub Copilot
 .copilot.microsoft.com

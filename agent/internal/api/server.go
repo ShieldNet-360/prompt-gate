@@ -147,6 +147,11 @@ type ProxyController interface {
 	Enable(ctx context.Context) (caCertPath string, err error)
 	Disable(ctx context.Context, removeCA bool) error
 	Status() ProxyStatus
+	// SetListenAddr updates the proxy listen address at runtime.
+	// If the listener is running it is stopped and restarted on the
+	// new address. If stopped only the address is recorded for the
+	// next Enable call.
+	SetListenAddr(ctx context.Context, addr string) error
 	// Upstream CA bundle management (proxy_upstream_ca_bundle):
 	SetUpstreamCA(pem []byte) (subjects []string, err error)
 	ClearUpstreamCA() error
@@ -168,6 +173,21 @@ type TamperStatus struct {
 // return 503.
 type TamperReporter interface {
 	Status() TamperStatus
+}
+
+// AlertStatus is the body returned by GET /api/alerter/status —
+// aggregate, counters-only.
+type AlertStatus struct {
+	Enabled         bool  `json:"enabled"`
+	ThresholdBlocks int64 `json:"threshold_blocks"`
+	LastFiredAt     int64 `json:"last_fired_at"`
+	FiresTotal      int64 `json:"fires_total"`
+}
+
+// AlertReporter is the subset of alerter.Alerter the API needs. Wired
+// in SetAlertReporter; nil means /api/alerter/status returns 503.
+type AlertReporter interface {
+	AlertStatus() AlertStatus
 }
 
 // RuleOverride is the subset of rules.OverrideStore the API needs.
@@ -207,24 +227,26 @@ type AgentSelfUpdater interface {
 
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store        *store.Store
-	Policy       PolicyEngine
-	Stats        StatsView
-	DLP          DLPScanner
-	RuleUpdater  RuleUpdater
-	Proxy        ProxyController
-	Profile      *profile.Holder
-	ProfileApply profile.PolicyStore
-	Tamper       TamperReporter
-	Rules        RuleOverride
-	AgentUpdate  AgentSelfUpdater
-	Canaries     CanaryRegistrar
-	Notifier     *notify.Notifier
-	RuleFiles    []string // optional paths whose mtimes feed /api/status
-	startedAt    time.Time
-	scanLimiter  *rateLimiter
-	bearerToken  string
-	once         sync.Once
+	Store         *store.Store
+	Policy        PolicyEngine
+	Stats         StatsView
+	DLP           DLPScanner
+	RuleUpdater   RuleUpdater
+	Proxy         ProxyController
+	Profile       *profile.Holder
+	ProfileApply  profile.PolicyStore
+	Tamper        TamperReporter
+	Alert         AlertReporter
+	Canaries      CanaryRegistrar
+	Rules         RuleOverride
+	AgentUpdate   AgentSelfUpdater
+	Notifier      *notify.Notifier
+	RuleFiles     []string                      // optional paths whose mtimes feed /api/status
+	ConfigPatcher func(listenAddr string) error // optional: persists proxy addr to YAML
+	startedAt     time.Time
+	scanLimiter   *rateLimiter
+	bearerToken   string
+	once          sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -296,6 +318,12 @@ func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
 // Optional; when nil the /api/proxy/* endpoints return 503.
 func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
 
+// SetConfigPatcher registers a callback that persists a new proxy
+// listen address to the YAML config file after an in-memory change.
+func (s *Server) SetConfigPatcher(fn func(listenAddr string) error) {
+	s.ConfigPatcher = fn
+}
+
 // SetProfile wires a profile holder into the server. When the
 // holder's current profile reports Managed=true, policy mutation
 // endpoints (PUT /api/policies/:category, PUT /api/dlp/config) return
@@ -307,6 +335,10 @@ func (s *Server) SetProfile(h *profile.Holder, ps profile.PolicyStore) {
 
 // SetTamperReporter wires the tamper detector into the server.
 func (s *Server) SetTamperReporter(t TamperReporter) { s.Tamper = t }
+
+// SetAlertReporter wires the webhook alerter into the server. Optional;
+// nil means /api/alerter/status returns 503.
+func (s *Server) SetAlertReporter(a AlertReporter) { s.Alert = a }
 
 // SetRuleOverride wires the admin allow/block override store into
 // the server.
@@ -322,6 +354,7 @@ func (s *Server) SetAgentUpdater(u AgentSelfUpdater) { s.AgentUpdate = u }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/status", s.handleStatus)
+	mux.HandleFunc("/api/attestation", s.handleAttestation)
 	mux.HandleFunc("/api/policies", s.handlePoliciesCollection)
 	mux.HandleFunc("/api/policies/", s.handlePolicyItem)
 	mux.HandleFunc("/api/stats", s.handleStats)
@@ -333,10 +366,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/proxy/enable", s.handleProxyEnable)
 	mux.HandleFunc("/api/proxy/disable", s.handleProxyDisable)
 	mux.HandleFunc("/api/proxy/status", s.handleProxyStatus)
+	mux.HandleFunc("/api/proxy/listen", s.handleProxyListen)
 	mux.HandleFunc("/api/proxy/upstream-ca", s.handleProxyUpstreamCA)
 	mux.HandleFunc("/api/profile", s.handleProfileGet)
 	mux.HandleFunc("/api/profile/import", s.handleProfileImport)
 	mux.HandleFunc("/api/tamper/status", s.handleTamperStatus)
+	mux.HandleFunc("/api/alerter/status", s.handleAlertStatus)
 	mux.HandleFunc("/api/stats/export", s.handleStatsExport)
 	mux.HandleFunc("/api/rules/files", s.handleRuleFiles)
 	mux.HandleFunc("/api/rules/files/", s.handleRuleFileItem)

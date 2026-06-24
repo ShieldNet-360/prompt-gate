@@ -213,7 +213,7 @@ jobs:
         run: |
           mkdir -p release
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
-            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' \
+            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
             -o -name '*.zip' \
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/

@@ -87,6 +87,82 @@ func LoadFromURL(ctx context.Context, client *http.Client, rawURL string) (*Prof
 	return Parse(raw)
 }
 
+// FetchResult carries a conditional fetch outcome. When Changed is
+// false the remote returned 304 Not Modified and Profile is nil; ETag
+// and LastModified echo back the validators to reuse on the next poll.
+type FetchResult struct {
+	Profile      *Profile
+	ETag         string
+	LastModified string
+	Changed      bool
+}
+
+// LoadFromURLConditional fetches the profile with HTTP conditional
+// headers (If-None-Match / If-Modified-Since). On 304 it returns
+// Changed=false and a nil Profile so the caller can keep the active
+// profile untouched — making steady-state polling a zero-work no-op.
+// It applies the same scheme check, SSRF guard, size cap, and guarded
+// client as LoadFromURL.
+func LoadFromURLConditional(ctx context.Context, client *http.Client, rawURL, etag, lastModified string) (FetchResult, error) {
+	if strings.TrimSpace(rawURL) == "" {
+		return FetchResult{}, errors.New("profile: url is empty")
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("profile: parse url %q: %w", rawURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return FetchResult{}, fmt.Errorf("profile: url scheme %q is not http(s)", u.Scheme)
+	}
+	if err := rejectPrivateHost(u.Hostname()); err != nil {
+		return FetchResult{}, err
+	}
+	if client == nil {
+		client = newGuardedClient()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("profile: build request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
+	if lastModified != "" {
+		req.Header.Set("If-Modified-Since", lastModified)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("profile: GET %q: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotModified {
+		return FetchResult{ETag: etag, LastModified: lastModified, Changed: false}, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return FetchResult{}, fmt.Errorf("profile: GET %q: status %d", rawURL, resp.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxProfileBytes+1))
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("profile: read body: %w", err)
+	}
+	if len(raw) > maxProfileBytes {
+		return FetchResult{}, fmt.Errorf("profile: response exceeds %d bytes", maxProfileBytes)
+	}
+	p, err := Parse(raw)
+	if err != nil {
+		return FetchResult{}, err
+	}
+	return FetchResult{
+		Profile:      p,
+		ETag:         resp.Header.Get("ETag"),
+		LastModified: resp.Header.Get("Last-Modified"),
+		Changed:      true,
+	}, nil
+}
+
 // rejectPrivateHost resolves host and returns an error if any resolved
 // IP falls in a private, loopback, or link-local range (SE-01).
 //
