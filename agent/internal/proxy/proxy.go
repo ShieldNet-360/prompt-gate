@@ -735,85 +735,60 @@ func deniedResponse(req *http.Request, hostname string) *http.Response {
 	return resp
 }
 
-func deniedHTML(host string) string {
-	host = html.EscapeString(host)
+// blockRow is one label/value line in a block page's detail box. Value
+// must already be HTML-escaped when it carries user-controlled input.
+type blockRow struct {
+	Label string
+	Value string
+	Tag   bool // render Value as a red pill instead of plain text
+}
+
+// blockPage renders the shared Prompt Gate interstitial used for both
+// the DNS/category "Site Blocked" page and the DLP "Request Blocked"
+// page — identical layout, differing only in title, icon colour/glyph,
+// heading, subtitle, and detail rows.
+func blockPage(title, iconColor, iconGlyph, heading, subtitle string, rows []blockRow) string {
+	var detail strings.Builder
+	for _, r := range rows {
+		value := `<span class="detail-value">` + r.Value + `</span>`
+		if r.Tag {
+			value = `<span class="tag">` + r.Value + `</span>`
+		}
+		detail.WriteString(`
+    <div class="detail-row">
+      <span class="detail-label">` + r.Label + `</span>
+      ` + value + `
+    </div>`)
+	}
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Site Blocked — Prompt Gate</title>
+<title>` + title + `</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  .card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 16px;
-    max-width: 520px;
-    width: 100%;
-    padding: 2.5rem;
-    text-align: center;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-  }
-  .icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.5rem;
-    background: #b91c1c;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 520px; width: 100%; padding: 2.5rem; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.4); }
+  .icon { width: 64px; height: 64px; margin: 0 auto 1.5rem; background: ` + iconColor + `; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; }
   h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; }
   .subtitle { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem; }
-  .detail {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: left;
-  }
+  .detail { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; text-align: left; }
   .detail-row { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; }
   .detail-label { color: #64748b; }
   .detail-value { color: #f1f5f9; font-weight: 500; }
-  .btn {
-    display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.5rem;
-    background: #3b82f6; color: #fff; border: none; border-radius: 8px;
-    font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none;
-  }
+  .tag { display: inline-block; background: #7f1d1d; color: #fca5a5; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .btn { display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.5rem; background: #3b82f6; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none; }
   .btn:hover { background: #2563eb; }
   .footer { margin-top: 1.5rem; font-size: 0.75rem; color: #475569; }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="icon">&#x1F6AB;</div>
-  <h1>Site Blocked</h1>
-  <p class="subtitle">
-    Access to this site has been restricted by your organization's policy.
-  </p>
-  <div class="detail">
-    <div class="detail-row">
-      <span class="detail-label">Destination</span>
-      <span class="detail-value">` + host + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Action</span>
-      <span class="detail-value">Denied by category policy</span>
-    </div>
+  <div class="icon">` + iconGlyph + `</div>
+  <h1>` + heading + `</h1>
+  <p class="subtitle">` + subtitle + `</p>
+  <div class="detail">` + detail.String() + `
   </div>
   <p class="subtitle">
     If you believe this is a mistake, contact your IT administrator.
@@ -823,6 +798,17 @@ func deniedHTML(host string) string {
 </div>
 </body>
 </html>`
+}
+
+func deniedHTML(host string) string {
+	return blockPage(
+		"Site Blocked — Prompt Gate", "#b91c1c", "&#x1F6AB;", "Site Blocked",
+		"Access to this site has been restricted by your organization's policy.",
+		[]blockRow{
+			{Label: "Destination", Value: html.EscapeString(host)},
+			{Label: "Action", Value: "Denied by category policy"},
+		},
+	)
 }
 
 // blockedResponse builds the HTTP 451 reply with an HTML block page
@@ -882,137 +868,15 @@ func setBlockCORS(h http.Header, req *http.Request) {
 }
 
 func blockedHTML(patternName, host string) string {
-	patternName = html.EscapeString(patternName)
-	host = html.EscapeString(host)
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blocked by Prompt Gate</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  .card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 16px;
-    max-width: 520px;
-    width: 100%;
-    padding: 2.5rem;
-    text-align: center;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-  }
-  .icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.5rem;
-    background: #dc2626;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #f8fafc;
-    margin-bottom: 0.75rem;
-  }
-  .subtitle {
-    color: #94a3b8;
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
-  }
-  .detail {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: left;
-  }
-  .detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.35rem 0;
-    font-size: 0.85rem;
-  }
-  .detail-label { color: #64748b; }
-  .detail-value { color: #f1f5f9; font-weight: 500; }
-  .tag {
-    display: inline-block;
-    background: #7f1d1d;
-    color: #fca5a5;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .btn {
-    display: inline-block;
-    margin-top: 1.25rem;
-    padding: 0.6rem 1.5rem;
-    background: #3b82f6;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-  }
-  .btn:hover { background: #2563eb; }
-  .footer {
-    margin-top: 1.5rem;
-    font-size: 0.75rem;
-    color: #475569;
-  }
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="icon">&#x1F6E1;</div>
-  <h1>Request Blocked</h1>
-  <p class="subtitle">
-    Prompt Gate detected sensitive data in your request and blocked it
-    to protect your organization.
-  </p>
-  <div class="detail">
-    <div class="detail-row">
-      <span class="detail-label">Policy</span>
-      <span class="tag">` + patternName + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Destination</span>
-      <span class="detail-value">` + host + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Action</span>
-      <span class="detail-value">Blocked</span>
-    </div>
-  </div>
-  <p class="subtitle">
-    If you believe this is a mistake, contact your IT administrator.
-  </p>
-  <a class="btn" href="javascript:history.back()">Go Back</a>
-  <div class="footer">Secured by Prompt Gate</div>
-</div>
-</body>
-</html>`
+	return blockPage(
+		"Blocked by Prompt Gate", "#dc2626", "&#x1F6E1;", "Request Blocked",
+		"Prompt Gate detected sensitive data in your request and blocked it to protect your organization.",
+		[]blockRow{
+			{Label: "Policy", Value: html.EscapeString(patternName), Tag: true},
+			{Label: "Destination", Value: html.EscapeString(host)},
+			{Label: "Action", Value: "Blocked"},
+		},
+	)
 }
 
 func badGateway(req *http.Request) *http.Response {
