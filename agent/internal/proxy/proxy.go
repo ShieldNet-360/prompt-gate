@@ -254,8 +254,13 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			return req, nil
 		}
 
-		scanText := decodeScanBody(req, body)
-		result := s.dlp.Scan(req.Context(), scanText)
+		// decodeScanBody + Scan run over UNTRUSTED upload bytes
+		// (gzip/deflate, multipart, base64). A panic in that parsing must
+		// never crash the agent — that would black-hole every user's
+		// traffic (the failure mode this guard exists to prevent). On
+		// panic we fail OPEN: forward the request unscanned and log,
+		// consistent with the watchdog's fail-open posture.
+		result := scanBodySafely(s, req, body)
 		// Wipe the raw body as soon as the scan completes. The DLP
 		// pipeline copies any matched ranges into ScanResult fields
 		// (just the pattern name) before returning, so the request
@@ -598,6 +603,22 @@ func combineReaders(parts ...[]byte) io.Reader {
 		readers = append(readers, strings.NewReader(bytesToString(p)))
 	}
 	return io.MultiReader(readers...)
+}
+
+// scanBodySafely decodes and DLP-scans an upload body, recovering from
+// any panic in the untrusted-input parsing (gzip/deflate, multipart,
+// base64) so a malformed payload can never crash the agent. A crash here
+// would take down the proxy and black-hole every user's traffic — the
+// exact failure this hardening prevents. On panic it fails OPEN: returns
+// a non-blocked result so the request is forwarded unscanned.
+func scanBodySafely(s *Server, req *http.Request, body []byte) (result dlp.ScanResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = dlp.ScanResult{Blocked: false}
+			fmt.Fprintf(os.Stderr, "proxy: recovered from scan panic (failing open): %v\n", r)
+		}
+	}()
+	return s.dlp.Scan(req.Context(), decodeScanBody(req, body))
 }
 
 // decodeScanBody converts the raw request body bytes into a string
