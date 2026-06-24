@@ -47,9 +47,17 @@ func shQuote(s string) string {
 // the proxy across N network services cost N×2+ prompts.
 func runWithAdmin(label, script string) error {
 	// Escape for embedding inside an AppleScript double-quoted literal.
-	esc := strings.ReplaceAll(script, `\`, `\\`)
-	esc = strings.ReplaceAll(esc, `"`, `\"`)
-	apple := fmt.Sprintf(`do shell script "%s" with administrator privileges`, esc)
+	esc := func(s string) string {
+		s = strings.ReplaceAll(s, `\`, `\\`)
+		return strings.ReplaceAll(s, `"`, `\"`)
+	}
+	// Show a self-explanatory message in the macOS auth dialog. Without a
+	// `with prompt` clause the system shows the bare "osascript wants to
+	// make changes", leaving the user with no idea what they're approving.
+	// The prompt names the app and the specific action (`label`).
+	prompt := "Prompt Gate needs your administrator password to " + label + "."
+	apple := fmt.Sprintf(`do shell script "%s" with prompt "%s" with administrator privileges`,
+		esc(script), esc(prompt))
 	if out, err := exec.Command("osascript", "-e", apple).CombinedOutput(); err != nil {
 		return fmt.Errorf("sysconf: %s (admin): %s (%w)", label, strings.TrimSpace(string(out)), err)
 	}
@@ -64,7 +72,7 @@ func applyProxy(host string, port int) error {
 // daemon is running it sends the command over the Unix socket (zero prompts).
 // Otherwise it falls back to the osascript admin-batch path (one prompt).
 func applyProxyWithCA(host string, port int, caPath string) error {
-	if helperAvailable() {
+	if ensureHelperReady() {
 		// Always use APPLY_PROXY (without CA). CA trust is handled
 		// separately by installCA() → login keychain + user trust domain.
 		return helperCmd(fmt.Sprintf("APPLY_PROXY %s %d", host, port))
@@ -89,7 +97,7 @@ func applyProxyWithCA(host string, port int, caPath string) error {
 		fmt.Sprintf("/sbin/pfctl -a %s -f %s", shQuote(pfAnchor), shQuote(pfRulesFile)),
 		"/sbin/pfctl -e 2>/dev/null || true",
 	)
-	return runWithAdmin("enable proxy", strings.Join(cmds, " && "))
+	return runWithAdmin("turn on network protection (route HTTPS through the local filter)", strings.Join(cmds, " && "))
 }
 
 // caTrusted reports whether our CA is present in any keychain.
@@ -121,7 +129,7 @@ func restoreProxy() error {
 		fmt.Sprintf("/sbin/pfctl -a %s -F all 2>/dev/null || true", shQuote(pfAnchor)),
 		fmt.Sprintf("/bin/rm -f %s", shQuote(pfRulesFile)),
 	)
-	return runWithAdmin("disable proxy", strings.Join(cmds, " && "))
+	return runWithAdmin("turn off network protection and restore your network settings", strings.Join(cmds, " && "))
 }
 
 func applyDNS(dnsIP string) error {
@@ -137,7 +145,7 @@ func applyDNS(dnsIP string) error {
 	for _, svc := range svcs {
 		cmds = append(cmds, fmt.Sprintf("/usr/sbin/networksetup -setdnsservers %s %s", shQuote(svc), ip))
 	}
-	return runWithAdmin("apply DNS", strings.Join(cmds, " && "))
+	return runWithAdmin("apply DNS filtering", strings.Join(cmds, " && "))
 }
 
 func restoreDNS() error {
@@ -152,7 +160,7 @@ func restoreDNS() error {
 	for _, svc := range svcs {
 		cmds = append(cmds, fmt.Sprintf("/usr/sbin/networksetup -setdnsservers %s Empty", shQuote(svc)))
 	}
-	return runWithAdmin("restore DNS", strings.Join(cmds, " && "))
+	return runWithAdmin("restore your DNS settings", strings.Join(cmds, " && "))
 }
 
 const (
@@ -174,11 +182,11 @@ func loginKeychain() string {
 func installCA(caPath string) error {
 	// Prefer the privileged helper: it trusts the CA in the SYSTEM
 	// keychain as root over the Unix socket — zero password prompts.
-	// This is the common case once the helper is installed, and it
-	// removes the login-keychain trust dialog that would otherwise be a
-	// second prompt on top of the one-time helper install. Fall back to
-	// the login-keychain path below only when no helper is present.
-	if helperAvailable() {
+	// ensureHelperReady installs it on first use, so on a fresh install
+	// this is what collapses the would-be CA-trust prompt into the single
+	// helper-install prompt. Fall back to the login-keychain trust dialog
+	// only when the helper can't be brought up.
+	if ensureHelperReady() {
 		if err := helperCmd("TRUST_CA " + caPath); err == nil {
 			return nil
 		}
@@ -251,7 +259,7 @@ func removeCA(caPath string) error {
 
 	// Clean system keychain — needs admin privileges.
 	if exec.Command("security", "find-certificate", "-c", caCommonName, systemKeychain).Run() == nil {
-		_ = runWithAdmin("remove CA", fmt.Sprintf(
+		_ = runWithAdmin("remove its security certificate", fmt.Sprintf(
 			`/usr/bin/security remove-trusted-cert -d %s 2>/dev/null; `+
 				`/usr/bin/security remove-trusted-cert %s 2>/dev/null; `+
 				`while /usr/bin/security find-certificate -c %s %s >/dev/null 2>&1; do `+
