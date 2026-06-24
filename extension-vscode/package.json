@@ -1,0 +1,47 @@
+{
+  "name": "prompt-gate",
+  "displayName": "Prompt Gate",
+  "description": "On-device DLP — stops secrets reaching AI coding assistants. Scans editor content via the local Prompt Gate agent.",
+  "version": "0.1.0",
+  "publisher": "shieldnet-360",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/ShieldNet-360/prompt-gate" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Linters"],
+  "keywords": ["dlp", "security", "secrets", "ai", "copilot", "cursor"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "promptGate.scanSelection",
+        "title": "Prompt Gate: Scan selection for secrets"
+      }
+    ],
+    "configuration": {
+      "title": "Prompt Gate",
+      "properties": {
+        "promptGate.agentUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:9191",
+          "description": "Base URL of the local Prompt Gate agent."
+        },
+        "promptGate.scanOnEdit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan edits as you type (debounced) and warn on detected secrets."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "typecheck": "tsc -p ./ --noEmit",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

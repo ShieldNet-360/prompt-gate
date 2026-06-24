@@ -36,6 +36,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/elazarl/goproxy"
@@ -49,11 +50,26 @@ import (
 // traffic.
 const DefaultListenAddr = "127.0.0.1:8443"
 
-// maxScanBytes mirrors the cap on POST /api/dlp/scan. Larger request
-// bodies are forwarded verbatim and counted, but only the first
-// maxScanBytes go through the DLP pipeline so a multi-MB upload
-// can't blow up agent memory.
-const maxScanBytes = 4 * 1024 * 1024
+// ErrAddrInUse is returned (wrapped) by ListenAndServe / Enable when the
+// proxy listen address is already bound by another process — typically a
+// stale or duplicate prompt-gate agent. It is matchable with errors.Is so
+// callers can distinguish a recoverable port conflict (don't kill the whole
+// agent; surface an actionable message) from a genuine startup failure.
+var ErrAddrInUse = errors.New("proxy: listen address already in use")
+
+// maxScanBytes mirrors the cap on POST /api/dlp/scan. It bounds the
+// amount of *extracted text* fed to the DLP pipeline — after a body is
+// decompressed and unwrapped (multipart, base64), at most this many
+// bytes are scanned so a large upload can't blow up agent memory or
+// the regex engine.
+const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
+
+// maxFileBytes bounds the raw request body buffered for inspection.
+// File uploads (multipart, gzipped, base64-encoded) need the whole
+// payload captured before they can be decoded, so this is larger than
+// maxScanBytes. Bodies beyond this size are forwarded verbatim but only
+// the first maxFileBytes are decoded/scanned.
+const maxFileBytes = 40 * 1024 * 1024 // 40 MiB
 
 // PolicyAction is the resolved policy decision for a proxy CONNECT target.
 type PolicyAction string
@@ -238,8 +254,13 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			return req, nil
 		}
 
-		scanText := decodeScanBody(req, body)
-		result := s.dlp.Scan(req.Context(), scanText)
+		// decodeScanBody + Scan run over UNTRUSTED upload bytes
+		// (gzip/deflate, multipart, base64). A panic in that parsing must
+		// never crash the agent — that would black-hole every user's
+		// traffic (the failure mode this guard exists to prevent). On
+		// panic we fail OPEN: forward the request unscanned and log,
+		// consistent with the watchdog's fail-open posture.
+		result := scanBodySafely(s, req, body)
 		// Wipe the raw body as soon as the scan completes. The DLP
 		// pipeline copies any matched ranges into ScanResult fields
 		// (just the pattern name) before returning, so the request
@@ -449,6 +470,13 @@ func (s *Server) ListenAndServe(addr string) error {
 			s.listenOn = ""
 		}
 		s.mu.Unlock()
+		if errors.Is(err, syscall.EADDRINUSE) {
+			// Surface a matchable, actionable error so callers can keep
+			// the rest of the agent alive and tell the user the real
+			// cause (another instance is holding the port) instead of an
+			// opaque "enable proxy failed".
+			return fmt.Errorf("%w: %s (another prompt-gate agent may already be running): %v", ErrAddrInUse, addr, err)
+		}
 		return err
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -486,7 +514,10 @@ func (s *Server) notifyBlock(patternName, host string) {
 	n := s.notifier
 	s.mu.Unlock()
 	if n != nil {
-		go n.NotifyBlock(patternName, host)
+		go func() {
+			defer recoverGoroutine("notifyBlock")
+			n.NotifyBlock(patternName, host)
+		}()
 	}
 }
 
@@ -504,7 +535,21 @@ func (s *Server) recordEvent(ctx context.Context, eventType, host, patternName s
 	if r != nil {
 		// Fire-and-forget in a goroutine so a slow DB write
 		// doesn't block the proxy hot path.
-		go r.RecordBlockEvent(ctx, eventType, host, patternName)
+		go func() {
+			defer recoverGoroutine("recordEvent")
+			_ = r.RecordBlockEvent(ctx, eventType, host, patternName)
+		}()
+	}
+}
+
+// recoverGoroutine is the panic backstop for the proxy's fire-and-forget
+// goroutines. A panic in a bare `go` goroutine terminates the whole
+// process (only net/http recovers its request goroutines), which would
+// black-hole every user's traffic — contain it here. Kept local to match
+// this package's stderr-only logging (no per-request metadata).
+func recoverGoroutine(label string) {
+	if rec := recover(); rec != nil {
+		fmt.Fprintf(os.Stderr, "proxy: recovered from panic in %s goroutine: %v\n", label, rec)
 	}
 }
 
@@ -518,7 +563,7 @@ func (s *Server) bumpStats(ctx context.Context, blocked bool) {
 	_ = s.stats.BumpDLP(ctx, blocked)
 }
 
-// readScanBody drains up to maxScanBytes from req.Body. It returns
+// readScanBody drains up to maxFileBytes from req.Body. It returns
 // the captured bytes plus a replacement io.ReadCloser that the
 // downstream goproxy machinery can use to forward the request body
 // to the upstream server unchanged. Returns nil bytes and a nil
@@ -536,12 +581,12 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 	for {
 		n, err := body.Read(tmp)
 		if n > 0 {
-			if len(buf)+n > maxScanBytes {
+			if len(buf)+n > maxFileBytes {
 				// Trim to the cap and keep reading so the upstream
 				// still receives the entire body — we just don't
 				// scan past the limit. Concatenating the rest into
 				// an io.Reader chain is enough to forward it.
-				keep := maxScanBytes - len(buf)
+				keep := maxFileBytes - len(buf)
 				if keep < 0 {
 					keep = 0
 				}
@@ -577,6 +622,22 @@ func combineReaders(parts ...[]byte) io.Reader {
 	return io.MultiReader(readers...)
 }
 
+// scanBodySafely decodes and DLP-scans an upload body, recovering from
+// any panic in the untrusted-input parsing (gzip/deflate, multipart,
+// base64) so a malformed payload can never crash the agent. A crash here
+// would take down the proxy and black-hole every user's traffic — the
+// exact failure this hardening prevents. On panic it fails OPEN: returns
+// a non-blocked result so the request is forwarded unscanned.
+func scanBodySafely(s *Server, req *http.Request, body []byte) (result dlp.ScanResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = dlp.ScanResult{Blocked: false}
+			fmt.Fprintf(os.Stderr, "proxy: recovered from scan panic (failing open): %v\n", r)
+		}
+	}()
+	return s.dlp.Scan(req.Context(), decodeScanBody(req, body))
+}
+
 // decodeScanBody converts the raw request body bytes into a string
 // suitable for DLP scanning. For application/x-www-form-urlencoded
 // bodies (used by Gemini, ChatGPT, and similar SPA front-ends) the
@@ -584,43 +645,68 @@ func combineReaders(parts ...[]byte) io.Reader {
 // match the actual text. For all other content types the raw bytes
 // are returned as-is.
 func decodeScanBody(req *http.Request, body []byte) string {
-	ct := ""
+	ct, enc := "", ""
 	if req != nil {
 		ct = req.Header.Get("Content-Type")
+		enc = req.Header.Get("Content-Encoding")
 	}
+
+	// Undo transport compression so the scanner sees plaintext. Returns
+	// the original bytes unchanged when the body isn't actually gzip/
+	// deflate compressed.
+	body = decompressForScan(enc, body)
+
+	// multipart/form-data carries file uploads — the OpenAI / xAI /
+	// Anthropic Files APIs and browser attachment posts. Pull out the
+	// filenames and the text content of each part (decoding base64 parts).
+	if strings.Contains(ct, "multipart/form-data") {
+		if text := extractMultipart(ct, body); text != "" {
+			return capScanText(text)
+		}
+		// Boundary parsing failed — fall through to raw handling.
+	}
+
 	raw := bytesToString(body)
-	if !strings.Contains(ct, "application/x-www-form-urlencoded") {
-		return raw
-	}
-	// Parse form values and concatenate all decoded values separated
-	// by newlines. This preserves every user-supplied string while
-	// stripping the key= framing and percent encoding.
-	vals, err := url.ParseQuery(raw)
-	if err != nil {
-		// Fall back to a simple percent-decode of the entire body.
-		if decoded, e := url.QueryUnescape(raw); e == nil {
-			return decoded
-		}
-		return raw
-	}
-	keys := make([]string, 0, len(vals))
-	for k := range vals {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var sb strings.Builder
-	for _, k := range keys {
-		for _, v := range vals[k] {
-			if sb.Len() > 0 {
-				sb.WriteByte('\n')
+
+	// application/x-www-form-urlencoded (Gemini / ChatGPT SPA front-ends):
+	// decode the percent-encoded values so the patterns match real text.
+	if strings.Contains(ct, "application/x-www-form-urlencoded") {
+		vals, err := url.ParseQuery(raw)
+		if err != nil {
+			// Fall back to a simple percent-decode of the entire body.
+			if decoded, e := url.QueryUnescape(raw); e == nil {
+				return capScanText(decoded)
 			}
-			sb.WriteString(v)
+			return capScanText(raw)
 		}
+		keys := make([]string, 0, len(vals))
+		for k := range vals {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var sb strings.Builder
+		for _, k := range keys {
+			for _, v := range vals[k] {
+				if sb.Len() > 0 {
+					sb.WriteByte('\n')
+				}
+				sb.WriteString(v)
+			}
+		}
+		if sb.Len() == 0 {
+			return capScanText(raw)
+		}
+		return capScanText(sb.String())
 	}
-	if sb.Len() == 0 {
-		return raw
+
+	// JSON, plain text, octet-stream, or unknown: scan the raw text plus
+	// any base64-encoded text embedded in it (inline file data such as
+	// {"source":{"data":"<base64>"}}, or a base64-encoded text file sent
+	// as the whole body).
+	if decoded := decodeBase64Text(raw); decoded != "" {
+		return capScanText(raw + "\n" + decoded)
 	}
-	return sb.String()
+	return capScanText(raw)
 }
 
 // deniedResponse builds an HTTP 403 reply for domains blocked by
@@ -643,88 +729,66 @@ func deniedResponse(req *http.Request, hostname string) *http.Response {
 	}
 	resp.Header.Set("Content-Type", "text/html; charset=utf-8")
 	resp.Header.Set("Cache-Control", "no-store")
+	// Let a cross-origin caller read the 403 so the injected overlay can
+	// show the block page (same reasoning as the 451 path).
+	setBlockCORS(resp.Header, req)
 	return resp
 }
 
-func deniedHTML(host string) string {
-	host = html.EscapeString(host)
+// blockRow is one label/value line in a block page's detail box. Value
+// must already be HTML-escaped when it carries user-controlled input.
+type blockRow struct {
+	Label string
+	Value string
+	Tag   bool // render Value as a red pill instead of plain text
+}
+
+// blockPage renders the shared Prompt Gate interstitial used for both
+// the DNS/category "Site Blocked" page and the DLP "Request Blocked"
+// page — identical layout, differing only in title, icon colour/glyph,
+// heading, subtitle, and detail rows.
+func blockPage(title, iconColor, iconGlyph, heading, subtitle string, rows []blockRow) string {
+	var detail strings.Builder
+	for _, r := range rows {
+		value := `<span class="detail-value">` + r.Value + `</span>`
+		if r.Tag {
+			value = `<span class="tag">` + r.Value + `</span>`
+		}
+		detail.WriteString(`
+    <div class="detail-row">
+      <span class="detail-label">` + r.Label + `</span>
+      ` + value + `
+    </div>`)
+	}
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Site Blocked — Prompt Gate</title>
+<title>` + title + `</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  .card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 16px;
-    max-width: 520px;
-    width: 100%;
-    padding: 2.5rem;
-    text-align: center;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-  }
-  .icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.5rem;
-    background: #b91c1c;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 520px; width: 100%; padding: 2.5rem; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.4); }
+  .icon { width: 64px; height: 64px; margin: 0 auto 1.5rem; background: ` + iconColor + `; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; }
   h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; }
   .subtitle { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem; }
-  .detail {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: left;
-  }
+  .detail { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; text-align: left; }
   .detail-row { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; }
   .detail-label { color: #64748b; }
   .detail-value { color: #f1f5f9; font-weight: 500; }
-  .btn {
-    display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.5rem;
-    background: #3b82f6; color: #fff; border: none; border-radius: 8px;
-    font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none;
-  }
+  .tag { display: inline-block; background: #7f1d1d; color: #fca5a5; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .btn { display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.5rem; background: #3b82f6; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none; }
   .btn:hover { background: #2563eb; }
   .footer { margin-top: 1.5rem; font-size: 0.75rem; color: #475569; }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="icon">&#x1F6AB;</div>
-  <h1>Site Blocked</h1>
-  <p class="subtitle">
-    Access to this site has been restricted by your organization's policy.
-  </p>
-  <div class="detail">
-    <div class="detail-row">
-      <span class="detail-label">Destination</span>
-      <span class="detail-value">` + host + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Action</span>
-      <span class="detail-value">Denied by category policy</span>
-    </div>
+  <div class="icon">` + iconGlyph + `</div>
+  <h1>` + heading + `</h1>
+  <p class="subtitle">` + subtitle + `</p>
+  <div class="detail">` + detail.String() + `
   </div>
   <p class="subtitle">
     If you believe this is a mistake, contact your IT administrator.
@@ -734,6 +798,17 @@ func deniedHTML(host string) string {
 </div>
 </body>
 </html>`
+}
+
+func deniedHTML(host string) string {
+	return blockPage(
+		"Site Blocked — Prompt Gate", "#b91c1c", "&#x1F6AB;", "Site Blocked",
+		"Access to this site has been restricted by your organization's policy.",
+		[]blockRow{
+			{Label: "Destination", Value: html.EscapeString(host)},
+			{Label: "Action", Value: "Denied by category policy"},
+		},
+	)
 }
 
 // blockedResponse builds the HTTP 451 reply with an HTML block page
@@ -762,142 +837,46 @@ func blockedResponse(req *http.Request, result dlp.ScanResult) *http.Response {
 	// Expose pattern name so the injected interceptor script can
 	// read it from fetch/XHR responses without parsing the HTML body.
 	resp.Header.Set("X-SE-Pattern", patternName)
-	resp.Header.Set("Access-Control-Expose-Headers", "X-SE-Pattern")
+	// File uploads are almost always a cross-origin fetch/XHR (the page
+	// on chat.example.com POSTing to an upload/API host). Without CORS
+	// headers the browser turns our 451 into an opaque network error, so
+	// the page's JS — and our injected overlay's `status===451` check —
+	// never sees it: the upload silently fails with no block page. Echo
+	// the request Origin so the response is readable to the caller.
+	setBlockCORS(resp.Header, req)
 	return resp
 }
 
+// setBlockCORS makes a block response readable to a cross-origin
+// fetch/XHR caller so the injected interceptor can surface the block
+// page. The Origin is echoed (with credentials) when present — `*` is
+// invalid alongside credentialed requests — falling back to `*` for
+// origin-less callers. Also exposes X-SE-Pattern to scripts.
+func setBlockCORS(h http.Header, req *http.Request) {
+	origin := ""
+	if req != nil {
+		origin = req.Header.Get("Origin")
+	}
+	if origin != "" {
+		h.Set("Access-Control-Allow-Origin", origin)
+		h.Set("Access-Control-Allow-Credentials", "true")
+		h.Add("Vary", "Origin")
+	} else {
+		h.Set("Access-Control-Allow-Origin", "*")
+	}
+	h.Set("Access-Control-Expose-Headers", "X-SE-Pattern")
+}
+
 func blockedHTML(patternName, host string) string {
-	patternName = html.EscapeString(patternName)
-	host = html.EscapeString(host)
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blocked by Prompt Gate</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  .card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 16px;
-    max-width: 520px;
-    width: 100%;
-    padding: 2.5rem;
-    text-align: center;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-  }
-  .icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.5rem;
-    background: #dc2626;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #f8fafc;
-    margin-bottom: 0.75rem;
-  }
-  .subtitle {
-    color: #94a3b8;
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
-  }
-  .detail {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: left;
-  }
-  .detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.35rem 0;
-    font-size: 0.85rem;
-  }
-  .detail-label { color: #64748b; }
-  .detail-value { color: #f1f5f9; font-weight: 500; }
-  .tag {
-    display: inline-block;
-    background: #7f1d1d;
-    color: #fca5a5;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .btn {
-    display: inline-block;
-    margin-top: 1.25rem;
-    padding: 0.6rem 1.5rem;
-    background: #3b82f6;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-  }
-  .btn:hover { background: #2563eb; }
-  .footer {
-    margin-top: 1.5rem;
-    font-size: 0.75rem;
-    color: #475569;
-  }
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="icon">&#x1F6E1;</div>
-  <h1>Request Blocked</h1>
-  <p class="subtitle">
-    Prompt Gate detected sensitive data in your request and blocked it
-    to protect your organization.
-  </p>
-  <div class="detail">
-    <div class="detail-row">
-      <span class="detail-label">Policy</span>
-      <span class="tag">` + patternName + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Destination</span>
-      <span class="detail-value">` + host + `</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Action</span>
-      <span class="detail-value">Blocked</span>
-    </div>
-  </div>
-  <p class="subtitle">
-    If you believe this is a mistake, contact your IT administrator.
-  </p>
-  <a class="btn" href="javascript:history.back()">Go Back</a>
-  <div class="footer">Secured by Prompt Gate</div>
-</div>
-</body>
-</html>`
+	return blockPage(
+		"Blocked by Prompt Gate", "#dc2626", "&#x1F6E1;", "Request Blocked",
+		"Prompt Gate detected sensitive data in your request and blocked it to protect your organization.",
+		[]blockRow{
+			{Label: "Policy", Value: html.EscapeString(patternName), Tag: true},
+			{Label: "Destination", Value: html.EscapeString(host)},
+			{Label: "Action", Value: "Blocked"},
+		},
+	)
 }
 
 func badGateway(req *http.Request) *http.Response {
