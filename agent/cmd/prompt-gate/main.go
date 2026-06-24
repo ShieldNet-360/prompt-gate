@@ -73,6 +73,8 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prompt-gate scan [flags] [file]")
+	fmt.Fprintln(w, "  prompt-gate scan --dir .               recursively scan a directory")
+	fmt.Fprintln(w, "  prompt-gate scan --dir . --sarif       emit SARIF for GitHub Code Scanning")
 	fmt.Fprintln(w, "  prompt-gate scan --staged              scan the git staged diff")
 	fmt.Fprintln(w, "  prompt-gate scan --diff < changes.diff scan a unified diff (added lines)")
 	fmt.Fprintln(w, "  prompt-gate git-hook install|uninstall|status")
@@ -88,6 +90,8 @@ func cmdScan(args []string) int {
 	patternsPath := fs.String("patterns", "", "path to dlp_patterns.json (default: bundled rules/)")
 	exclusionsPath := fs.String("exclusions", "", "path to dlp_exclusions.json (default: bundled rules/)")
 	quiet := fs.Bool("quiet", false, "exit 1 on block, 0 on allow, no output")
+	dir := fs.String("dir", "", "recursively scan all text files under this directory")
+	sarif := fs.Bool("sarif", false, "emit SARIF 2.1.0 (for GitHub Code Scanning)")
 	staged := fs.Bool("staged", false, "scan the git staged diff (runs 'git diff --cached')")
 	diff := fs.Bool("diff", false, "scan a unified diff read from stdin/file (added lines only)")
 	if err := fs.Parse(args); err != nil {
@@ -106,6 +110,10 @@ func cmdScan(args []string) int {
 		return 2
 	}
 
+	// Directory mode: recursively scan a tree (CI / SARIF use-case).
+	if *dir != "" {
+		return scanDir(pipeline, *dir, *sarif, *quiet)
+	}
 	// Diff modes scan only the added lines of changed files, reporting
 	// per-file findings — the natural shape for pre-commit hooks and CI.
 	if *staged {
@@ -140,12 +148,34 @@ func cmdScan(args []string) int {
 		return 0
 	}
 
+	if *sarif {
+		var fr []fileResult
+		if result.Blocked {
+			fr = []fileResult{{File: scanArgName(fs.Arg(0)), Blocked: true, PatternName: result.PatternName, Score: result.Score}}
+		}
+		out, _ := json.MarshalIndent(buildSARIF(fr, version), "", "  ")
+		fmt.Fprintln(stdout, string(out))
+		if result.Blocked {
+			return 1
+		}
+		return 0
+	}
+
 	out, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Println(string(out))
 	if result.Blocked {
 		return 1
 	}
 	return 0
+}
+
+// scanArgName returns a SARIF-friendly artifact URI for single-file or
+// stdin scans.
+func scanArgName(arg string) string {
+	if arg == "" || arg == "-" {
+		return "<stdin>"
+	}
+	return filepath.ToSlash(arg)
 }
 
 func resolveRulePaths(patFlag, excFlag string) (string, string, error) {
