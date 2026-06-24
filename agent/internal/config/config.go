@@ -87,6 +87,12 @@ type Config struct {
 	// takes precedence over ProfileURL when both are set.
 	ProfileURL string `yaml:"profile_url"`
 
+	// ProfileUpdateInterval, when > 0 and ProfileURL is set, makes the
+	// agent periodically re-fetch and re-apply the profile (with an
+	// ETag / Last-Modified delta check) without a restart. 0 (default)
+	// disables auto-refresh.
+	ProfileUpdateInterval time.Duration `yaml:"profile_update_interval"`
+
 	// HeartbeatURL is the URL the agent POSTs an aggregate heartbeat
 	// to. Empty (default) disables the heartbeat. The payload is
 	// strictly {agent_version, os_type, os_arch, aggregate_counters}
