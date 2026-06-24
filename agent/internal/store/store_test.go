@@ -44,6 +44,7 @@ func TestOpen_SchemaAndSeeds(t *testing.T) {
 		"block_events",
 		"category_policies",
 		"dlp_allowlist", // feedback allowlist
+		"dlp_canaries",  // planted tripwire tokens
 		"dlp_config",
 		"rule_versions",
 		"rulesets",

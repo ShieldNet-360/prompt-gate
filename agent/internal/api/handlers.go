@@ -635,6 +635,7 @@ func (s *Server) handleDLPScan(w http.ResponseWriter, r *http.Request) {
 		if s.Stats != nil {
 			_ = bumpDLPStats(r.Context(), s.Store, result.Blocked)
 		}
+		s.noteCanaryTrigger(r.Context(), result.Blocked, result.PatternName)
 		writeJSON(w, http.StatusOK, result)
 		return
 	}
@@ -659,6 +660,7 @@ func (s *Server) handleDLPScan(w http.ResponseWriter, r *http.Request) {
 	if s.Stats != nil {
 		_ = bumpDLPStats(r.Context(), s.Store, result.Blocked)
 	}
+	s.noteCanaryTrigger(r.Context(), result.Blocked, result.PatternName)
 
 	writeJSON(w, http.StatusOK, result)
 }
