@@ -51,6 +51,15 @@ type Pipeline struct {
 	threshold      *ThresholdEngine
 	largeThreshold int
 
+	// basePatterns is the rule-file pattern set last passed to
+	// Rebuild. canaryPatterns is the user's planted tripwires
+	// (SetCanaryPatterns). The active set (patterns, above) is the
+	// concatenation of the two, rebuilt by applyPatternsLocked
+	// whenever either changes — so a rule-file Rebuild never drops
+	// canaries, and a canary change never drops rule patterns.
+	basePatterns   []*Pattern
+	canaryPatterns []*Pattern
+
 	// disabledCategories holds the set of pattern categories that
 	// should be skipped at scan time. Empty by default (all
 	// categories active).
@@ -172,14 +181,41 @@ func (p *Pipeline) Categories() []string {
 // exclusion list. Called on agent startup and whenever rule files are
 // updated (POST /api/rules/update or future automatic rule sync).
 func (p *Pipeline) Rebuild(patterns []*Pattern, exclusions []Exclusion) {
-	auto := BuildAutomaton(patterns)
 	p.mu.Lock()
-	p.patterns = patterns
-	p.automaton = auto
+	p.basePatterns = patterns
 	p.exclusions = exclusions
+	p.applyPatternsLocked()
 	cache := p.cache
 	p.mu.Unlock()
 	cache.Reset()
+}
+
+// SetCanaryPatterns swaps in the user's canary tripwire patterns and
+// re-applies the active set, preserving the current rule-file
+// patterns. Pass nil/empty to clear all canaries. Safe to call
+// concurrently with Scan; the scan cache is reset so verdicts produced
+// before a canary existed are not served stale.
+func (p *Pipeline) SetCanaryPatterns(canaries []*Pattern) {
+	p.mu.Lock()
+	p.canaryPatterns = canaries
+	p.applyPatternsLocked()
+	cache := p.cache
+	p.mu.Unlock()
+	cache.Reset()
+}
+
+// applyPatternsLocked recomputes the active pattern set and automaton
+// from basePatterns + canaryPatterns. The caller must hold p.mu.
+func (p *Pipeline) applyPatternsLocked() {
+	if len(p.canaryPatterns) == 0 {
+		p.patterns = p.basePatterns
+	} else {
+		combined := make([]*Pattern, 0, len(p.basePatterns)+len(p.canaryPatterns))
+		combined = append(combined, p.basePatterns...)
+		combined = append(combined, p.canaryPatterns...)
+		p.patterns = combined
+	}
+	p.automaton = BuildAutomaton(p.patterns)
 }
 
 // EnableCache attaches a ScanCache to the pipeline. Passing nil
@@ -359,12 +395,7 @@ func (p *Pipeline) scanImpl(
 		canonical, _ = correlator.Combine(sessionID, canonical)
 	}
 
-	// Step 1: classify content — currently used to short-circuit
-	// scans of obviously-empty input and to label the result for
-	// future per-class pattern subsets.
-	_ = ClassifyContent(canonical)
-
-	// Step 2: Aho-Corasick prefix scan.
+	// Aho-Corasick prefix scan.
 	candidates := auto.Scan(canonical)
 
 	// Adaptive scanning + category filter: drop candidates whose

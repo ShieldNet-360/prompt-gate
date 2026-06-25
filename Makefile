@@ -109,33 +109,10 @@ dist: agent electron extension
 	@echo "==> Dev distribution assembled in $(DIST)/"
 
 # ──────────────── helper: write config.yaml ────────
+# Copy the canonical config.yaml (single source of truth) instead of
+# re-emitting a drift-prone copy of it.
 define write_config
-	@printf '%s\n' \
-	  '# Prompt Gate agent configuration' \
-	  '' \
-	  'upstream_dns: "8.8.8.8:53"' \
-	  'dns_listen: "127.0.0.1:15353"' \
-	  'api_listen: "127.0.0.1:9191"' \
-	  'proxy_listen: "127.0.0.1:8443"' \
-	  '' \
-	  'db_path: "prompt-gate.db"' \
-	  '' \
-	  'rule_paths:' \
-	  '  - rules/ai_chat_blocked.txt' \
-	  '  - rules/ai_code_blocked.txt' \
-	  '  - rules/ai_chat_dlp.txt' \
-	  '  - rules/ai_allowed.txt' \
-	  '  - rules/phishing.txt' \
-	  '  - rules/social.txt' \
-	  '' \
-	  'dlp_patterns: rules/dlp_patterns.json' \
-	  'dlp_exclusions: rules/dlp_exclusions.json' \
-	  '' \
-	  'proxy_enabled: false' \
-	  'heartbeat_interval: 1h' \
-	  'stats_flush_interval: 60s' \
-	  'rule_update_interval: 6h' \
-	  > $(1)/config.yaml
+	@cp config.yaml $(1)/config.yaml
 endef
 
 # ──────────────── make macos ────────────────
@@ -229,34 +206,13 @@ linux: agent
 	@# -- binary
 	@mkdir -p $(LINUX_STG)/usr/bin
 	cp $(BIN)/prompt-gate-agent $(LINUX_STG)/usr/bin/
-	@# -- config (absolute paths for systemd — CWD is /)
+	@# -- config: canonical config.yaml with paths rewritten absolute for
+	@#    systemd (CWD is /). Single source of truth + a path sed.
 	@mkdir -p $(LINUX_STG)/etc/prompt-gate/rules
-	@printf '%s\n' \
-	  '# Prompt Gate agent configuration (installed by .deb)' \
-	  '' \
-	  'upstream_dns: "8.8.8.8:53"' \
-	  'dns_listen: "127.0.0.1:15353"' \
-	  'api_listen: "127.0.0.1:9191"' \
-	  'proxy_listen: "127.0.0.1:8443"' \
-	  '' \
-	  'db_path: "/var/lib/prompt-gate/prompt-gate.db"' \
-	  '' \
-	  'rule_paths:' \
-	  '  - /etc/prompt-gate/rules/ai_chat_blocked.txt' \
-	  '  - /etc/prompt-gate/rules/ai_code_blocked.txt' \
-	  '  - /etc/prompt-gate/rules/ai_chat_dlp.txt' \
-	  '  - /etc/prompt-gate/rules/ai_allowed.txt' \
-	  '  - /etc/prompt-gate/rules/phishing.txt' \
-	  '  - /etc/prompt-gate/rules/social.txt' \
-	  '' \
-	  'dlp_patterns: /etc/prompt-gate/rules/dlp_patterns.json' \
-	  'dlp_exclusions: /etc/prompt-gate/rules/dlp_exclusions.json' \
-	  '' \
-	  'proxy_enabled: false' \
-	  'heartbeat_interval: 1h' \
-	  'stats_flush_interval: 60s' \
-	  'rule_update_interval: 6h' \
-	  > $(LINUX_STG)/etc/prompt-gate/config.yaml
+	@sed -e 's|db_path: "prompt-gate.db"|db_path: "/var/lib/prompt-gate/prompt-gate.db"|' \
+	     -e 's|- rules/|- /etc/prompt-gate/rules/|' \
+	     -e 's|: rules/|: /etc/prompt-gate/rules/|' \
+	     config.yaml > $(LINUX_STG)/etc/prompt-gate/config.yaml
 	cp rules/*.txt rules/*.json $(LINUX_STG)/etc/prompt-gate/rules/
 	@# -- helper scripts
 	@mkdir -p $(LINUX_STG)/usr/share/prompt-gate

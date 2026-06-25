@@ -76,6 +76,23 @@ the profile over HTTPS. Validation runs on every load — a malformed profile
 falls back to the last good profile and logs a single line to the agent log
 (no profile body is logged).
 
+### Auto-refresh (central fleet management)
+
+Set `profile_update_interval` (e.g. `15m`) alongside `profile_url` to have the
+agent **periodically re-fetch and re-apply** the profile without a restart:
+
+```yaml
+profile_url: "https://mdm.example.com/profiles/prompt-gate.yaml"
+profile_update_interval: 15m   # 0 (default) = fetch once at startup only
+```
+
+Edit the one JSON on your server and every agent picks it up within the
+interval — MDM-style central management. The fetch uses HTTP conditional
+requests (`If-None-Match` / `If-Modified-Since`), so an unchanged profile is a
+zero-work `304 Not Modified` no-op. A failed fetch keeps the last applied
+profile (the agent never reverts to an empty policy). The same SSRF guard as
+the startup fetch applies. `GET /api/profile` reflects the active version.
+
 When `managed: true`, the Electron tray UI hides the category toggles and the
 Settings page shows a read-only banner with the profile ID + version.
 
@@ -146,6 +163,38 @@ agent posts a JSON heartbeat on a fixed interval (default 5 min):
 The heartbeat carries only aggregate counters — no domain names, no URLs, no
 user identifiers. The receiving endpoint should reply 200 OK; non-200 responses
 are retried with exponential backoff. See `agent/internal/heartbeat/`.
+
+## 7b. Threshold alerting (SIEM / Slack webhooks)
+
+Where the heartbeat is a *scheduled* aggregate push for dashboards, the alerter
+is an *event-driven* push for incident response: it fires a webhook the moment
+DLP blocks spike. Enable it in `config.yaml` (or an enterprise profile):
+
+```yaml
+alert_webhook_url: "https://hooks.slack.com/services/…"   # blank = disabled
+alert_threshold_blocks: 10   # new blocks within a window that trigger an alert (min 5)
+alert_interval: 5m           # polling cadence
+```
+
+When the number of new DLP blocks since the last alert reaches the threshold,
+the agent POSTs:
+
+```json
+{
+  "alert_type": "dlp_block_threshold",
+  "agent_version": "1.0.1",
+  "os_type": "darwin",
+  "os_arch": "arm64",
+  "blocks_in_window": 12,
+  "exported_at": 1750000000
+}
+```
+
+The payload is **counters-only** — no domain names, URLs, IPs, matched values,
+or pattern names ever leave the device (same privacy invariant as the
+heartbeat, enforced by a test). `GET /api/alerter/status` reports
+`{enabled, threshold_blocks, last_fired_at, fires_total}`. HTTPS-only;
+private/loopback hosts are rejected. See `agent/internal/alerter/`.
 
 ## 8. Troubleshooting
 

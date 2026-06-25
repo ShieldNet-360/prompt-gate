@@ -1,0 +1,36 @@
+# Example: scan a repository for secrets/PII with Prompt Gate and surface
+# findings in the GitHub Security tab via Code Scanning.
+#
+# Copy this into your own repo's .github/workflows/ to use it.
+name: Prompt Gate DLP Scan (example)
+
+on:
+  workflow_dispatch:   # example only — run manually; copy into your own repo to gate PRs
+
+permissions:
+  contents: read
+  security-events: write   # required to upload SARIF
+
+jobs:
+  dlp-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: pg
+        uses: ShieldNet-360/prompt-gate@main   # pin to a tag (e.g. @v1.0.1) in real use
+        with:
+          path: '.'
+          sarif-file: 'prompt-gate.sarif'
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'prompt-gate.sarif'
+
+      - name: Fail if secrets found
+        if: steps.pg.outputs.blocked == 'true'
+        run: |
+          echo "::error::Prompt Gate detected secrets/PII — see the Security tab."
+          exit 1

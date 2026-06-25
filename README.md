@@ -275,7 +275,6 @@ prompt-gate/
 │   │   ├── store/                    # SQLite (modernc.org/sqlite, WAL)
 │   │   ├── tamper/                   # OS DNS/proxy tamper detector
 │   │   └── updater/                  # Agent self-update
-│   ├── nfpm.yaml                     # .deb packaging
 │   ├── scripts/{post,pre}*.sh
 │   ├── go.mod / go.sum
 │   └── Makefile                      # build / test / lint targets
@@ -283,8 +282,8 @@ prompt-gate/
 │   ├── main.ts                       # Tray icon, health polling, BrowserWindow
 │   ├── preload.ts                    # Secure contextBridge
 │   ├── src/
-│   │   ├── pages/{Settings,Status,ProxySettings,Rules,Setup}.tsx
-│   │   ├── components/{CategoryToggle,StatsCard}.tsx
+│   │   ├── pages/{ProxySettings,Rules,Setup}.tsx
+│   │   ├── components/{SetupIcon,Toast}.tsx
 │   │   └── api/agent.ts              # HTTP client for the Go agent
 │   ├── package.json
 │   └── electron-builder.yml
@@ -315,15 +314,14 @@ prompt-gate/
 │   ├── dlp-pattern-authoring-guide.md
 │   └── accessibility.md
 ├── scripts/                          # Platform install / DNS / proxy scripts
-│   ├── macos/                        # build-pkg.sh, postinstall.sh, uninstall.sh,
+│   ├── macos/                        # postinstall.sh, uninstall.sh,
 │   │                                 # configure-dns.sh, install-ca.sh,
 │   │                                 # configure-proxy.sh,
 │   │                                 # com.shieldnet360.promptgate.plist
-│   ├── windows/                      # prompt-gate.wxs, build-msi.ps1,
-│   │                                 # postinstall.ps1, uninstall.ps1,
+│   ├── windows/                      # postinstall.ps1, uninstall.ps1,
 │   │                                 # configure-dns.ps1, register-service.ps1,
 │   │                                 # install-ca.ps1, configure-proxy.ps1
-│   └── linux/                        # build-packages.sh, postinstall.sh,
+│   └── linux/                        # postinstall.sh,
 │                                     # preremove.sh, uninstall.sh,
 │                                     # configure-dns.sh, install-ca.sh,
 │                                     # configure-proxy.sh, prompt-gate.service

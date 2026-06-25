@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/alerter"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/api"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/config"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
@@ -211,6 +212,27 @@ func buildStdioPipeline(ctx context.Context, configPath string) (*dlp.Pipeline, 
 		enableAllowlist(ctx, pipeline, statsStore.DB())
 	}
 	return pipeline, statsStore, nil
+}
+
+// loadCanaryPatterns reads the persisted canary tripwires from the
+// store, builds their DLP patterns, and registers them on the live
+// pipeline. Kept separate from Rebuild so a rule-file reload never
+// drops canaries (the pipeline holds them as an overlay). A nil store
+// or empty set is a no-op.
+func loadCanaryPatterns(ctx context.Context, s *store.Store, p *dlp.Pipeline) error {
+	if s == nil {
+		return nil
+	}
+	canaries, err := s.ListCanaries(ctx)
+	if err != nil {
+		return err
+	}
+	patterns := make([]*dlp.Pattern, 0, len(canaries))
+	for _, c := range canaries {
+		patterns = append(patterns, dlp.CanaryPattern(c.Token, c.Label))
+	}
+	p.SetCanaryPatterns(patterns)
+	return nil
 }
 
 // applyDLPRuntimeConfig copies the runtime tunables from the
@@ -416,6 +438,13 @@ func run(configPath string) error {
 		pipeline.Rebuild(patterns, exclusions)
 		enableAllowlist(ctx, pipeline, s.DB())
 		apiServer.SetDLP(pipeline)
+		apiServer.SetCanaryRegistrar(pipeline)
+		// Load any persisted canary tripwires into the live pipeline so
+		// they survive restarts. Best-effort: a load failure leaves the
+		// pipeline running without canaries rather than failing startup.
+		if err := loadCanaryPatterns(ctx, s, pipeline); err != nil {
+			log.Warnf("canary load failed: %v", err)
+		}
 		log.Infof("DLP pipeline ready (patterns=%s)", cfg.DLPPatternsPath)
 
 		// Wire the local MITM proxy. The controller is constructed
@@ -581,6 +610,20 @@ func run(configPath string) error {
 	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
 		log.Errorf("profile load failed: %v", err)
 	}
+	// Optional enterprise-profile auto-refresh: re-fetch + re-apply the
+	// profile from profile_url on an interval, with an ETag/Last-Modified
+	// delta check, so fleet policy changes propagate without a restart.
+	if cfg.ProfileURL != "" && cfg.ProfileUpdateInterval > 0 {
+		refresher := profile.NewRefresher(holder, cfg.ProfileURL, cfg.ProfileUpdateInterval,
+			func(ctx context.Context, p *profile.Profile) error {
+				if err := p.Apply(ctx, profileApplyOptions(applyStore, engine, pipeline)); err != nil {
+					return err
+				}
+				return holder.Set(p)
+			})
+		go refresher.Start(ctx, func(format string, args ...interface{}) { log.Infof(format, args...) })
+		log.Infof("enterprise profile auto-refresh enabled (every %s)", cfg.ProfileUpdateInterval)
+	}
 
 	// Tamper detector goroutine.
 	if cfg.DNSListen != "" {
@@ -618,6 +661,24 @@ func run(configPath string) error {
 			hb.Start(ctx, func(format string, args ...interface{}) {
 				log.Infof(format, args...)
 			})
+		})
+	}
+
+	// Optional threshold webhook alerter. URL=="" disables it.
+	al, err := alerter.New(alerter.Options{
+		URL:             cfg.AlertWebhookURL,
+		AgentVersion:    version,
+		ThresholdBlocks: int64(cfg.AlertThresholdBlocks),
+		Interval:        cfg.AlertInterval,
+		Stats:           counter,
+	})
+	if err != nil {
+		return fmt.Errorf("init alerter: %w", err)
+	}
+	if al != nil {
+		apiServer.SetAlertReporter(alertAdapter{a: al})
+		go al.Start(ctx, func(format string, args ...interface{}) {
+			log.Infof(format, args...)
 		})
 	}
 
@@ -979,6 +1040,18 @@ func (a *profileApplyAdapter) SetDLPConfig(ctx context.Context, c profile.DLPCon
 
 // tamperAdapter bridges the *tamper.Detector to the api.TamperReporter
 // interface, mapping tamper.Status field-for-field to api.TamperStatus.
+type alertAdapter struct{ a *alerter.Alerter }
+
+func (x alertAdapter) AlertStatus() api.AlertStatus {
+	st := x.a.Status()
+	return api.AlertStatus{
+		Enabled:         st.Enabled,
+		ThresholdBlocks: st.ThresholdBlocks,
+		LastFiredAt:     st.LastFiredAt,
+		FiresTotal:      st.FiresTotal,
+	}
+}
+
 type tamperAdapter struct{ detector *tamper.Detector }
 
 func (a tamperAdapter) Status() api.TamperStatus {
@@ -1011,12 +1084,19 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 	if err != nil {
 		return err
 	}
+	if err := p.Apply(ctx, profileApplyOptions(ps, engine, pipeline)); err != nil {
+		return err
+	}
+	return h.Set(p)
+}
+
+// profileApplyOptions builds the ApplyOptions used to apply an
+// enterprise profile, including the DLPSink that pushes merged
+// thresholds/weights into the live pipeline so a profile takes effect
+// without a restart. Shared by startup and the auto-refresher.
+func profileApplyOptions(ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) profile.ApplyOptions {
 	opts := profile.ApplyOptions{PolicyStore: ps, Reloader: engine}
 	if pipeline != nil {
-		// Push the merged DLP snapshot into the live pipeline so a
-		// profile that ships stricter thresholds takes effect on
-		// the same boot, not the next one. Without this hook the
-		// pipeline keeps the values it was constructed with above.
 		opts.DLPSink = func(c profile.DLPConfigSnapshot) {
 			pipeline.Threshold().Set(dlp.Thresholds{
 				Critical: c.ThresholdCritical,
@@ -1033,10 +1113,7 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 			})
 		}
 	}
-	if err := p.Apply(ctx, opts); err != nil {
-		return err
-	}
-	return h.Set(p)
+	return opts
 }
 
 // splitHostPort returns the host portion of an addr like "127.0.0.1:53".

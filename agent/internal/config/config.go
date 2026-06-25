@@ -87,6 +87,12 @@ type Config struct {
 	// takes precedence over ProfileURL when both are set.
 	ProfileURL string `yaml:"profile_url"`
 
+	// ProfileUpdateInterval, when > 0 and ProfileURL is set, makes the
+	// agent periodically re-fetch and re-apply the profile (with an
+	// ETag / Last-Modified delta check) without a restart. 0 (default)
+	// disables auto-refresh.
+	ProfileUpdateInterval time.Duration `yaml:"profile_update_interval"`
+
 	// HeartbeatURL is the URL the agent POSTs an aggregate heartbeat
 	// to. Empty (default) disables the heartbeat. The payload is
 	// strictly {agent_version, os_type, os_arch, aggregate_counters}
@@ -96,6 +102,19 @@ type Config struct {
 	// HeartbeatInterval is the cadence at which heartbeats are sent
 	// when HeartbeatURL is non-empty. Defaults to 1h.
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
+
+	// AlertWebhookURL is the URL the agent POSTs a threshold alert to
+	// when DLP blocks spike. Empty (default) disables alerting. The
+	// payload is counters-only — no access data leaves the device.
+	AlertWebhookURL string `yaml:"alert_webhook_url"`
+
+	// AlertThresholdBlocks is the number of new DLP blocks within a
+	// window that triggers an alert. Defaults to 10 (min 5).
+	AlertThresholdBlocks int `yaml:"alert_threshold_blocks"`
+
+	// AlertInterval is the polling cadence for the alert threshold
+	// when AlertWebhookURL is non-empty. Defaults to 5m.
+	AlertInterval time.Duration `yaml:"alert_interval"`
 
 	// LocalRulesDir is the override directory for admin-managed
 	// allow/block lists and DLP overrides. Defaults to RulesDir/local
@@ -163,6 +182,8 @@ func Default() Config {
 		ProxyListen:           "127.0.0.1:8443",
 		ProxyEnabled:          false,
 		HeartbeatInterval:     time.Hour,
+		AlertThresholdBlocks:  10,
+		AlertInterval:         5 * time.Minute,
 		LargeContentThreshold: 50 * 1024,
 		DLPCacheTTLSeconds:    5,
 		DLPCacheCapacity:      1024,
@@ -187,143 +208,18 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("read config: %w", err)
 	}
 
-	var parsed Config
-	if err := yaml.Unmarshal(data, &parsed); err != nil {
+	// Decode directly onto the default-seeded config. yaml.v3 assigns
+	// only the keys present in the file, so an omitted field keeps its
+	// default and an explicit value — including an explicit `0` — wins.
+	// That is exactly the "omitted vs explicit 0" distinction the four
+	// DLP int fields document, with no shadow struct or per-field merge.
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
-
-	// Re-decode the int fields that have explicit "zero disables"
-	// semantics into pointer-typed shadow fields. YAML unmarshal
-	// folds an omitted field and an explicit `0` into the same Go
-	// zero value on an `int`, so merge() cannot tell them apart on
-	// the regular Config view alone.
-	var overlay dlpIntOverlay
-	if err := yaml.Unmarshal(data, &overlay); err != nil {
-		return Config{}, fmt.Errorf("parse config: %w", err)
-	}
-
-	merged := merge(cfg, parsed)
-	overlay.apply(&merged)
-	if err := merged.validate(); err != nil {
+	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
-	return merged, nil
-}
-
-// dlpIntOverlay re-decodes the four DLP int fields whose
-// documented behaviour distinguishes "omitted" from "explicit 0".
-// A pointer field lets the YAML decoder give us a nil value when
-// the key is absent and a `*int` pointing at zero when the operator
-// wrote `: 0` explicitly. This is the only way to recover that
-// distinction without changing the public Config struct's field
-// types and rippling through every consumer.
-type dlpIntOverlay struct {
-	LargeContentThreshold *int `yaml:"large_content_threshold"`
-	DLPCacheTTLSeconds    *int `yaml:"dlp_cache_ttl_seconds"`
-	DLPCacheCapacity      *int `yaml:"dlp_cache_capacity"`
-	DLPRateLimitPerSec    *int `yaml:"dlp_rate_limit_per_sec"`
-}
-
-// apply copies any explicitly-set overlay values onto cfg. nil
-// pointers (omitted keys) are skipped so the default seeded by
-// merge() survives.
-func (o dlpIntOverlay) apply(cfg *Config) {
-	if o.LargeContentThreshold != nil {
-		cfg.LargeContentThreshold = *o.LargeContentThreshold
-	}
-	if o.DLPCacheTTLSeconds != nil {
-		cfg.DLPCacheTTLSeconds = *o.DLPCacheTTLSeconds
-	}
-	if o.DLPCacheCapacity != nil {
-		cfg.DLPCacheCapacity = *o.DLPCacheCapacity
-	}
-	if o.DLPRateLimitPerSec != nil {
-		cfg.DLPRateLimitPerSec = *o.DLPRateLimitPerSec
-	}
-}
-
-func merge(defaults, override Config) Config {
-	out := defaults
-	if override.UpstreamDNS != "" {
-		out.UpstreamDNS = override.UpstreamDNS
-	}
-	if override.DNSListen != "" {
-		out.DNSListen = override.DNSListen
-	}
-	if override.APIListen != "" {
-		out.APIListen = override.APIListen
-	}
-	if len(override.RulePaths) > 0 {
-		out.RulePaths = override.RulePaths
-	}
-	if override.DBPath != "" {
-		out.DBPath = override.DBPath
-	}
-	if override.StatsFlushInterval != 0 {
-		out.StatsFlushInterval = override.StatsFlushInterval
-	}
-	if override.DLPPatternsPath != "" {
-		out.DLPPatternsPath = override.DLPPatternsPath
-	}
-	if override.DLPExclusionsPath != "" {
-		out.DLPExclusionsPath = override.DLPExclusionsPath
-	}
-	if override.RuleUpdateURL != "" {
-		out.RuleUpdateURL = override.RuleUpdateURL
-	}
-	if override.RuleUpdateInterval != 0 {
-		out.RuleUpdateInterval = override.RuleUpdateInterval
-	}
-	if override.RulesDir != "" {
-		out.RulesDir = override.RulesDir
-	}
-	if override.ProxyListen != "" {
-		out.ProxyListen = override.ProxyListen
-	}
-	if override.ProxyUpstreamCABundle != "" {
-		out.ProxyUpstreamCABundle = override.ProxyUpstreamCABundle
-	}
-	if override.ProxyEnabled {
-		out.ProxyEnabled = true
-	}
-	if override.CACertPath != "" {
-		out.CACertPath = override.CACertPath
-	}
-	if override.CAKeyPath != "" {
-		out.CAKeyPath = override.CAKeyPath
-	}
-	if len(override.ProxyPinningBypass) > 0 {
-		out.ProxyPinningBypass = override.ProxyPinningBypass
-	}
-	if override.ProfilePath != "" {
-		out.ProfilePath = override.ProfilePath
-	}
-	if override.ProfileURL != "" {
-		out.ProfileURL = override.ProfileURL
-	}
-	if override.HeartbeatURL != "" {
-		out.HeartbeatURL = override.HeartbeatURL
-	}
-	if override.HeartbeatInterval != 0 {
-		out.HeartbeatInterval = override.HeartbeatInterval
-	}
-	if override.LocalRulesDir != "" {
-		out.LocalRulesDir = override.LocalRulesDir
-	}
-	// The four DLP int fields with "zero disables" semantics are
-	// handled by dlpIntOverlay.apply() after merge() runs, so
-	// they are intentionally not copied here — a `!= 0` guard would
-	// silently drop the operator's explicit `0`.
-	if len(override.DLPDisabledCategories) > 0 {
-		out.DLPDisabledCategories = override.DLPDisabledCategories
-	}
-	if override.AgentUpdateManifestURL != "" {
-		out.AgentUpdateManifestURL = override.AgentUpdateManifestURL
-	}
-	if override.AgentUpdatePublicKey != "" {
-		out.AgentUpdatePublicKey = override.AgentUpdatePublicKey
-	}
-	return out
+	return cfg, nil
 }
 
 func (c Config) validate() error {
