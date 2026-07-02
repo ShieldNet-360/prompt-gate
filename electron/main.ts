@@ -39,6 +39,8 @@ let eventSource: ReturnType<typeof connectEventStream> | null = null;
 type TrayState = 'error' | 'off' | 'on';
 let lastTrayState: TrayState | null = null;
 let updateAvailable = false;
+let updateDownloaded = false;
+let pendingVersion: string | null = null;
 let proxyRunning: boolean | null = null;
 let lastTamperDetections: number | null = null;
 // Agent supervision. agentStopping is set while we deliberately stop the
@@ -47,6 +49,7 @@ let lastTamperDetections: number | null = null;
 // startup can't spin in a tight loop.
 let agentStopping = false;
 let restarting = false;
+let isUpdating = false;
 let recentCrashes: number[] = []; // timestamps (ms) of unexpected exits
 const CRASH_WINDOW_MS = 60_000;
 const CRASH_BURST_LIMIT = 5;
@@ -147,11 +150,21 @@ function buildMenu(): Menu {
     { type: 'separator' },
     { label: proxyLabel, enabled: false },
   ];
-  if (updateAvailable) {
+  if (updateDownloaded) {
     template.push({ type: 'separator' });
     template.push({
-      label: 'Update available — install and restart',
-      click: () => autoUpdater.quitAndInstall(),
+      label: pendingVersion
+        ? `Install update v${pendingVersion} & restart`
+        : 'Install update & restart',
+      click: () => performUpdateQuit(),
+    });
+  } else if (updateAvailable) {
+    template.push({ type: 'separator' });
+    template.push({
+      label: pendingVersion
+        ? `Download update v${pendingVersion}`
+        : 'Download available update',
+      click: () => { void autoUpdater.downloadUpdate(); },
     });
   }
   template.push({ type: 'separator' });
@@ -698,12 +711,17 @@ function repairConfigDirPermissions(dir: string): Promise<void> {
 //   2. a broken ~/.prompt-gate (root-owned) the agent can't write.
 // Best-effort: on failure the tray simply shows the unreachable state.
 async function startManagedAgent(): Promise<void> {
+  // Check both conditions in parallel — on a cold start both fail fast
+  // (ECONNREFUSED on localhost is immediate), but parallelizing avoids
+  // 1.5s+ of sequential timeout waits in edge cases.
+  const [configured, reachable] = await Promise.all([agentConfigured(), agentReachable()]);
+
   // A properly-configured agent is already serving → attach to it.
-  if (await agentConfigured()) return;
+  if (configured) return;
 
   // Something may be answering but misconfigured (no proxy wired). Clear
   // it so our managed agent can bind the port.
-  if (await agentReachable()) {
+  if (reachable) {
     killStaleAgents();
     await new Promise<void>((r) => setTimeout(r, 500));
   }
@@ -749,9 +767,12 @@ async function startManagedAgent(): Promise<void> {
   }
 
   // Wait until it reports a configured proxy, so the first toggle works.
-  for (let i = 0; i < 20; i++) {
+  // Wait until it reports a configured proxy, so the first toggle works.
+  // Poll every 200ms (was 300ms) for faster detection; 30 iterations
+  // keeps the same 6s total ceiling.
+  for (let i = 0; i < 30; i++) {
     if (await agentConfigured()) return;
-    await new Promise<void>((r) => setTimeout(r, 300));
+    await new Promise<void>((r) => setTimeout(r, 200));
   }
   console.error('managed agent: did not become configured within timeout');
 }
@@ -893,6 +914,23 @@ function stopManagedAgent(): void {
   agentProcess = null;
 }
 
+// Clean shutdown before an auto-update install. The before-quit handler
+// normally intercepts app.quit() to show the "proxy still active" dialog
+// and then calls app.exit(0) — which skips will-quit and prevents
+// electron-updater from running its installer. This function does the
+// cleanup (restore proxy, stop agent, stop polling) first, then sets
+// isUpdating so before-quit lets the quit proceed naturally.
+function performUpdateQuit(): void {
+  isUpdating = true;
+  quitConfirmed = true;
+  void restoreSystemProxy().finally(() => {
+    proxyRunning = false;
+    stopHealthPolling();
+    disconnectEventStream();
+    stopManagedAgent();
+    autoUpdater.quitAndInstall();
+  });
+}
 // ── Single-instance lock ──
 // Only one Prompt Gate instance may run at a time. A second instance
 // would fight over the agent API port, system proxy settings, and DNS
@@ -1019,20 +1057,22 @@ app.whenReady().then(async () => {
   tray.setContextMenu(buildMenu());
   tray.on('click', () => showView('status'));
 
-  // Bring up the agent. This can take up to 6s; the tray and IPC
-  // handlers are already live so the UI is responsive during the wait.
-  await startManagedAgent();
+  // Bring up the agent in the background — don't block app startup on it.
+  // The tray starts in 'error' state and flips to 'off' once health polling
+  // detects the agent. IPC handlers, helper install, event stream, and the
+  // auto-update check all run immediately instead of waiting up to 6s.
+  const agentReady = startManagedAgent();
 
   // ── Safety net: restore system proxy to OFF on startup ──
   // If the app was force-killed or crashed while the proxy was active,
   // the system proxy still points at 127.0.0.1:8443 with nothing
-  // listening — the user loses internet. Always restore on launch so
-  // connectivity is guaranteed. The user can re-enable via the toggle.
-  void restoreSystemProxy().then((ok) => {
+  // listening — the user loses internet. Chain this after the agent is
+  // up so the restore call actually reaches it.
+  agentReady.then(() => restoreSystemProxy()).then((ok) => {
     if (ok) console.log('startup: system proxy restored to OFF');
     proxyRunning = false;
     refreshTrayMenu();
-  }).catch(() => { /* agent not reachable yet — no-op */ });
+  }).catch(() => { /* agent not reachable — no-op */ });
 
   // Install the privileged proxy-helper daemon in the background.
   void ensureHelperInstalled();
@@ -1041,26 +1081,68 @@ app.whenReady().then(async () => {
   connectAgentEvents();
 
   // electron-updater wiring. The auto-update feed URL comes from
-  // electron-builder.yml's publish.github block. We surface availability
-  // in the tray menu but never silently install — the user explicitly
-  // clicks "Update available" to apply. The "install and restart" menu
-  // item only appears after `update-downloaded` fires, because
-  // autoUpdater.quitAndInstall() requires the update file on disk;
-  // `update-available` only signals that metadata was fetched.
-  autoUpdater.autoDownload = true;
+  // electron-builder.yml's publish block (generates app-update.yml at
+  // build time). Flow: check at startup → notify user → user agrees →
+  // download → on completion ask to install & restart. Nothing happens
+  // silently; the user is in control of every step.
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.on('update-downloaded', () => {
+
+  autoUpdater.on('update-available', (info) => {
+    // Guard against duplicate notifications if the event fires more than once.
+    if (updateAvailable || updateDownloaded) return;
     updateAvailable = true;
+    pendingVersion = info.version ?? null;
     refreshTrayMenu();
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Available',
+      message: pendingVersion
+        ? `Prompt Gate ${pendingVersion} is available.`
+        : 'A new version of Prompt Gate is available.',
+      detail: 'Would you like to download and install it now?',
+      buttons: ['Update Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) {
+        void autoUpdater.downloadUpdate();
+      }
+    }).catch((err) => {
+      console.error('update dialog error:', err);
+    });
   });
+
+  autoUpdater.on('update-downloaded', () => {
+    updateDownloaded = true;
+    updateAvailable = false;
+    refreshTrayMenu();
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Ready',
+      message: 'The update has been downloaded.',
+      detail: 'Install and restart now?',
+      buttons: ['Install & Restart', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) {
+        performUpdateQuit();
+      }
+    }).catch((err) => {
+      console.error('install dialog error:', err);
+    });
+  });
+
   autoUpdater.on('error', (err) => {
     // Update failures are not fatal — log to stderr and continue.
     console.error('auto-update error:', err);
   });
+
   // Dev runs (no packaged app) cannot self-update; suppress the call.
   if (app.isPackaged) {
-    void autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      console.error('checkForUpdatesAndNotify failed:', err);
+    void autoUpdater.checkForUpdates().catch((err) => {
+      console.error('checkForUpdates failed:', err);
     });
   }
 });
@@ -1127,6 +1209,11 @@ function restoreSystemProxy(): Promise<boolean> {
 }
 
 app.on('before-quit', (e) => {
+  // Auto-update: cleanup was already done by performUpdateQuit(). Let the
+  // quit proceed naturally so electron-updater's will-quit handler can run
+  // the installer. Intercepting here and calling app.exit(0) would skip
+  // will-quit and the update would never install.
+  if (isUpdating) return;
   // First pass: if the proxy is active, intercept the quit, ask the
   // user what to do, then re-quit ourselves. Once the user has
   // answered (quitConfirmed = true) subsequent before-quit firings
