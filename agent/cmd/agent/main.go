@@ -38,7 +38,7 @@ import (
 )
 
 // version is overridable at build time via -ldflags.
-var version = "0.1.0"
+var version = "1.0.2"
 
 // log is a convenience alias for the global logger.
 var log = logging.Log

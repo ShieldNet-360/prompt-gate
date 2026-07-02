@@ -980,6 +980,7 @@ app.whenReady().then(async () => {
     `http://${AGENT_HOST}:${AGENT_PORT}`,
   );
 
+  ipcMain.handle('prompt-gate:get-version', () => app.getVersion());
   ipcMain.handle('prompt-gate:get-agent-token', () => {
     try {
       const tokenPath = path.join(os.homedir(), '.prompt-gate', 'api-token');

@@ -5,6 +5,27 @@ All notable changes to Prompt Gate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2]
+
+### Added
+
+- Auto-update flow: checks GitHub releases at startup, notifies the user,
+  downloads and installs on consent (electron-updater + `publish` block).
+- `performUpdateQuit()` — clean shutdown before auto-update install so the
+  `before-quit` handler doesn't block `will-quit` (the installer trigger).
+- Non-blocking agent startup: tray, IPC handlers, auto-update check, and
+  helper installation all run immediately instead of waiting for the Go agent.
+- Parallelized initial agent reachability checks (`agentConfigured` +
+  `agentReachable` via `Promise.all`).
+- Faster agent-ready polling (200ms interval, was 300ms).
+- Centralized version: UI reads version dynamically from `package.json` via
+  `getVersion` IPC handler instead of hardcoding.
+- Makefile now injects `VERSION` into the Go agent binary via ldflags.
+
+### Changed
+
+- Version bump across all packaging, docs, and UI to 1.0.2.
+
 ## [1.0.1]
 
 ### Changed
@@ -54,5 +75,6 @@ about what you do.
   SBOM per release, OpenSSF Scorecard, CodeQL, signed and verifiable
   release artifacts, and Homebrew / winget packaging.
 
+[1.0.2]: https://github.com/ShieldNet-360/prompt-gate/releases/tag/v1.0.2
 [1.0.1]: https://github.com/ShieldNet-360/prompt-gate/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ShieldNet-360/prompt-gate/releases/tag/v1.0.0

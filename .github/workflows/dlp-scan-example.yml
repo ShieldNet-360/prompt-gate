@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: pg
-        uses: ShieldNet-360/prompt-gate@main   # pin to a tag (e.g. @v1.0.1) in real use
+        uses: ShieldNet-360/prompt-gate@main   # pin to a tag (e.g. @v1.0.2) in real use
         with:
           path: '.'
           sarif-file: 'prompt-gate.sarif'

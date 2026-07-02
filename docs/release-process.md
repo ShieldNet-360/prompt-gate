@@ -82,7 +82,7 @@ For an urgent fix against an already-released version:
 6. Delete the hotfix branch.
 
 A false-positive flood is the most likely launch-day hotfix trigger;
-the FP issue template feeds it. Keep the `v1.0.1` window pre-planned.
+the FP issue template feeds it. Keep the `v1.0.2` window pre-planned.
 
 ## Rolling back a bad release
 
