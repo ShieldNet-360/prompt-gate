@@ -88,5 +88,11 @@ msi:
   shortcutName: Prompt Gate
   runAfterFinish: true
 # Publishing is handled by the release workflow (softprops/action-gh-release).
-# Do NOT add a publish block here — electron-builder would attempt to upload
-# on tagged builds and fail when GH_TOKEN is unavailable.
+# The publish block below is ONLY for generating app-update.yml (the runtime
+# feed config that electron-updater reads to know where to check for updates).
+# --publish never in the build scripts prevents auto-upload; the release
+# workflow handles the actual asset upload via softprops/action-gh-release.
+publish:
+  provider: github
+  owner: ShieldNet-360
+  repo: prompt-gate
