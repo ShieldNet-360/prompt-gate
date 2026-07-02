@@ -1153,6 +1153,10 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
 
 /* ── About Us page ── */
 function AboutUsPage({ onBack }: { onBack: () => void }) {
+  const [version, setVersion] = useState('…');
+  useEffect(() => {
+    window.secureEdge?.getVersion?.().then(setVersion).catch(() => {});
+  }, []);
   return (
     <div className="settings-page">
       <div className="settings-header">
@@ -1164,7 +1168,7 @@ function AboutUsPage({ onBack }: { onBack: () => void }) {
           <SetupIcon size={64} />
         </div>
         <h2 className="about-heading">Prompt Gate</h2>
-        <p className="about-version">Version 1.0.1</p>
+        <p className="about-version">Version {version}</p>
         <div className="about-section">
           <p>
             Built by <strong>ShieldNet 360</strong> — a small team passionate about

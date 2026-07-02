@@ -1,5 +1,5 @@
 PackageIdentifier: ShieldNet360.PromptGate
-PackageVersion: 1.0.1
+PackageVersion: 1.0.2
 InstallerLocale: en-US
 Platform:
   - Windows.Desktop
