@@ -698,7 +698,16 @@ func run(configPath string) error {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 	log.Info("agent shutting down")
-	api.RestoreAllSysConf()
+	done := make(chan struct{})
+	go func() {
+		api.RestoreAllSysConf()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		log.Warn("agent: RestoreAllSysConf timed out during shutdown")
+	}
 	return nil
 }
 

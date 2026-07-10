@@ -758,7 +758,9 @@ async function startManagedAgent(): Promise<void> {
       try { execSync(`xattr -rd com.apple.quarantine "${path.dirname(bin)}"`, { stdio: 'ignore' }); } catch { /* best-effort */ }
     }
     agentStopping = false; // we are bringing it up; future exits are crashes
-    agentProcess = spawn(bin, ['-config', cfg], { stdio: 'ignore', detached: false });
+    const logPath = path.join(app.getPath('userData'), 'agent.log');
+    const logStream = fs.openSync(logPath, 'a');
+    agentProcess = spawn(bin, ['-config', cfg], { stdio: ['ignore', logStream, logStream], detached: false });
     agentProcess.on('exit', () => { agentProcess = null; onAgentExit(); });
     agentProcess.on('error', (err) => { console.error('managed agent spawn error:', err); agentProcess = null; onAgentExit(); });
   } catch (err) {
