@@ -3182,45 +3182,6 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "productivity"
-    },
-    {
-      "name": "Prompt Injection - Instruction Override",
-      "regex": "(?i)ignore\\s+(all\\s+|the\\s+|any\\s+)?(previous|prior|above|earlier|preceding)\\s+(instruction|instructions|prompt|prompts|context|message|messages|rule|rules)",
-      "prefix": "ignore",
-      "severity": "high",
-      "score_weight": 2,
-      "hotwords": [],
-      "hotword_window": 0,
-      "hotword_boost": 0,
-      "require_hotword": false,
-      "entropy_min": 0,
-      "category": "prompt_injection"
-    },
-    {
-      "name": "Prompt Injection - System Prompt Delimiter",
-      "regex": "(?i)<\\|im_start\\|>\\s*system",
-      "prefix": "<|im_start|>",
-      "severity": "high",
-      "score_weight": 2,
-      "hotwords": [],
-      "hotword_window": 0,
-      "hotword_boost": 0,
-      "require_hotword": false,
-      "entropy_min": 0,
-      "category": "prompt_injection"
-    },
-    {
-      "name": "Prompt Injection - Jailbreak Persona",
-      "regex": "(?i)you\\s+are\\s+now\\s+(dan\\b|an?\\s+(unrestricted|unfiltered|uncensored|jailbroken))",
-      "prefix": "you are now",
-      "severity": "high",
-      "score_weight": 2,
-      "hotwords": [],
-      "hotword_window": 0,
-      "hotword_boost": 0,
-      "require_hotword": false,
-      "entropy_min": 0,
-      "category": "prompt_injection"
     }
   ]
 }
