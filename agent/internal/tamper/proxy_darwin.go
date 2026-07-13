@@ -6,6 +6,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // proxyCheckDarwin shells out to `networksetup -getwebproxy` and
@@ -21,8 +22,10 @@ func platformProxyCheckOS(ctx context.Context, expected string) (bool, error) {
 	services := []string{"Wi-Fi", "Ethernet"}
 	for _, svc := range services {
 		for _, sub := range []string{"-getwebproxy", "-getsecurewebproxy"} {
-			cmd := exec.CommandContext(ctx, "networksetup", sub, svc)
+			tctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			cmd := exec.CommandContext(tctx, "networksetup", sub, svc)
 			out, err := cmd.Output()
+			cancel()
 			if err != nil {
 				continue
 			}
