@@ -15,7 +15,7 @@ jobs:
   dlp-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: pg
         uses: ShieldNet-360/prompt-gate@main   # pin to a tag (e.g. @v1.0.2) in real use
@@ -25,7 +25,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'prompt-gate.sarif'
 
