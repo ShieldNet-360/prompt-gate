@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // platformDNSCheck inspects /etc/resolv.conf on Linux/BSD and
@@ -55,8 +56,10 @@ func dnsCheckResolvConf(expectedServer string) (bool, error) {
 func dnsCheckDarwin(ctx context.Context, expectedServer string) (bool, error) {
 	services := []string{"Wi-Fi", "Ethernet"}
 	for _, svc := range services {
-		cmd := exec.CommandContext(ctx, "networksetup", "-getdnsservers", svc)
+		tctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		cmd := exec.CommandContext(tctx, "networksetup", "-getdnsservers", svc)
 		out, err := cmd.Output()
+		cancel()
 		if err != nil {
 			continue
 		}

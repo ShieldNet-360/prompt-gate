@@ -122,15 +122,15 @@ endef
 # The managed-agent lifecycle in main.ts generates config.yaml at
 # runtime (~/.prompt-gate/agent-managed.yaml), so we do NOT ship a
 # static config — only the binary and rule files.
-VERSION    ?= 1.0.1
+VERSION    ?= 1.0.2
 RES_BIN    := electron/resources/bin
 RES_RULES  := electron/resources/rules
 .PHONY: macos
 macos: electron-deps
 	@echo "==> [1/3] Building Go agent + proxy-helper (release)..."
 	@mkdir -p $(RES_BIN) $(RES_RULES)
-	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-agent ./cmd/agent
-	cd agent && go build -trimpath -ldflags "-s -w" -o ../$(RES_BIN)/prompt-gate-proxy-helper ./cmd/proxy-helper
+	cd agent && go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o ../$(RES_BIN)/prompt-gate-agent ./cmd/agent
+	cd agent && go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o ../$(RES_BIN)/prompt-gate-proxy-helper ./cmd/proxy-helper
 	@cp rules/*.txt rules/*.json $(RES_RULES)/ 2>/dev/null || true
 	@echo "==> [2/3] Building Electron renderer + main..."
 	cd electron && npm run build

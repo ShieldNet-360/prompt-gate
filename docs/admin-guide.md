@@ -182,7 +182,7 @@ the agent POSTs:
 ```json
 {
   "alert_type": "dlp_block_threshold",
-  "agent_version": "1.0.1",
+  "agent_version": "1.0.2",
   "os_type": "darwin",
   "os_arch": "arm64",
   "blocks_in_window": 12,

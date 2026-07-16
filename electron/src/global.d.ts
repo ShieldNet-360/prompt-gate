@@ -22,6 +22,7 @@ export interface PromptGateBridge {
   getOpenAtLogin?(): Promise<boolean>;
   setOpenAtLogin?(enabled: boolean): Promise<boolean>;
   clearStaleProxy?(): Promise<boolean>;
+  getVersion?(): Promise<string>;
 }
 
 declare global {

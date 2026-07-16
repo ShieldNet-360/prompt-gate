@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Gate | Technical Architecture</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --heading: #ffffff;
+            --primary: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --code-bg: #010409;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 3rem;
+        }
+
+        /* Sidebar Navigation */
+        nav {
+            position: sticky;
+            top: 2rem;
+            height: calc(100vh - 4rem);
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            padding-right: 1.5rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--heading);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        nav a {
+            color: var(--text);
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s;
+            font-size: 0.95rem;
+        }
+
+        nav a:hover, nav a.active {
+            background-color: var(--surface);
+            color: var(--primary);
+        }
+
+        /* Main Content */
+        main {
+            padding-bottom: 5rem;
+        }
+
+        h1, h2, h3 {
+            color: var(--heading);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        
+        h2 {
+            font-size: 1.8rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-top: 4rem;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+        }
+
+        /* Technical Cards */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .tech-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .tech-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+        }
+
+        .tech-card code {
+            display: inline-block;
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-bottom: 0.5rem;
+            color: var(--heading);
+        }
+
+        /* Diagram Containers */
+        .diagram-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background-color: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--heading);
+            font-weight: 600;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .privacy-box {
+            border-left: 4px solid var(--success);
+            background-color: rgba(63, 185, 80, 0.1);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            nav {
+                position: static;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                padding-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <nav>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Prompt Gate
+        </div>
+        <ul>
+            <li><a href="#overview">System Overview</a></li>
+            <li><a href="#architecture">Architecture Diagram</a></li>
+            <li><a href="#privacy">Privacy & Data Flow</a></li>
+            <li><a href="#dlp-pipeline">Layered DLP Pipeline</a></li>
+            <li><a href="#components">Core Components</a></li>
+            <li><a href="#file-uploads">File Upload Inspection</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <section id="overview">
+            <h1>Technical Architecture</h1>
+            <p>Prompt Gate is an open-source, privacy-first AI Data Leakage Prevention system for desktop environments. It intercepts requests bound for AI tools via DNS, browser extensions, or an optional MITM proxy, executing a high-performance in-memory DLP pipeline to prevent secret leakage.</p>
+            
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h3>Go Backend</h3>
+                    <code>agent/cmd/agent/main.go</code>
+                    <p>Single statically compiled binary running on `127.0.0.1`. Includes an embedded DNS resolver, HTTP API, token-bucket rate limiter, and SQLite store for config/counters.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>Electron Tray</h3>
+                    <code>electron/main.ts</code>
+                    <p>System tray interface interacting with the Go backend via HTTP. Provides configuration UI for rules, policies, and MITM proxy management.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>Browser Extension</h3>
+                    <code>extension/src/background/</code>
+                    <p>Manifest V3 extension for Chrome/Firefox/Safari. Captures text from paste/submit events and forwards to backend via Native Messaging (or HTTP fallback).</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture">
+            <h2>System Architecture</h2>
+            <p>The system operates using a Three-Layer Defense model anchored by the local Go backend service.</p>
+            
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        %% Define Desktop Agent components
+                        subgraph Desktop Agent
+                            UI[Electron Tray UI] -->|HTTP 9191| API[Go Backend Service API]
+                            API --> PolicyEngine[Policy Engine]
+                            PolicyEngine --> SQLite[(SQLite Store)]
+                            Updater[Rule Updater] -->|HTTPS GET| RuleFiles[Local Rule Files]
+                            RuleFiles -.-> PolicyEngine
+                        end
+
+                        %% Layer 1
+                        subgraph Layer 1: DNS Blocking
+                            DNS[Embedded DNS Resolver :15353] -.->|NXDOMAIN for Blocked| PolicyEngine
+                        end
+
+                        %% Layer 2
+                        subgraph Layer 2: DLP Inspection
+                            Ext[Browser Extension] -->|Native Messaging / HTTP| API
+                            API --> DLP[DLP Scanner Pipeline]
+                            DLP -->|Score >= Threshold| Block[Block Response]
+                            DLP -->|Score < Threshold| Allow[Allow Response]
+                        end
+
+                        %% Layer 3
+                        subgraph Layer 3: MITM Proxy
+                            Proxy[Local MITM Proxy :8443] -->|Decrypts Tier-2 Traffic| DLP
+                            Proxy -->|Opaque Tunnel| PolicyEngine
+                        end
+                        
+                        style Desktop Agent fill:#f0f4f8,stroke:#cbd5e1,stroke-width:2px,color:#333
+                        style Layer 1: DNS Blocking fill:#e0f2fe,stroke:#7dd3fc,stroke-width:2px,color:#333
+                        style Layer 2: DLP Inspection fill:#fef08a,stroke:#fde047,stroke-width:2px,color:#333
+                        style Layer 3: MITM Proxy fill:#fce7f3,stroke:#f9a8d4,stroke-width:2px,color:#333
+                </div>
+            </div>
+        </section>
+
+        <section id="privacy">
+            <h2>Privacy & Data Flow</h2>
+            <p><strong>Core Invariant: Process, Don't Persist.</strong> At no point in the default flow is a domain name, URL, IP address, or request content written to any persistent storage.</p>
+            
+            <div class="privacy-box">
+                <strong>Zero Payload Persistence:</strong> DLP scan content is processed strictly in-memory and garbage-collected immediately after the response is sent. Counters (`dns_blocks_total`, `dlp_blocks_total`) are stored as bare integers in SQLite.
+            </div>
+
+            <div class="diagram-container">
+                <div class="mermaid">
+                    flowchart LR
+                        Req[Incoming Request] --> Policy{Policy Check}
+                        
+                        Policy -->|Allow| Fwd[Forward Request\nNo Trace]
+                        Policy -->|Block Tier 3/4| Blk[Block\nIncrement dns_blocks++]
+                        
+                        Policy -->|DLP Scan Tier 2| Pipe[In-Memory DLP Pipeline]
+                        
+                        Pipe -->|Score < Threshold| Fwd
+                        Pipe -->|Score >= Threshold| DLPBlk[Block + Notify\nIncrement dlp_blocks++]
+                        
+                        style Req fill:#333,color:#fff
+                        style Policy fill:#0284c7,color:#fff
+                        style Pipe fill:#8b5cf6,color:#fff
+                        style Fwd fill:#16a34a,color:#fff
+                        style Blk fill:#dc2626,color:#fff
+                        style DLPBlk fill:#dc2626,color:#fff
+                </div>
+            </div>
+        </section>
+
+        <section id="dlp-pipeline">
+            <h2>Layered DLP Pipeline</h2>
+            <p>To meet a strict <code>&lt; 1ms</code> execution budget, Prompt Gate avoids running heavy regexes universally. Instead, it utilizes an advanced, adversary-resistant layered pipeline.</p>
+
+            <div class="diagram-container">
+                <div class="mermaid">
+                    flowchart TD
+                        In["Content Arrives"] --> Norm["0a: Normalisation"]
+                        Norm -.->|"ZWSP Strip, Homoglyph Fold, NFKC, Base64 Decode"| Norm
+                        
+                        Norm --> Corr["0b: Session Correlator"]
+                        Corr -.->|"Prepends prior paste for multi-part exfiltration"| Corr
+                        
+                        Corr --> Class["1: Content Classifier"]
+                        Class -.->|"Identifies Source Code, Structured Data, etc."| Class
+                        
+                        Class --> AC["2: Aho-Corasick Scan"]
+                        AC -.->|"O(n) prefix scan over all patterns"| AC
+                        
+                        AC --> Filter{"Adaptive Filter"}
+                        Filter -->|"Drop candidates based on payload size"| Regex["3: Regex Revalidation"]
+                        
+                        Regex --> Bloom["3.5a: Public-Example Bloom"]
+                        Bloom -.->|"SHA-256 match against AWS docs, etc."| Bloom
+                        
+                        Bloom --> Router["3.5b: Placeholder Router"]
+                        Router -.->|"Ignores YOUR_KEY, {{var}}"| Router
+                        
+                        Router --> Allow["3.5c: Feedback Allowlist"]
+                        
+                        Allow --> Score["4: Per-Match Scoring"]
+                        Score -.->|"Base Weight + Hotword proximity + Entropy"| Score
+                        
+                        Score --> Context["4.5: Context Bias"]
+                        Context -.->|"Destination/Path bias e.g. tests = -1"| Context
+                        
+                        Context --> Thresh{"5: Score >= Threshold?"}
+                        Thresh -->|"Yes"| Block["Block & Drop from Memory"]
+                        Thresh -->|"No"| Safe["Allow & Drop from Memory"]
+
+                        style In fill:#333,color:#fff
+                        style Block fill:#dc2626,color:#fff
+                        style Safe fill:#16a34a,color:#fff
+                        style Score fill:#0ea5e9,color:#fff
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pipeline Layer</th>
+                        <th>File Location</th>
+                        <th>Description / Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Normalisation</td>
+                        <td><code>agent/internal/dlp/normalize.go</code></td>
+                        <td>Defeats `A​K​I​A` / `АKIA` evasion. (~100 μs)</td>
+                    </tr>
+                    <tr>
+                        <td>Aho-Corasick Scan</td>
+                        <td><code>agent/internal/dlp/ahocorasick.go</code></td>
+                        <td>Single pass deterministic matching to skip full regexes. (~100 μs)</td>
+                    </tr>
+                    <tr>
+                        <td>Correlator</td>
+                        <td><code>agent/internal/dlp/correlator.go</code></td>
+                        <td>Reassembles split secrets bounded by Session ID. (~30 μs)</td>
+                    </tr>
+                    <tr>
+                        <td>Scoring Engine</td>
+                        <td><code>agent/internal/dlp/scorer.go</code></td>
+                        <td>Evaluates hotwords, calculates Shannon entropy. (~200 μs)</td>
+                    </tr>
+                    <tr>
+                        <td>Context Bias</td>
+                        <td><code>agent/internal/dlp/scorer_context.go</code></td>
+                        <td>Applies -2 bias for code_hosts, path constraints.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="components">
+            <h2>Core Component Technical Details</h2>
+            
+            <h3>MITM Proxy (Optional Tier 2)</h3>
+            <p>Located in <code>agent/internal/proxy/</code>. Built on `goproxy` running at `127.0.0.1:8443`.</p>
+            <ul>
+                <li>Generates per-device Root CA (ECDSA P-256) on first run, cached in `~/.prompt-gate/ca.crt`.</li>
+                <li>Leaves non-Tier-2 traffic as opaque TCP tunnels. Decrypts only traffic bound for inspected domains.</li>
+                <li>Fires HTTP 451 upon DLP block, dropping the request body from memory instantly.</li>
+            </ul>
+
+            <h3>SQLite Store</h3>
+            <p>Located in <code>agent/internal/store/</code>. Utilizes pure Go SQLite (`modernc.org/sqlite`) running in WAL mode.</p>
+            <ul>
+                <li>Database stays extremely small (~8KB default).</li>
+                <li>Contains tables: `category_policies`, `aggregate_stats`, `dlp_config`, `dlp_allowlist` (salted SHA-256 hashes only).</li>
+                <li>The `block_events` table explicitly requires opt-in via `agent_preferences`. Checked universally on write-paths.</li>
+            </ul>
+        </section>
+        
+        <section id="file-uploads">
+            <h2>File Upload & Payload Inspection</h2>
+            <p>Prompt Gate inspects file uploads traversing through the MITM Proxy (and text from the browser network interceptor), focusing exclusively on surfacing embedded text to the DLP Pipeline.</p>
+
+            <div class="diagram-container">
+                <div class="mermaid">
+                    flowchart TD
+                        Upload["File Upload / HTTP Payload"] --> Check{"Is it Compressed?"}
+                        Check -->|"Yes (gzip/deflate)"| Decompress["Decompress to Memory\n(maxFileBytes limit)"]
+                        Check -->|"No"| Multipart{"Is it Multipart?"}
+                        Decompress --> Multipart
+                        
+                        Multipart -->|"Yes"| ParsePart["Parse Parts & Extract\nFilenames & Text"]
+                        Multipart -->|"No"| Base64{"Check Base64 Blocks"}
+                        ParsePart --> Base64
+                        
+                        Base64 -->|"Valid UTF-8 Base64 Found"| Decode["Decode Base64 to Text"]
+                        Base64 -->|"None"| Combine["Combine Extracted Text"]
+                        Decode --> Combine
+                        
+                        Combine --> Scan["Pass to DLP Pipeline\n(maxScanBytes limit)"]
+                        
+                        style Upload fill:#333,color:#fff
+                        style Scan fill:#8b5cf6,color:#fff
+                </div>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h3>Transparent Decompression</h3>
+                    <code>agent/internal/proxy/extract.go</code>
+                    <p>Transparently inflates <strong>gzip</strong> and <strong>deflate</strong> body encodings so the DLP scanner can view the raw plaintext. A strict byte boundary is applied to prevent decompression bombs.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>Multipart Parsing</h3>
+                    <p>Parses <code>multipart/form-data</code> bodies (e.g., Anthropic/OpenAI Files API). It extracts not just the text content of every part, but also <strong>filenames</strong>, which frequently embed secrets (like <code>.env</code> or <code>id_rsa</code>).</p>
+                </div>
+                <div class="tech-card">
+                    <h3>Base64 Extraction</h3>
+                    <p>Hunts for Base64 blobs embedded inside JSON arrays, octet-stream uploads, or raw strings. If a matched blob decodes to overwhelmingly printable characters (valid UTF-8 text), it is appended to the scan buffer.</p>
+                </div>
+            </div>
+
+            <div class="privacy-box">
+                <strong>What it Checks:</strong> 165 real-world detection patterns across 14 categories. This includes: Cloud Provider Keys (AWS, Azure, GCP), Infrastructure (Terraform, K8s, Docker), Code hosts (GitHub, GitLab), AI/ML API Keys, Payment Processors (Stripe), CI/CD Tokens, Messaging (Slack, Twilio), Auth/Identity (Auth0, Okta), Language Ecosystems (NPM, PyPI, Maven), Mobile (iOS APNs, Android Signing), Database credentials, PEM/Private Keys, JWTs, generic passwords, and PII (SSN, credit cards).
+            </div>
+            <div class="privacy-box" style="border-left-color: var(--warning); background-color: rgba(210, 153, 34, 0.1);">
+                <strong>Scope limits:</strong> Binary document formats (PDFs, zip, Office files) and non-textual image blobs are intentionally bypassed to strictly bound the scan time and memory footprint (<code>maxScanBytes</code> limit).
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+    mermaid.initialize({
+        theme: 'base',
+        themeVariables: {
+            fontFamily: 'Inter',
+            primaryColor: '#e0f2fe',
+            primaryTextColor: '#333',
+            primaryBorderColor: '#7dd3fc',
+            lineColor: '#58a6ff',
+            secondaryColor: '#fef08a',
+            tertiaryColor: '#fce7f3'
+        },
+        startOnLoad: true
+    });
+</script>
+</body>
+</html>
