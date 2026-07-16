@@ -9,8 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+// helperInstallMu serializes helper installation so the agent's
+// install-on-first-use path and the tray's explicit InstallHelper call
+// can't both fire the (single) admin prompt at once.
+var helperInstallMu sync.Mutex
 
 const (
 	helperSocket      = "/var/run/prompt-gate-proxy.sock"
@@ -64,6 +70,57 @@ func helperInstalled() bool {
 // helperRunning delegates to helperAvailable.
 func helperRunning() bool { return helperAvailable() }
 
+// waitForHelper polls until the helper answers PING or the deadline
+// passes. Used right after an install (launchctl load takes ~1s to bring
+// the daemon up) so the very next privileged call goes over the socket
+// instead of racing to a second password prompt.
+func waitForHelper(d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if helperAvailable() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// ensureHelperReady guarantees the privileged helper is up before a
+// privileged operation, installing it on first use. This is what makes a
+// fresh install cost ONE password prompt instead of three: the first
+// privileged action (CA trust or proxy enable) installs the helper (one
+// prompt) and every subsequent action — CA trust, proxy, DNS — flows over
+// the socket with zero prompts, regardless of the order the tray drives
+// them in. Returns false (caller falls back to its own osascript path)
+// only when the helper binary can't be found or install/startup fails, so
+// non-helper layouts are never blocked.
+func ensureHelperReady() bool {
+	if helperAvailable() {
+		return true
+	}
+	helperInstallMu.Lock()
+	defer helperInstallMu.Unlock()
+	// Re-check under the lock: a concurrent caller (or the tray's
+	// InstallHelper) may have brought it up while we waited.
+	if helperAvailable() {
+		return true
+	}
+	if !helperInstalled() {
+		bin, err := findHelperBin()
+		if err != nil {
+			return false // can't install — caller uses the osascript fallback
+		}
+		// We already hold helperInstallMu, so call the locked worker
+		// directly (installHelper would re-lock and deadlock).
+		if err := installHelperLocked(bin); err != nil {
+			return false
+		}
+	}
+	return waitForHelper(5 * time.Second)
+}
+
 // findHelperBin locates the proxy-helper binary next to the current
 // executable (production bundle) or in common dev build paths.
 func findHelperBin() (string, error) {
@@ -106,10 +163,26 @@ const helperPlistXML = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `
 
-// installHelper copies the helper binary and LaunchDaemon plist, then loads
-// the daemon — all in a SINGLE admin prompt. After this the helper starts
-// immediately and future proxy/DNS toggles require zero prompts.
+// installHelper installs the privileged helper through ONE admin prompt,
+// serialized and idempotent: if the helper is already up it returns
+// without prompting, and the mutex prevents the tray's explicit install
+// and the agent's install-on-first-use (ensureHelperReady) from both
+// firing the prompt. This is the entry point used by the public
+// InstallHelper / the API; ensureHelperReady (already holding the lock)
+// calls installHelperLocked directly.
 func installHelper(helperBinSrc string) error {
+	helperInstallMu.Lock()
+	defer helperInstallMu.Unlock()
+	if helperAvailable() {
+		return nil // already running — don't prompt again
+	}
+	return installHelperLocked(helperBinSrc)
+}
+
+// installHelperLocked does the actual copy + plist + launchctl load in a
+// single admin prompt. The caller MUST hold helperInstallMu. After this
+// the helper starts within ~1s and future proxy/DNS/CA ops need no prompt.
+func installHelperLocked(helperBinSrc string) error {
 	tmp, err := os.CreateTemp("", "com.shieldnet360.promptgate.proxy-helper.*.plist")
 	if err != nil {
 		return fmt.Errorf("sysconf: write plist tmp: %w", err)
@@ -130,7 +203,7 @@ func installHelper(helperBinSrc string) error {
 		fmt.Sprintf("/bin/chmod 644 %s", shQuote(helperPlistDst)),
 		fmt.Sprintf("/bin/launchctl load -w %s", shQuote(helperPlistDst)),
 	}, " && ")
-	return runWithAdmin("install Prompt Gate proxy helper", script)
+	return runWithAdmin("set up its network helper (this is asked only once)", script)
 }
 
 // uninstallHelper stops and removes the helper daemon. Exported for future
