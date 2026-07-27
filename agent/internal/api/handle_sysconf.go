@@ -164,6 +164,13 @@ func (s *Server) handleSystemCA(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, sysConfResponse{OK: false, Message: err.Error()})
 			return
 		}
+		
+		// Auto-configure Firefox to trust OS certificates
+		if err := sysconf.PatchFirefoxProfiles(); err != nil {
+			log.Printf("sysconf: Warning: failed to patch Firefox profiles: %v", err)
+			// We don't fail the overall install if Firefox patching fails (e.g. Firefox not installed)
+		}
+
 		writeJSON(w, http.StatusOK, sysConfResponse{OK: true, Message: "CA certificate installed."})
 
 	case "remove":
