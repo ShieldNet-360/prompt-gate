@@ -442,10 +442,11 @@ func (s *Server) handleBlockEvents(w http.ResponseWriter, r *http.Request) {
 // `managed` field lets the Electron UI grey out the consent toggle
 // when an enterprise profile has locked the agent.
 type preferencesResponse struct {
-	BlockEventsEnabled     bool  `json:"block_events_enabled"`
-	BlockEventsConsentedAt int64 `json:"block_events_consented_at"`
-	RedactEnabled          bool  `json:"redact_enabled"`
-	Managed                bool  `json:"managed"`
+	BlockEventsEnabled     bool   `json:"block_events_enabled"`
+	BlockEventsConsentedAt int64  `json:"block_events_consented_at"`
+	RedactEnabled          bool   `json:"redact_enabled"`
+	DLPAction              string `json:"dlp_action"`
+	Managed                bool   `json:"managed"`
 }
 
 func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
@@ -453,6 +454,10 @@ func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	s.sendPreferencesResponse(w, r)
+}
+
+func (s *Server) sendPreferencesResponse(w http.ResponseWriter, r *http.Request) {
 	prefs, err := s.Store.GetAgentPreferences(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "read preferences failed")
@@ -462,6 +467,7 @@ func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
 		BlockEventsEnabled:     prefs.BlockEventsEnabled,
 		BlockEventsConsentedAt: prefs.BlockEventsConsentedAt,
 		RedactEnabled:          prefs.RedactEnabled,
+		DLPAction:              prefs.DLPAction,
 		Managed:                s.Profile != nil && s.Profile.Locked(),
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -493,17 +499,38 @@ func (s *Server) handleRedactMode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "update preferences failed")
 		return
 	}
-	prefs, err := s.Store.GetAgentPreferences(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "read preferences failed")
+	s.sendPreferencesResponse(w, r)
+}
+
+type dlpActionBody struct {
+	Action string `json:"action"`
+}
+
+func (s *Server) handleDLPAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, preferencesResponse{
-		BlockEventsEnabled:     prefs.BlockEventsEnabled,
-		BlockEventsConsentedAt: prefs.BlockEventsConsentedAt,
-		RedactEnabled:          prefs.RedactEnabled,
-		Managed:                false,
-	})
+	if s.Profile != nil && s.Profile.Locked() {
+		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
+		return
+	}
+	var body dlpActionBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if body.Action != "block" && body.Action != "mask" && body.Action != "bypass" {
+		writeError(w, http.StatusBadRequest, `action must be "block", "mask", or "bypass"`)
+		return
+	}
+	if s.Store != nil {
+		if err := s.Store.SetDLPAction(r.Context(), body.Action); err != nil {
+			writeError(w, http.StatusInternalServerError, "update preferences failed")
+			return
+		}
+	}
+	s.sendPreferencesResponse(w, r)
 }
 
 // blockEventsConsent is the PUT body for /api/preferences/block-events.

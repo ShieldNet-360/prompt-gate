@@ -41,17 +41,17 @@ func capScanText(s string) string {
 // scanner sees plaintext. It is bounded by maxFileBytes (decompression-
 // bomb guard) and falls back to the original bytes on any error or when
 // the encoding isn't compression we handle.
-func decompressForScan(enc string, body []byte) []byte {
+func decompressForScan(enc string, body []byte) ([]byte, bool) {
 	enc = strings.ToLower(strings.TrimSpace(enc))
 	if enc == "" || enc == "identity" || len(body) == 0 {
-		return body
+		return body, true
 	}
 	var r io.Reader
 	switch {
 	case strings.Contains(enc, "gzip"), strings.Contains(enc, "x-gzip"):
 		zr, err := gzip.NewReader(bytes.NewReader(body))
 		if err != nil {
-			return body
+			return body, false
 		}
 		defer zr.Close()
 		r = zr
@@ -60,13 +60,52 @@ func decompressForScan(enc string, body []byte) []byte {
 		defer fr.Close()
 		r = fr
 	default:
-		return body
+		return body, false
 	}
 	dec, err := io.ReadAll(io.LimitReader(r, maxFileBytes))
 	if err != nil || len(dec) == 0 {
-		return body
+		return body, false
 	}
-	return dec
+	return dec, true
+}
+
+// compressRedactedBody re-compresses the redacted text matching the original
+// Content-Encoding header (gzip or deflate). Returns uncompressed bytes if no
+// compression was used originally.
+func compressRedactedBody(enc string, redactedText string) ([]byte, error) {
+	enc = strings.ToLower(strings.TrimSpace(enc))
+	data := []byte(redactedText)
+	if enc == "" || enc == "identity" {
+		return data, nil
+	}
+
+	switch {
+	case strings.Contains(enc, "gzip"), strings.Contains(enc, "x-gzip"):
+		var buf bytes.Buffer
+		gw := gzip.NewWriter(&buf)
+		if _, err := gw.Write(data); err != nil {
+			return nil, err
+		}
+		if err := gw.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	case strings.Contains(enc, "deflate"):
+		var buf bytes.Buffer
+		fw, err := flate.NewWriter(&buf, flate.DefaultCompression)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(data); err != nil {
+			return nil, err
+		}
+		if err := fw.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	default:
+		return data, nil
+	}
 }
 
 // extractMultipart parses a multipart/form-data body and returns the

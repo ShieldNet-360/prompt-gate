@@ -387,6 +387,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/preferences", s.handlePreferences)
 	mux.HandleFunc("/api/preferences/block-events", s.handleBlockEventsConsent)
 	mux.HandleFunc("/api/preferences/redact-mode", s.handleRedactMode)
+	mux.HandleFunc("/api/preferences/dlp-action", s.handleDLPAction)
 	mux.HandleFunc("/api/protection-plan", s.handleProtectionPlan)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/dlp/allowlist", s.handleDLPAllowlistCollection)

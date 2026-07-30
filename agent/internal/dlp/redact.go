@@ -3,6 +3,7 @@ package dlp
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -17,7 +18,7 @@ const (
 // genericRedactToken is used when merged spans cover more than one
 // distinct secret type, so we never have to guess a label across a
 // merged region.
-const genericRedactToken = "[REDACTED]"
+const genericRedactToken = "**"
 
 // Redaction is one applied replacement. Start/End are byte offsets into
 // the RETURNED RedactedContent (not the original). The matched value is
@@ -146,22 +147,35 @@ func (p *Pipeline) locateSecrets(original string) ([]span, bool) {
 		seen[key] = struct{}{}
 
 		token := tokens.tokenFor(m.Pattern, m.Value)
-		from := 0
+		targets := []string{m.Value}
+		if esc := url.QueryEscape(m.Value); esc != m.Value {
+			targets = append(targets, esc)
+		}
+		if escPath := url.PathEscape(m.Value); escPath != m.Value {
+			targets = append(targets, escPath)
+		}
+		if slashEsc := strings.ReplaceAll(m.Value, "/", "%2F"); slashEsc != m.Value {
+			targets = append(targets, slashEsc)
+		}
+
 		found := false
-		for {
-			rel := strings.Index(original[from:], m.Value)
-			if rel < 0 {
-				break
+		for _, target := range targets {
+			from := 0
+			for {
+				rel := strings.Index(original[from:], target)
+				if rel < 0 {
+					break
+				}
+				start := from + rel
+				spans = append(spans, span{
+					start:   start,
+					end:     start + len(target),
+					token:   token,
+					pattern: m.Pattern.Name,
+				})
+				from = start + len(target)
+				found = true
 			}
-			start := from + rel
-			spans = append(spans, span{
-				start:   start,
-				end:     start + len(m.Value),
-				token:   token,
-				pattern: m.Pattern.Name,
-			})
-			from = start + len(m.Value)
-			found = true
 		}
 		if !found {
 			// Secret exists only in normalized form (homoglyph / base64
@@ -251,12 +265,11 @@ func (a *tokenAllocator) tokenFor(pat *Pattern, value string) string {
 	slug := categorySlug(pat)
 	for {
 		a.counter[slug]++
-		tok := fmt.Sprintf("[%s_%d]", slug, a.counter[slug])
+		tok := fmt.Sprintf("KEY_%s_%d", slug, a.counter[slug])
 		if !strings.Contains(a.original, tok) {
 			a.byValue[key] = tok
 			return tok
 		}
-		// token already present in the source — bump and retry.
 	}
 }
 

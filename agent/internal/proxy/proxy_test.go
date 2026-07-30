@@ -35,11 +35,28 @@ func (f *fakeScanner) Scan(_ context.Context, content string) dlp.ScanResult {
 	return dlp.ScanResult{}
 }
 
+func (f *fakeScanner) Redact(ctx context.Context, content, sessionID string, source dlp.SourceContext) dlp.RedactionResult {
+	res := f.Scan(ctx, content)
+	if !res.Blocked {
+		return dlp.RedactionResult{ScanResult: res, Action: dlp.ActionAllow, RedactedContent: content}
+	}
+	redacted := strings.ReplaceAll(content, f.blockOn, "**")
+	return dlp.RedactionResult{
+		ScanResult:      res,
+		Action:          dlp.ActionRedact,
+		RedactedContent: redacted,
+	}
+}
+
 // panicScanner panics on every Scan, simulating a parser blowing up on a
 // malformed upload. scanBodySafely must absorb it and fail open.
 type panicScanner struct{}
 
 func (panicScanner) Scan(context.Context, string) dlp.ScanResult {
+	panic("simulated scan/parse panic on untrusted upload")
+}
+
+func (panicScanner) Redact(context.Context, string, string, dlp.SourceContext) dlp.RedactionResult {
 	panic("simulated scan/parse panic on untrusted upload")
 }
 

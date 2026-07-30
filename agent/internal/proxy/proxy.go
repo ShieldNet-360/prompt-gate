@@ -22,12 +22,14 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"html"
+	"strconv"
 	"io"
 	"net/http"
 	"net/url"
@@ -104,6 +106,12 @@ func (f PolicyCheckerFunc) CheckHost(host string) PolicyAction { return f(host) 
 // DLPScanner is the subset of dlp.Pipeline the proxy needs.
 type DLPScanner interface {
 	Scan(ctx context.Context, content string) dlp.ScanResult
+	Redact(ctx context.Context, content, sessionID string, source dlp.SourceContext) dlp.RedactionResult
+}
+
+// ActionProvider supplies the configured DLP action ("block", "mask", "bypass").
+type ActionProvider interface {
+	DLPAction(ctx context.Context) string
 }
 
 // StatsBumper is the subset of store.Store we need to keep
@@ -131,12 +139,13 @@ type EventRecorder interface {
 // Server is the local MITM proxy. Construct via New; start with
 // ListenAndServe; stop with Shutdown.
 type Server struct {
-	policy   PolicyChecker
-	dlp      DLPScanner
-	stats    StatsBumper
-	notifier Notifier
-	recorder EventRecorder
-	ca       *CA
+	policy         PolicyChecker
+	dlp            DLPScanner
+	stats          StatsBumper
+	notifier       Notifier
+	recorder       EventRecorder
+	actionProvider ActionProvider
+	ca             *CA
 
 	httpProxy *goproxy.ProxyHttpServer
 
@@ -243,6 +252,18 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			return req, nil
 		}
 
+		dlpAction := "block"
+		s.mu.Lock()
+		ap := s.actionProvider
+		s.mu.Unlock()
+		if ap != nil {
+			dlpAction = ap.DLPAction(req.Context())
+		}
+
+		if dlpAction == "bypass" || isPreflightOrTelemetryPath(req.URL.Path) {
+			return req, nil
+		}
+
 		body, replacement, err := readScanBody(req)
 		if err != nil {
 			return req, badGateway(req)
@@ -252,6 +273,66 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 		}
 		if len(body) == 0 {
 			return req, nil
+		}
+
+		if dlpAction == "mask" {
+			enc := ""
+			ct := ""
+			if req != nil {
+				enc = req.Header.Get("Content-Encoding")
+				ct = req.Header.Get("Content-Type")
+			}
+			decompressed, ok := decompressForScan(enc, body)
+			if !ok {
+				s.scans.Add(1)
+				s.blocks.Add(1)
+				s.notifyBlock("Unsupported Compression", hostname)
+				s.recordEvent(req.Context(), "dlp", hostname, "Unsupported Compression")
+				return req, blockedResponse(req, dlp.ScanResult{Blocked: true, Score: 1.0, PatternName: "Unsupported Compression"})
+			}
+			bodyStr := bytesToString(decompressed)
+
+			var redactRes dlp.RedactionResult
+			if strings.Contains(ct, "application/x-www-form-urlencoded") {
+				redactedContent, isRedacted, resScan := redactFormBody(req.Context(), s.dlp, bodyStr)
+				redactRes = dlp.RedactionResult{
+					ScanResult: resScan,
+					Action:     dlp.ActionAllow,
+				}
+				if isRedacted {
+					redactRes.Action = dlp.ActionRedact
+					redactRes.RedactedContent = redactedContent
+				}
+			} else {
+				redactRes = s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
+			}
+
+			if redactRes.Action == dlp.ActionAllow {
+				return req, nil
+			}
+
+			if redactRes.Action == dlp.ActionRedact {
+				finalPayload, err := compressRedactedBody(enc, redactRes.RedactedContent)
+				if err != nil {
+					s.blocks.Add(1)
+					s.notifyBlock(redactRes.PatternName, hostname)
+					s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
+					return req, blockedResponse(req, redactRes.ScanResult)
+				}
+				s.scans.Add(1)
+				s.bumpStats(req.Context(), redactRes.Blocked)
+				req.Body = io.NopCloser(bytes.NewReader(finalPayload))
+				req.ContentLength = int64(len(finalPayload))
+				req.Header.Set("Content-Length", strconv.Itoa(len(finalPayload)))
+				return req, nil
+			}
+
+			// Fail-closed to block if redaction failed or could not be done safely
+			s.scans.Add(1)
+			s.blocks.Add(1)
+			s.notifyBlock(redactRes.PatternName, hostname)
+			s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
+			return req, blockedResponse(req, redactRes.ScanResult)
 		}
 
 		// decodeScanBody + Scan run over UNTRUSTED upload bytes
@@ -528,6 +609,13 @@ func (s *Server) SetRecorder(r EventRecorder) {
 	s.mu.Unlock()
 }
 
+// SetActionProvider sets the action provider used to check configured DLP behavior.
+func (s *Server) SetActionProvider(ap ActionProvider) {
+	s.mu.Lock()
+	s.actionProvider = ap
+	s.mu.Unlock()
+}
+
 func (s *Server) recordEvent(ctx context.Context, eventType, host, patternName string) {
 	s.mu.Lock()
 	r := s.recorder
@@ -654,7 +742,7 @@ func decodeScanBody(req *http.Request, body []byte) string {
 	// Undo transport compression so the scanner sees plaintext. Returns
 	// the original bytes unchanged when the body isn't actually gzip/
 	// deflate compressed.
-	body = decompressForScan(enc, body)
+	body, _ = decompressForScan(enc, body)
 
 	// multipart/form-data carries file uploads — the OpenAI / xAI /
 	// Anthropic Files APIs and browser attachment posts. Pull out the
@@ -1094,4 +1182,51 @@ showOverlay({pattern:p});
 return origSend.apply(this,arguments);
 };
 })();</script>`
+}
+
+func isPreflightOrTelemetryPath(path string) bool {
+	p := strings.ToLower(path)
+	return strings.Contains(p, "/prepare") ||
+		strings.Contains(p, "/ping") ||
+		strings.Contains(p, "/telemetry") ||
+		strings.Contains(p, "/ces/") ||
+		strings.Contains(p, "/lat/r")
+}
+
+func redactFormBody(ctx context.Context, dlpScanner DLPScanner, bodyStr string) (string, bool, dlp.ScanResult) {
+	vals, err := url.ParseQuery(bodyStr)
+	if err != nil {
+		if unescaped, e := url.QueryUnescape(bodyStr); e == nil {
+			res := dlpScanner.Redact(ctx, unescaped, "", dlp.SourceContext{})
+			if res.Action == dlp.ActionRedact {
+				return url.QueryEscape(res.RedactedContent), true, res.ScanResult
+			}
+			return bodyStr, false, res.ScanResult
+		}
+		res := dlpScanner.Redact(ctx, bodyStr, "", dlp.SourceContext{})
+		return res.RedactedContent, res.Action == dlp.ActionRedact, res.ScanResult
+	}
+
+	anyRedacted := false
+	var firstResult dlp.ScanResult
+	newVals := make(url.Values)
+	for k, vList := range vals {
+		for _, v := range vList {
+			res := dlpScanner.Redact(ctx, v, "", dlp.SourceContext{})
+			if res.Action == dlp.ActionRedact {
+				anyRedacted = true
+				if firstResult.PatternName == "" {
+					firstResult = res.ScanResult
+				}
+				newVals.Add(k, res.RedactedContent)
+			} else {
+				newVals.Add(k, v)
+			}
+		}
+	}
+
+	if anyRedacted {
+		return newVals.Encode(), true, firstResult
+	}
+	return bodyStr, false, firstResult
 }

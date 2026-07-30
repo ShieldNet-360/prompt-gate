@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SetupIcon } from './components/SetupIcon';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { agent } from './api/agent';
+import { agent, AgentPreferences } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
 import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
@@ -980,7 +980,7 @@ function OverridesPage({ onBack }: { onBack: () => void }) {
 
 /* Privacy sub-page — block event history opt-in */
 function PrivacyPage({ onBack }: { onBack: () => void }) {
-  const [prefs, setPrefs] = useState<{ block_events_enabled: boolean; block_events_consented_at: number; managed: boolean } | null>(null);
+  const [prefs, setPrefs] = useState<AgentPreferences | null>(null);
   const [showConsent, setShowConsent] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
@@ -1009,6 +1009,23 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const changeDLPAction = async (action: 'block' | 'mask' | 'bypass') => {
+    try {
+      const updated = await agent.setDLPAction(action);
+      setPrefs(updated);
+      const labels: Record<string, string> = {
+        block: 'DLP behavior set to Block Request (default).',
+        mask: 'DLP behavior set to Auto-hide Secrets (**).',
+        bypass: 'DLP behavior set to Bypass.',
+      };
+      setFeedback({ kind: 'success', message: labels[action] || 'DLP behavior updated.' });
+    } catch (err) {
+      setFeedback({ kind: 'error', message: String(err) });
+    }
+  };
+
+  const currentAction = prefs?.dlp_action || (prefs?.redact_enabled ? 'mask' : 'block');
+
   return (
     <div className="settings-page">
       <div className="settings-header">
@@ -1024,38 +1041,77 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
       )}
 
       {prefs && (
-        <div className="privacy-card">
-          <div className="privacy-card-header">
-            <div>
-              <div className="privacy-card-title">Block event history</div>
-              <div className="privacy-card-desc">
-                Records the destination domain and pattern name of each blocked event
-                in local SQLite (last 500 events). Never uploaded.
-              </div>
-              {prefs.block_events_consented_at > 0 && !prefs.block_events_enabled && (
-                <div className="privacy-card-meta">
-                  Last consented {new Date(prefs.block_events_consented_at * 1000).toLocaleString()}
+        <>
+          <div className="privacy-card">
+            <div className="privacy-card-header">
+              <div>
+                <div className="privacy-card-title">Block event history</div>
+                <div className="privacy-card-desc">
+                  Records the destination domain and pattern name of each blocked event
+                  in local SQLite (last 500 events). Never uploaded.
                 </div>
-              )}
-            </div>
-            <div className="privacy-card-toggle">
-              {prefs.managed ? (
-                <span className="privacy-managed-badge">Managed</span>
-              ) : (
-                <button
-                  type="button"
-                  className={`dash-toggle small ${prefs.block_events_enabled ? 'on' : 'off'}`}
-                  aria-pressed={prefs.block_events_enabled}
-                  onClick={() => prefs.block_events_enabled ? void disableHistory() : setShowConsent(true)}
-                >
-                  <span className="dash-toggle-track">
-                    <span className="dash-toggle-thumb" />
-                  </span>
-                </button>
-              )}
+                {prefs.block_events_consented_at > 0 && !prefs.block_events_enabled && (
+                  <div className="privacy-card-meta">
+                    Last consented {new Date(prefs.block_events_consented_at * 1000).toLocaleString()}
+                  </div>
+                )}
+              </div>
+              <div className="privacy-card-toggle">
+                {prefs.managed ? (
+                  <span className="privacy-managed-badge">Managed</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`dash-toggle small ${prefs.block_events_enabled ? 'on' : 'off'}`}
+                    aria-pressed={prefs.block_events_enabled}
+                    onClick={() => prefs.block_events_enabled ? void disableHistory() : setShowConsent(true)}
+                  >
+                    <span className="dash-toggle-track">
+                      <span className="dash-toggle-thumb" />
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+
+          <div className="privacy-card" style={{ marginTop: '16px' }}>
+            <div className="privacy-card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '12px' }}>
+              <div>
+                <div className="privacy-card-title">Secret Detection Behavior</div>
+                <div className="privacy-card-desc">
+                  Choose how Prompt Gate handles prompts containing detected secret keys:
+                </div>
+              </div>
+              <div className="policy-rule-actions">
+                <button
+                  type="button"
+                  className={`policy-rule-btn ${currentAction === 'block' ? 'active' : ''}`}
+                  onClick={() => void changeDLPAction('block')}
+                  disabled={prefs.managed}
+                >
+                  🛑 Block (Default)
+                </button>
+                <button
+                  type="button"
+                  className={`policy-rule-btn ${currentAction === 'mask' ? 'active' : ''}`}
+                  onClick={() => void changeDLPAction('mask')}
+                  disabled={prefs.managed}
+                >
+                  🙈 Auto-hide (**)
+                </button>
+                <button
+                  type="button"
+                  className={`policy-rule-btn ${currentAction === 'bypass' ? 'active' : ''}`}
+                  onClick={() => void changeDLPAction('bypass')}
+                  disabled={prefs.managed}
+                >
+                  ⏩ Bypass
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {showConsent && (

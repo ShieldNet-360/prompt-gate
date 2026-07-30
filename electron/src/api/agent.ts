@@ -103,6 +103,7 @@ export interface AgentPreferences {
   block_events_enabled: boolean;
   block_events_consented_at: number; // unix seconds; 0 = never consented
   redact_enabled: boolean; // false = block (default); true = mask + send
+  dlp_action?: 'block' | 'mask' | 'bypass';
   managed: boolean;
 }
 
@@ -379,6 +380,21 @@ export const agent = {
       method: 'PUT',
       body: JSON.stringify({ enabled }),
     });
+  },
+  async setDLPAction(action: 'block' | 'mask' | 'bypass'): Promise<AgentPreferences> {
+    try {
+      return await http<AgentPreferences>('/api/preferences/dlp-action', {
+        method: 'PUT',
+        body: JSON.stringify({ action }),
+      });
+    } catch (err: any) {
+      if (action === 'mask') {
+        return await this.setRedactEnabled(true);
+      } else if (action === 'block') {
+        return await this.setRedactEnabled(false);
+      }
+      throw err;
+    }
   },
 
   // Setup wizard: apply a protection plan preset ("extra" or "light").

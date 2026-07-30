@@ -247,6 +247,12 @@ func (s *Store) migrate(ctx context.Context) error {
 		}
 	}
 	if _, err := s.db.ExecContext(ctx,
+		`ALTER TABLE agent_preferences ADD COLUMN dlp_action TEXT NOT NULL DEFAULT 'block'`); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("migrate: add dlp_action: %w", err)
+		}
+	}
+	if _, err := s.db.ExecContext(ctx,
 		fmt.Sprintf("PRAGMA user_version = %d", schemaVersion)); err != nil {
 		return fmt.Errorf("set user_version: %w", err)
 	}
@@ -484,62 +490,103 @@ func (s *Store) AppendRuleVersion(ctx context.Context, version string) error {
 // enabled=true (it never auto-clears on disable, so the timestamp
 // records when the user most recently said yes).
 type AgentPreferences struct {
-	BlockEventsEnabled     bool  `json:"block_events_enabled"`
-	BlockEventsConsentedAt int64 `json:"block_events_consented_at"`
+	BlockEventsEnabled     bool   `json:"block_events_enabled"`
+	BlockEventsConsentedAt int64  `json:"block_events_consented_at"`
 	// RedactEnabled flips the DLP action on a detected secret from the
 	// default "block" to "redact" (mask the secret, let the rest
 	// through). Default false = block.
-	RedactEnabled bool `json:"redact_enabled"`
+	RedactEnabled bool   `json:"redact_enabled"`
+	DLPAction     string `json:"dlp_action"`
 }
 
 // GetAgentPreferences reads the singleton agent_preferences row.
 func (s *Store) GetAgentPreferences(ctx context.Context) (AgentPreferences, error) {
 	var p AgentPreferences
 	var enabled, redact int
+	var action string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT block_events_enabled, block_events_consented_at, redact_enabled
+		SELECT block_events_enabled, block_events_consented_at, redact_enabled, dlp_action
 		FROM agent_preferences WHERE id = 1
-	`).Scan(&enabled, &p.BlockEventsConsentedAt, &redact)
+	`).Scan(&enabled, &p.BlockEventsConsentedAt, &redact, &action)
 	if err != nil {
 		return AgentPreferences{}, fmt.Errorf("get agent_preferences: %w", err)
 	}
 	p.BlockEventsEnabled = enabled != 0
 	p.RedactEnabled = redact != 0
+	if action == "" {
+		if redact != 0 {
+			action = "mask"
+		} else {
+			action = "block"
+		}
+	}
+	p.DLPAction = action
 	return p, nil
+}
+
+// DLPAction reports the configured behavior when a secret is detected:
+// "block" (default), "mask", or "bypass".
+func (s *Store) DLPAction(ctx context.Context) string {
+	var action string
+	var redact int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT dlp_action, redact_enabled FROM agent_preferences WHERE id = 1`,
+	).Scan(&action, &redact)
+	if err != nil {
+		return "block"
+	}
+	if action == "" {
+		if redact != 0 {
+			return "mask"
+		}
+		return "block"
+	}
+	return action
+}
+
+// SetDLPAction updates the configured DLP behavior ("block", "mask", or "bypass").
+func (s *Store) SetDLPAction(ctx context.Context, action string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch action {
+	case "block", "mask", "bypass":
+	default:
+		return fmt.Errorf("invalid dlp_action: %q (must be block, mask, or bypass)", action)
+	}
+
+	redactVal := 0
+	if action == "mask" {
+		redactVal = 1
+	}
+
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE agent_preferences SET
+			dlp_action     = ?,
+			redact_enabled = ?,
+			updated_at     = CURRENT_TIMESTAMP
+		WHERE id = 1
+	`, action, redactVal)
+	if err != nil {
+		return fmt.Errorf("set dlp_action=%s: %w", action, err)
+	}
+	return nil
 }
 
 // RedactEnabled reports whether the user has opted into redaction.
 // Default false (block). Errors surface as false so the safe default
 // (block) is preserved on any read failure.
 func (s *Store) RedactEnabled(ctx context.Context) bool {
-	var redact int
-	err := s.db.QueryRowContext(ctx,
-		`SELECT redact_enabled FROM agent_preferences WHERE id = 1`,
-	).Scan(&redact)
-	if err != nil {
-		return false
-	}
-	return redact != 0
+	return s.DLPAction(ctx) == "mask"
 }
 
 // SetRedactEnabled flips the redact opt-in.
 func (s *Store) SetRedactEnabled(ctx context.Context, enabled bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	v := 0
+	act := "block"
 	if enabled {
-		v = 1
+		act = "mask"
 	}
-	_, err := s.db.ExecContext(ctx, `
-		UPDATE agent_preferences SET
-			redact_enabled = ?,
-			updated_at     = CURRENT_TIMESTAMP
-		WHERE id = 1
-	`, v)
-	if err != nil {
-		return fmt.Errorf("set redact_enabled=%d: %w", v, err)
-	}
-	return nil
+	return s.SetDLPAction(ctx, act)
 }
 
 // SetBlockEventsEnabled flips the opt-in flag. When enabling, the
