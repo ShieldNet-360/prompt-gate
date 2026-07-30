@@ -260,7 +260,7 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			dlpAction = ap.DLPAction(req.Context())
 		}
 
-		if dlpAction == "bypass" {
+		if dlpAction == "bypass" || isPreflightOrTelemetryPath(req.URL.Path) {
 			return req, nil
 		}
 
@@ -1166,4 +1166,13 @@ showOverlay({pattern:p});
 return origSend.apply(this,arguments);
 };
 })();</script>`
+}
+
+func isPreflightOrTelemetryPath(path string) bool {
+	p := strings.ToLower(path)
+	return strings.Contains(p, "/prepare") ||
+		strings.Contains(p, "/ping") ||
+		strings.Contains(p, "/telemetry") ||
+		strings.Contains(p, "/ces/") ||
+		strings.Contains(p, "/lat/r")
 }
