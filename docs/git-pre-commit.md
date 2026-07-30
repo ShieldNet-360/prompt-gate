@@ -45,7 +45,7 @@ If your team uses [pre-commit](https://pre-commit.com), add to
 ```yaml
 repos:
   - repo: https://github.com/ShieldNet-360/prompt-gate
-    rev: v1.0.2
+    rev: v1.1.1
     hooks:
       - id: prompt-gate
 ```

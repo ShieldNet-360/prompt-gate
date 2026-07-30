@@ -40,14 +40,14 @@ provably the source whose privacy test you just watched pass.
 ```bash
 # 1. Get the exact source for the release
 git clone https://github.com/ShieldNet-360/prompt-gate.git
-cd prompt-gate && git checkout v1.0.2
+cd prompt-gate && git checkout v1.1.1
 
 # 2. Watch the privacy invariant pass on that source
 go test ./agent/internal/store/ -run TestPrivacy -v   # (run from agent/ dir)
 
 # 3. Rebuild the agent and compare to the published binaries, bit-for-bit
-curl -fsSLO https://github.com/ShieldNet-360/prompt-gate/releases/download/v1.0.2/SHA256SUMS
-scripts/reproduce-agent.sh v1.0.2 SHA256SUMS
+curl -fsSLO https://github.com/ShieldNet-360/prompt-gate/releases/download/v1.1.1/SHA256SUMS
+scripts/reproduce-agent.sh v1.1.1 SHA256SUMS
 #   → "OK prompt-gate-agent-darwin-arm64", … "All agent binaries reproduced exactly."
 
 # 4. Confirm CI built it from this repo's tagged commit
