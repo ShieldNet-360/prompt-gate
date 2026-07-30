@@ -292,17 +292,11 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 
 			redactRes := s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
 			if redactRes.Action == dlp.ActionAllow {
-				for i := range body {
-					body[i] = 0
-				}
 				return req, nil
 			}
 
 			if redactRes.Action == dlp.ActionRedact {
 				finalPayload, err := compressRedactedBody(enc, redactRes.RedactedContent)
-				for i := range body {
-					body[i] = 0
-				}
 				if err != nil {
 					s.blocks.Add(1)
 					s.notifyBlock(redactRes.PatternName, hostname)
@@ -317,9 +311,6 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 				return req, nil
 			}
 
-			for i := range body {
-				body[i] = 0
-			}
 			// Fail-closed to block if redaction failed or could not be done safely
 			s.scans.Add(1)
 			s.blocks.Add(1)
