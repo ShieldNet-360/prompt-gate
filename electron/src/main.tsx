@@ -1083,10 +1083,11 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
                   Choose how Prompt Gate handles prompts containing detected secret keys:
                 </div>
               </div>
-              <div className="policy-rule-actions" style={{ width: '100%', gap: '8px' }}>
+              <div className="policy-rule-actions" style={{ width: '100%' }}>
                 <button
                   type="button"
                   className={`policy-rule-btn ${currentAction === 'block' ? 'active' : ''}`}
+                  style={{ flex: 1, padding: '8px 12px', textAlign: 'center' }}
                   onClick={() => void changeDLPAction('block')}
                   disabled={prefs.managed}
                 >
@@ -1095,6 +1096,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   className={`policy-rule-btn ${currentAction === 'mask' ? 'active' : ''}`}
+                  style={{ flex: 1, padding: '8px 12px', textAlign: 'center' }}
                   onClick={() => void changeDLPAction('mask')}
                   disabled={prefs.managed}
                 >
@@ -1103,6 +1105,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   className={`policy-rule-btn ${currentAction === 'bypass' ? 'active' : ''}`}
+                  style={{ flex: 1, padding: '8px 12px', textAlign: 'center' }}
                   onClick={() => void changeDLPAction('bypass')}
                   disabled={prefs.managed}
                 >
