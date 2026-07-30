@@ -276,10 +276,19 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 		}
 
 		if dlpAction == "mask" {
-			bodyStr := bytesToString(body)
+			enc := ""
+			if req != nil {
+				enc = req.Header.Get("Content-Encoding")
+			}
+			decompressed := decompressForScan(enc, body)
+			bodyStr := bytesToString(decompressed)
+
 			redactRes := s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
 			for i := range body {
 				body[i] = 0
+			}
+			for i := range decompressed {
+				decompressed[i] = 0
 			}
 			s.scans.Add(1)
 			s.bumpStats(req.Context(), redactRes.Blocked)
@@ -288,10 +297,16 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 				return req, nil
 			}
 			if redactRes.Action == dlp.ActionRedact {
-				redactedBytes := []byte(redactRes.RedactedContent)
-				req.Body = io.NopCloser(bytes.NewReader(redactedBytes))
-				req.ContentLength = int64(len(redactedBytes))
-				req.Header.Set("Content-Length", strconv.Itoa(len(redactedBytes)))
+				finalPayload, err := compressRedactedBody(enc, redactRes.RedactedContent)
+				if err != nil {
+					s.blocks.Add(1)
+					s.notifyBlock(redactRes.PatternName, hostname)
+					s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
+					return req, blockedResponse(req, redactRes.ScanResult)
+				}
+				req.Body = io.NopCloser(bytes.NewReader(finalPayload))
+				req.ContentLength = int64(len(finalPayload))
+				req.Header.Set("Content-Length", strconv.Itoa(len(finalPayload)))
 				return req, nil
 			}
 

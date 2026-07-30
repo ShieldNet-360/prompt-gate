@@ -69,6 +69,45 @@ func decompressForScan(enc string, body []byte) []byte {
 	return dec
 }
 
+// compressRedactedBody re-compresses the redacted text matching the original
+// Content-Encoding header (gzip or deflate). Returns uncompressed bytes if no
+// compression was used originally.
+func compressRedactedBody(enc string, redactedText string) ([]byte, error) {
+	enc = strings.ToLower(strings.TrimSpace(enc))
+	data := []byte(redactedText)
+	if enc == "" || enc == "identity" {
+		return data, nil
+	}
+
+	switch {
+	case strings.Contains(enc, "gzip"), strings.Contains(enc, "x-gzip"):
+		var buf bytes.Buffer
+		gw := gzip.NewWriter(&buf)
+		if _, err := gw.Write(data); err != nil {
+			return nil, err
+		}
+		if err := gw.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	case strings.Contains(enc, "deflate"):
+		var buf bytes.Buffer
+		fw, err := flate.NewWriter(&buf, flate.DefaultCompression)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(data); err != nil {
+			return nil, err
+		}
+		if err := fw.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	default:
+		return data, nil
+	}
+}
+
 // extractMultipart parses a multipart/form-data body and returns the
 // filenames and text content of every part, decoding any base64-encoded
 // part. Reading is bounded by maxScanBytes across all parts. Returns ""
