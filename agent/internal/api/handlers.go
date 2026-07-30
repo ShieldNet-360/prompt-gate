@@ -454,6 +454,10 @@ func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	s.sendPreferencesResponse(w, r)
+}
+
+func (s *Server) sendPreferencesResponse(w http.ResponseWriter, r *http.Request) {
 	prefs, err := s.Store.GetAgentPreferences(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "read preferences failed")
@@ -495,7 +499,7 @@ func (s *Server) handleRedactMode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "update preferences failed")
 		return
 	}
-	s.handlePreferences(w, r)
+	s.sendPreferencesResponse(w, r)
 }
 
 type dlpActionBody struct {
@@ -526,7 +530,7 @@ func (s *Server) handleDLPAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.handlePreferences(w, r)
+	s.sendPreferencesResponse(w, r)
 }
 
 // blockEventsConsent is the PUT body for /api/preferences/block-events.
