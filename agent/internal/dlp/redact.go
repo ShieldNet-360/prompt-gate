@@ -17,7 +17,7 @@ const (
 // genericRedactToken is used when merged spans cover more than one
 // distinct secret type, so we never have to guess a label across a
 // merged region.
-const genericRedactToken = "[REDACTED]"
+const genericRedactToken = "**"
 
 // Redaction is one applied replacement. Start/End are byte offsets into
 // the RETURNED RedactedContent (not the original). The matched value is
@@ -256,7 +256,6 @@ func (a *tokenAllocator) tokenFor(pat *Pattern, value string) string {
 			a.byValue[key] = tok
 			return tok
 		}
-		// token already present in the source — bump and retry.
 	}
 }
 

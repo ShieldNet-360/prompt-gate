@@ -280,37 +280,48 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			if req != nil {
 				enc = req.Header.Get("Content-Encoding")
 			}
-			decompressed := decompressForScan(enc, body)
+			decompressed, ok := decompressForScan(enc, body)
+			if !ok {
+				s.scans.Add(1)
+				s.blocks.Add(1)
+				s.notifyBlock("Unsupported Compression", hostname)
+				s.recordEvent(req.Context(), "dlp", hostname, "Unsupported Compression")
+				return req, blockedResponse(req, dlp.ScanResult{Blocked: true, Score: 1.0, PatternName: "Unsupported Compression"})
+			}
 			bodyStr := bytesToString(decompressed)
 
 			redactRes := s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
-			for i := range body {
-				body[i] = 0
-			}
-			for i := range decompressed {
-				decompressed[i] = 0
-			}
-			s.scans.Add(1)
-			s.bumpStats(req.Context(), redactRes.Blocked)
-
 			if redactRes.Action == dlp.ActionAllow {
+				for i := range body {
+					body[i] = 0
+				}
 				return req, nil
 			}
+
 			if redactRes.Action == dlp.ActionRedact {
 				finalPayload, err := compressRedactedBody(enc, redactRes.RedactedContent)
+				for i := range body {
+					body[i] = 0
+				}
 				if err != nil {
 					s.blocks.Add(1)
 					s.notifyBlock(redactRes.PatternName, hostname)
 					s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
 					return req, blockedResponse(req, redactRes.ScanResult)
 				}
+				s.scans.Add(1)
+				s.bumpStats(req.Context(), redactRes.Blocked)
 				req.Body = io.NopCloser(bytes.NewReader(finalPayload))
 				req.ContentLength = int64(len(finalPayload))
 				req.Header.Set("Content-Length", strconv.Itoa(len(finalPayload)))
 				return req, nil
 			}
 
+			for i := range body {
+				body[i] = 0
+			}
 			// Fail-closed to block if redaction failed or could not be done safely
+			s.scans.Add(1)
 			s.blocks.Add(1)
 			s.notifyBlock(redactRes.PatternName, hostname)
 			s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
@@ -724,7 +735,7 @@ func decodeScanBody(req *http.Request, body []byte) string {
 	// Undo transport compression so the scanner sees plaintext. Returns
 	// the original bytes unchanged when the body isn't actually gzip/
 	// deflate compressed.
-	body = decompressForScan(enc, body)
+	body, _ = decompressForScan(enc, body)
 
 	// multipart/form-data carries file uploads — the OpenAI / xAI /
 	// Anthropic Files APIs and browser attachment posts. Pull out the

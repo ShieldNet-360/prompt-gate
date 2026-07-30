@@ -41,17 +41,17 @@ func capScanText(s string) string {
 // scanner sees plaintext. It is bounded by maxFileBytes (decompression-
 // bomb guard) and falls back to the original bytes on any error or when
 // the encoding isn't compression we handle.
-func decompressForScan(enc string, body []byte) []byte {
+func decompressForScan(enc string, body []byte) ([]byte, bool) {
 	enc = strings.ToLower(strings.TrimSpace(enc))
 	if enc == "" || enc == "identity" || len(body) == 0 {
-		return body
+		return body, true
 	}
 	var r io.Reader
 	switch {
 	case strings.Contains(enc, "gzip"), strings.Contains(enc, "x-gzip"):
 		zr, err := gzip.NewReader(bytes.NewReader(body))
 		if err != nil {
-			return body
+			return body, false
 		}
 		defer zr.Close()
 		r = zr
@@ -60,13 +60,13 @@ func decompressForScan(enc string, body []byte) []byte {
 		defer fr.Close()
 		r = fr
 	default:
-		return body
+		return body, false
 	}
 	dec, err := io.ReadAll(io.LimitReader(r, maxFileBytes))
 	if err != nil || len(dec) == 0 {
-		return body
+		return body, false
 	}
-	return dec
+	return dec, true
 }
 
 // compressRedactedBody re-compresses the redacted text matching the original
