@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SetupIcon } from './components/SetupIcon';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { agent } from './api/agent';
+import { agent, AgentPreferences } from './api/agent';
 import { ProxySettings } from './pages/ProxySettings';
 import { Rules } from './pages/Rules';
 import { Setup, isSetupPending } from './pages/Setup';
