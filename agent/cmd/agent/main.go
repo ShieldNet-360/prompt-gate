@@ -480,10 +480,11 @@ func run(configPath string) error {
 					return proxy.PolicyAllow
 				}
 			}),
-			Scanner:  pipeline,
-			Stats:    proxyStats{s},
-			Notifier: notifier,
-			Recorder: storeRecorder{s},
+			Scanner:        pipeline,
+			Stats:          proxyStats{s},
+			Notifier:       notifier,
+			Recorder:       storeRecorder{s},
+			ActionProvider: s,
 		})
 		if err != nil {
 			return fmt.Errorf("build proxy controller: %w", err)

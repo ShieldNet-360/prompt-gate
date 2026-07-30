@@ -22,12 +22,14 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"html"
+	"strconv"
 	"io"
 	"net/http"
 	"net/url"
@@ -104,6 +106,12 @@ func (f PolicyCheckerFunc) CheckHost(host string) PolicyAction { return f(host) 
 // DLPScanner is the subset of dlp.Pipeline the proxy needs.
 type DLPScanner interface {
 	Scan(ctx context.Context, content string) dlp.ScanResult
+	Redact(ctx context.Context, content, sessionID string, source dlp.SourceContext) dlp.RedactionResult
+}
+
+// ActionProvider supplies the configured DLP action ("block", "mask", "bypass").
+type ActionProvider interface {
+	DLPAction(ctx context.Context) string
 }
 
 // StatsBumper is the subset of store.Store we need to keep
@@ -131,12 +139,13 @@ type EventRecorder interface {
 // Server is the local MITM proxy. Construct via New; start with
 // ListenAndServe; stop with Shutdown.
 type Server struct {
-	policy   PolicyChecker
-	dlp      DLPScanner
-	stats    StatsBumper
-	notifier Notifier
-	recorder EventRecorder
-	ca       *CA
+	policy         PolicyChecker
+	dlp            DLPScanner
+	stats          StatsBumper
+	notifier       Notifier
+	recorder       EventRecorder
+	actionProvider ActionProvider
+	ca             *CA
 
 	httpProxy *goproxy.ProxyHttpServer
 
@@ -243,6 +252,18 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			return req, nil
 		}
 
+		dlpAction := "block"
+		s.mu.Lock()
+		ap := s.actionProvider
+		s.mu.Unlock()
+		if ap != nil {
+			dlpAction = ap.DLPAction(req.Context())
+		}
+
+		if dlpAction == "bypass" {
+			return req, nil
+		}
+
 		body, replacement, err := readScanBody(req)
 		if err != nil {
 			return req, badGateway(req)
@@ -252,6 +273,33 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 		}
 		if len(body) == 0 {
 			return req, nil
+		}
+
+		if dlpAction == "mask" {
+			bodyStr := bytesToString(body)
+			redactRes := s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
+			for i := range body {
+				body[i] = 0
+			}
+			s.scans.Add(1)
+			s.bumpStats(req.Context(), redactRes.Blocked)
+
+			if redactRes.Action == dlp.ActionAllow {
+				return req, nil
+			}
+			if redactRes.Action == dlp.ActionRedact {
+				redactedBytes := []byte(redactRes.RedactedContent)
+				req.Body = io.NopCloser(bytes.NewReader(redactedBytes))
+				req.ContentLength = int64(len(redactedBytes))
+				req.Header.Set("Content-Length", strconv.Itoa(len(redactedBytes)))
+				return req, nil
+			}
+
+			// Fail-closed to block if redaction failed or could not be done safely
+			s.blocks.Add(1)
+			s.notifyBlock(redactRes.PatternName, hostname)
+			s.recordEvent(req.Context(), "dlp", hostname, redactRes.PatternName)
+			return req, blockedResponse(req, redactRes.ScanResult)
 		}
 
 		// decodeScanBody + Scan run over UNTRUSTED upload bytes
@@ -525,6 +573,13 @@ func (s *Server) notifyBlock(patternName, host string) {
 func (s *Server) SetRecorder(r EventRecorder) {
 	s.mu.Lock()
 	s.recorder = r
+	s.mu.Unlock()
+}
+
+// SetActionProvider sets the action provider used to check configured DLP behavior.
+func (s *Server) SetActionProvider(ap ActionProvider) {
+	s.mu.Lock()
+	s.actionProvider = ap
 	s.mu.Unlock()
 }
 

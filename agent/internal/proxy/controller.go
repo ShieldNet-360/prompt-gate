@@ -33,11 +33,12 @@ type ControllerConfig struct {
 	// proxy.New when the listener is brought up. Required at config
 	// time so the controller can be wired into the API server before
 	// the proxy is actually started.
-	Policy   PolicyChecker
-	Scanner  DLPScanner
-	Stats    StatsBumper
-	Notifier Notifier
-	Recorder EventRecorder
+	Policy         PolicyChecker
+	Scanner        DLPScanner
+	Stats          StatsBumper
+	Notifier       Notifier
+	Recorder       EventRecorder
+	ActionProvider ActionProvider
 
 	// UpstreamCABundle is an optional path to a PEM file of extra CA
 	// certificates to trust (alongside the system store) when verifying
@@ -98,6 +99,9 @@ func (c *Controller) buildServer() (*Server, error) {
 	}
 	if c.cfg.Recorder != nil {
 		srv.SetRecorder(c.cfg.Recorder)
+	}
+	if c.cfg.ActionProvider != nil {
+		srv.SetActionProvider(c.cfg.ActionProvider)
 	}
 	// Apply the upstream CA bundle from config, or a previously
 	// imported one persisted at the managed path (so it survives
