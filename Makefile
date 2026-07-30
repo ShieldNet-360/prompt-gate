@@ -122,7 +122,7 @@ endef
 # The managed-agent lifecycle in main.ts generates config.yaml at
 # runtime (~/.prompt-gate/agent-managed.yaml), so we do NOT ship a
 # static config — only the binary and rule files.
-VERSION    ?= 1.0.2
+VERSION    ?= $(shell cat VERSION 2>/dev/null || echo 1.1.1)
 RES_BIN    := electron/resources/bin
 RES_RULES  := electron/resources/rules
 .PHONY: macos

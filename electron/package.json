@@ -1,6 +1,6 @@
 {
   "name": "prompt-gate-tray",
-  "version": "1.0.2",
+  "version": "1.1.1",
   "private": true,
   "description": "Prompt Gate tray app — minimal Electron shell that talks to the Go agent over localhost HTTP.",
   "homepage": "https://github.com/ShieldNet-360/prompt-gate",

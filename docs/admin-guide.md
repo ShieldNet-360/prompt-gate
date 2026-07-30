@@ -148,7 +148,7 @@ agent posts a JSON heartbeat on a fixed interval (default 5 min):
 {
   "profile_id": "acme-prod-2026q2",
   "profile_version": 7,
-  "agent_version": "0.5.0",
+  "agent_version": "1.1.1",
   "manifest_version": "rules-2026-05-13",
   "stats": {
     "dns_queries_total": 50321,
@@ -182,7 +182,7 @@ the agent POSTs:
 ```json
 {
   "alert_type": "dlp_block_threshold",
-  "agent_version": "1.0.2",
+  "agent_version": "1.1.1",
   "os_type": "darwin",
   "os_arch": "arm64",
   "blocks_in_window": 12,

@@ -50,7 +50,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
   - id: pg
-    uses: ShieldNet-360/prompt-gate@v1.0.2
+    uses: ShieldNet-360/prompt-gate@v1.1.1
     with:
       path: '.'
       sarif-file: 'prompt-gate.sarif'
