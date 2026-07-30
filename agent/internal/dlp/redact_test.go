@@ -101,7 +101,7 @@ func TestRedact_TokenCollisionGuard(t *testing.T) {
 	if tok == "[AWS_ACCESS_KEY_1]" {
 		t.Fatalf("allocator returned a token already present in source: %q", tok)
 	}
-	if strings.TrimSpace(tok) == "" || !strings.HasPrefix(tok, "[") {
+	if strings.TrimSpace(tok) == "" || !strings.HasPrefix(tok, "KEY_") {
 		t.Fatalf("malformed token: %q", tok)
 	}
 }

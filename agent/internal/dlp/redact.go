@@ -265,7 +265,7 @@ func (a *tokenAllocator) tokenFor(pat *Pattern, value string) string {
 	slug := categorySlug(pat)
 	for {
 		a.counter[slug]++
-		tok := fmt.Sprintf("[%s_%d]", slug, a.counter[slug])
+		tok := fmt.Sprintf("KEY_%s_%d", slug, a.counter[slug])
 		if !strings.Contains(a.original, tok) {
 			a.byValue[key] = tok
 			return tok
