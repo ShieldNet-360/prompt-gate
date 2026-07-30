@@ -277,8 +277,10 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 
 		if dlpAction == "mask" {
 			enc := ""
+			ct := ""
 			if req != nil {
 				enc = req.Header.Get("Content-Encoding")
+				ct = req.Header.Get("Content-Type")
 			}
 			decompressed, ok := decompressForScan(enc, body)
 			if !ok {
@@ -290,7 +292,21 @@ func New(ca *CA, policy PolicyChecker, scanner DLPScanner, stats StatsBumper) (*
 			}
 			bodyStr := bytesToString(decompressed)
 
-			redactRes := s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
+			var redactRes dlp.RedactionResult
+			if strings.Contains(ct, "application/x-www-form-urlencoded") {
+				redactedContent, isRedacted, resScan := redactFormBody(req.Context(), s.dlp, bodyStr)
+				redactRes = dlp.RedactionResult{
+					ScanResult: resScan,
+					Action:     dlp.ActionAllow,
+				}
+				if isRedacted {
+					redactRes.Action = dlp.ActionRedact
+					redactRes.RedactedContent = redactedContent
+				}
+			} else {
+				redactRes = s.dlp.Redact(req.Context(), bodyStr, "", dlp.SourceContext{})
+			}
+
 			if redactRes.Action == dlp.ActionAllow {
 				return req, nil
 			}
@@ -1175,4 +1191,42 @@ func isPreflightOrTelemetryPath(path string) bool {
 		strings.Contains(p, "/telemetry") ||
 		strings.Contains(p, "/ces/") ||
 		strings.Contains(p, "/lat/r")
+}
+
+func redactFormBody(ctx context.Context, dlpScanner DLPScanner, bodyStr string) (string, bool, dlp.ScanResult) {
+	vals, err := url.ParseQuery(bodyStr)
+	if err != nil {
+		if unescaped, e := url.QueryUnescape(bodyStr); e == nil {
+			res := dlpScanner.Redact(ctx, unescaped, "", dlp.SourceContext{})
+			if res.Action == dlp.ActionRedact {
+				return url.QueryEscape(res.RedactedContent), true, res.ScanResult
+			}
+			return bodyStr, false, res.ScanResult
+		}
+		res := dlpScanner.Redact(ctx, bodyStr, "", dlp.SourceContext{})
+		return res.RedactedContent, res.Action == dlp.ActionRedact, res.ScanResult
+	}
+
+	anyRedacted := false
+	var firstResult dlp.ScanResult
+	newVals := make(url.Values)
+	for k, vList := range vals {
+		for _, v := range vList {
+			res := dlpScanner.Redact(ctx, v, "", dlp.SourceContext{})
+			if res.Action == dlp.ActionRedact {
+				anyRedacted = true
+				if firstResult.PatternName == "" {
+					firstResult = res.ScanResult
+				}
+				newVals.Add(k, res.RedactedContent)
+			} else {
+				newVals.Add(k, v)
+			}
+		}
+	}
+
+	if anyRedacted {
+		return newVals.Encode(), true, firstResult
+	}
+	return bodyStr, false, firstResult
 }

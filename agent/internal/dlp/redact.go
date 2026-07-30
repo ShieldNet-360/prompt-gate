@@ -3,6 +3,7 @@ package dlp
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -146,22 +147,35 @@ func (p *Pipeline) locateSecrets(original string) ([]span, bool) {
 		seen[key] = struct{}{}
 
 		token := tokens.tokenFor(m.Pattern, m.Value)
-		from := 0
+		targets := []string{m.Value}
+		if esc := url.QueryEscape(m.Value); esc != m.Value {
+			targets = append(targets, esc)
+		}
+		if escPath := url.PathEscape(m.Value); escPath != m.Value {
+			targets = append(targets, escPath)
+		}
+		if slashEsc := strings.ReplaceAll(m.Value, "/", "%2F"); slashEsc != m.Value {
+			targets = append(targets, slashEsc)
+		}
+
 		found := false
-		for {
-			rel := strings.Index(original[from:], m.Value)
-			if rel < 0 {
-				break
+		for _, target := range targets {
+			from := 0
+			for {
+				rel := strings.Index(original[from:], target)
+				if rel < 0 {
+					break
+				}
+				start := from + rel
+				spans = append(spans, span{
+					start:   start,
+					end:     start + len(target),
+					token:   token,
+					pattern: m.Pattern.Name,
+				})
+				from = start + len(target)
+				found = true
 			}
-			start := from + rel
-			spans = append(spans, span{
-				start:   start,
-				end:     start + len(m.Value),
-				token:   token,
-				pattern: m.Pattern.Name,
-			})
-			from = start + len(m.Value)
-			found = true
 		}
 		if !found {
 			// Secret exists only in normalized form (homoglyph / base64
