@@ -49,7 +49,9 @@ func runWithAdmin(label, script string) error {
 	// Escape for embedding inside an AppleScript double-quoted literal.
 	esc := strings.ReplaceAll(script, `\`, `\\`)
 	esc = strings.ReplaceAll(esc, `"`, `\"`)
-	apple := fmt.Sprintf(`do shell script "%s" with administrator privileges`, esc)
+	promptMsg := fmt.Sprintf("Prompt Gate needs administrator permission to %s.", label)
+	promptEsc := strings.ReplaceAll(promptMsg, `"`, `\"`)
+	apple := fmt.Sprintf(`do shell script "%s" with administrator privileges with prompt "%s"`, esc, promptEsc)
 	if out, err := exec.Command("osascript", "-e", apple).CombinedOutput(); err != nil {
 		return fmt.Errorf("sysconf: %s (admin): %s (%w)", label, strings.TrimSpace(string(out)), err)
 	}
