@@ -29,6 +29,25 @@ const HEALTH_INTERVAL_MS = 10_000;
 // Old agentBinDir / spawnAgent / killAgent removed — replaced by the
 // managed agent lifecycle below (startManagedAgent / stopManagedAgent).
 
+// ──────────────── Electron File Logging Setup ────────────────
+const logDir = path.join(os.homedir(), '.prompt-gate');
+try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ignore */ }
+const electronLogPath = path.join(logDir, `electron_debug_${new Date().toISOString().slice(0, 10)}.log`);
+const electronLogStream = fs.createWriteStream(electronLogPath, { flags: 'a' });
+
+function logElectron(...args: any[]) {
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const message = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  const formatted = `[${timestamp}] [electron] ${message}\n`;
+  process.stdout.write(formatted);
+  try { electronLogStream.write(formatted); } catch { /* ignore */ }
+}
+
+const origLog = console.log;
+const origErr = console.error;
+console.log = (...args: any[]) => { origLog(...args); logElectron(...args); };
+console.error = (...args: any[]) => { origErr(...args); logElectron(...args); };
+
 type View = 'status' | 'settings' | 'proxy';
 
 let tray: Tray | null = null;
@@ -328,17 +347,16 @@ async function tickHealth() {
   const [ok, proxyOk, tamper] = await Promise.all([pingAgent(), pingProxy(), pingTamper()]);
   updateTrayIcon(ok ? (proxyOk ? 'on' : 'off') : 'error');
 
-  if (!ok || !proxyOk) {
+  // Self-healing watchdog: only track agent API unreachability (!ok).
+  // proxyOk is false whenever protection is turned OFF by the user, which is a normal state.
+  if (!ok) {
     consecutiveUnhealthyTicks++;
   } else {
     consecutiveUnhealthyTicks = 0;
   }
 
-  // Self-healing watchdog: if the agent API or proxy listener remains unresponsive
-  // for 3 consecutive health checks (15s) while not intentionally stopping,
-  // force-kill the frozen process and bring up a fresh, healthy agent to restore internet.
   if (consecutiveUnhealthyTicks >= 3 && !agentStopping && !restarting) {
-    console.error(`health: agent/proxy unresponsive for ${consecutiveUnhealthyTicks} ticks — forcing restart to recover connection`);
+    console.error(`health: agent API unresponsive for ${consecutiveUnhealthyTicks} ticks — forcing restart to recover connection`);
     consecutiveUnhealthyTicks = 0;
     void forceRestartManagedAgent();
   }
