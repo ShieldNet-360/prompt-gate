@@ -697,18 +697,24 @@ function killStaleAgentsOnPort(port: number, exceptPid?: number): void {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).toString().trim();
     for (const pid of pids.split('\n')) {
-      const p = pid.trim();
+      const p = Number(pid.trim());
       if (!p) continue;
-      if (exceptPid && Number(p) === exceptPid) continue;
+      if (exceptPid && p === exceptPid) continue;
       let cmd = '';
       try {
         cmd = execSync(`ps -p ${p} -o command=`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
       } catch { /* process gone */ }
       if (cmd.includes('prompt-gate-agent')) {
         try {
-          process.kill(Number(p), 'SIGTERM');
-        } catch {
-          // Best-effort non-privileged kill; avoid popping admin dialogs on startup.
+          process.kill(p, 'SIGTERM');
+        } catch (err: any) {
+          // If unprivileged kill fails with EPERM, verify the root process is STILL running before asking for admin privileges.
+          if (err?.code === 'EPERM' && process.platform === 'darwin') {
+            try {
+              process.kill(p, 0); // signal 0 checks process existence
+              execSync(`osascript -e 'do shell script "kill -9 ${p}" with administrator privileges'`, { stdio: 'ignore' });
+            } catch { /* process already exited, no prompt needed */ }
+          }
         }
       }
     }
