@@ -637,10 +637,27 @@ function agentConfigured(): Promise<boolean> {
 // Kill any prompt-gate-agent process holding the API port. Used when a
 // stale/misconfigured instance (crashed prior run, leftover dev build)
 // occupies the port — we must clear it before our managed agent can bind.
-// Only kills processes whose command line is a prompt-gate-agent, never
-// arbitrary port owners. POSIX only; best-effort.
 function killStaleAgents(): void {
   killStaleAgentsOnPort(AGENT_PORT);
+  killStaleAgentsOnPort(8443);
+  killStaleAgentsOnPort(15353);
+  killOrphanedAgentProcesses();
+}
+
+function killOrphanedAgentProcesses(): void {
+  if (process.platform === 'win32') return;
+  try {
+    const pids = execSync(`pgrep -f prompt-gate-agent`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim();
+    for (const pid of pids.split('\n')) {
+      const p = Number(pid.trim());
+      if (!p || (agentProcess?.pid && p === agentProcess.pid)) continue;
+      try {
+        process.kill(p, 'SIGKILL');
+      } catch { /* best-effort */ }
+    }
+  } catch { /* no matching process */ }
 }
 
 // Kill any prompt-gate-agent listening on `port`, except `exceptPid` (our
@@ -833,6 +850,12 @@ async function restartManagedAgent(): Promise<void> {
 // forceRestartManagedAgent terminates any hanging/frozen child process and restarts a fresh agent.
 async function forceRestartManagedAgent(): Promise<void> {
   if (restarting) return;
+  const now = Date.now();
+  recentCrashes = recentCrashes.filter((t) => now - t < CRASH_WINDOW_MS);
+  if (recentCrashes.length > CRASH_BURST_LIMIT) {
+    console.error('health: crash burst limit reached — suppressing watchdog force-restart');
+    return;
+  }
   restarting = true;
   try {
     if (agentProcess) {
