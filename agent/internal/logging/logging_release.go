@@ -3,10 +3,12 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -21,12 +23,13 @@ func init() {
 		logPath := logFileEnv
 		if logPath == "" {
 			home, err := os.UserHomeDir()
+			fileName := fmt.Sprintf("agent_debug_%s.log", time.Now().Format("2006-01-02"))
 			if err == nil {
 				logDir := filepath.Join(home, ".prompt-gate")
 				_ = os.MkdirAll(logDir, 0755)
-				logPath = filepath.Join(logDir, "agent.log")
+				logPath = filepath.Join(logDir, fileName)
 			} else {
-				logPath = "agent.log"
+				logPath = fileName
 			}
 		}
 
