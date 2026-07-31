@@ -322,17 +322,25 @@ function pingTamper(): Promise<number | null> {
   });
 }
 
+let consecutiveUnhealthyTicks = 0;
+
 async function tickHealth() {
   const [ok, proxyOk, tamper] = await Promise.all([pingAgent(), pingProxy(), pingTamper()]);
   updateTrayIcon(ok ? (proxyOk ? 'on' : 'off') : 'error');
-  // Recovery net: the agent is unreachable and we hold no live child
-  // handle (its exit fired without us, or we attached to an external
-  // agent that has since died). Bring it back. The exit-handler path
-  // covers the common crash; this covers the rest. `restarting` guards
-  // against double-spawns.
-  if (!ok && !agentProcess && !agentStopping && !restarting) {
-    console.error('health: agent unreachable with no live process — restarting');
-    void restartManagedAgent();
+
+  if (!ok || !proxyOk) {
+    consecutiveUnhealthyTicks++;
+  } else {
+    consecutiveUnhealthyTicks = 0;
+  }
+
+  // Self-healing watchdog: if the agent API or proxy listener remains unresponsive
+  // for 3 consecutive health checks (15s) while not intentionally stopping,
+  // force-kill the frozen process and bring up a fresh, healthy agent to restore internet.
+  if (consecutiveUnhealthyTicks >= 3 && !agentStopping && !restarting) {
+    console.error(`health: agent/proxy unresponsive for ${consecutiveUnhealthyTicks} ticks — forcing restart to recover connection`);
+    consecutiveUnhealthyTicks = 0;
+    void forceRestartManagedAgent();
   }
   if (proxyOk !== proxyRunning) {
     proxyRunning = proxyOk;
@@ -816,6 +824,26 @@ async function restartManagedAgent(): Promise<void> {
   if (agentProcess) return; // already running again
   restarting = true;
   try {
+    await startManagedAgent();
+  } finally {
+    restarting = false;
+  }
+}
+
+// forceRestartManagedAgent terminates any hanging/frozen child process and restarts a fresh agent.
+async function forceRestartManagedAgent(): Promise<void> {
+  if (restarting) return;
+  restarting = true;
+  try {
+    if (agentProcess) {
+      try {
+        agentProcess.removeAllListeners('exit');
+        agentProcess.kill('SIGKILL');
+      } catch { /* best-effort */ }
+      agentProcess = null;
+    }
+    killStaleAgents();
+    await new Promise((r) => setTimeout(r, 500));
     await startManagedAgent();
   } finally {
     restarting = false;
