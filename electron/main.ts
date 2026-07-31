@@ -1155,19 +1155,18 @@ app.whenReady().then(async () => {
   // auto-update check all run immediately instead of waiting up to 6s.
   const agentReady = startManagedAgent();
 
-  // ── Safety net: restore system proxy to OFF on startup ──
-  // If the app was force-killed or crashed while the proxy was active,
-  // the system proxy still points at 127.0.0.1:8443 with nothing
-  // listening — the user loses internet. Chain this after the agent is
-  // up so the restore call actually reaches it.
-  agentReady.then(() => restoreSystemProxy()).then((ok) => {
-    if (ok) console.log('startup: system proxy restored to OFF');
-    proxyRunning = false;
-    refreshTrayMenu();
-  }).catch(() => { /* agent not reachable — no-op */ });
-
-  // Install the privileged proxy-helper daemon in the background.
-  void ensureHelperInstalled();
+  // ── Safety net & Privileged Helper Setup ──
+  // Ensure the helper is installed FIRST (1 admin prompt on fresh install),
+  // then restore system proxy to OFF via the helper (0 additional prompts).
+  agentReady
+    .then(() => ensureHelperInstalled())
+    .then(() => restoreSystemProxy())
+    .then((ok) => {
+      if (ok) console.log('startup: system proxy restored to OFF');
+      proxyRunning = false;
+      refreshTrayMenu();
+    })
+    .catch((err) => { console.error('startup helper/proxy setup error:', err); });
 
   startHealthPolling();
   connectAgentEvents();
