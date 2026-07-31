@@ -707,16 +707,8 @@ function killStaleAgentsOnPort(port: number, exceptPid?: number): void {
       if (cmd.includes('prompt-gate-agent')) {
         try {
           process.kill(Number(p), 'SIGTERM');
-        } catch (err: any) {
-          // EPERM → process is owned by root; ask for admin permission.
-          if (err?.code === 'EPERM' && process.platform === 'darwin') {
-            try {
-              execSync(
-                `osascript -e 'do shell script "kill ${p}" with administrator privileges'`,
-                { stdio: 'ignore' },
-              );
-            } catch { /* user cancelled the prompt or process already gone */ }
-          }
+        } catch {
+          // Best-effort non-privileged kill; avoid popping admin dialogs on startup.
         }
       }
     }
