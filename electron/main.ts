@@ -29,10 +29,19 @@ const HEALTH_INTERVAL_MS = 10_000;
 // Old agentBinDir / spawnAgent / killAgent removed — replaced by the
 // managed agent lifecycle below (startManagedAgent / stopManagedAgent).
 
-// ──────────────── Electron File Logging Setup ────────────────
+// ──────────────── Electron File Logging Setup (200MB Max) ────────────────
+const MAX_ELECTRON_LOG_BYTES = 200 * 1024 * 1024; // 200MB limit
 const logDir = path.join(os.homedir(), '.prompt-gate');
 try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ignore */ }
-const electronLogPath = path.join(logDir, `electron_debug_${new Date().toISOString().slice(0, 10)}.log`);
+const electronLogPath = path.join(logDir, 'electron.log');
+
+try {
+  const st = fs.statSync(electronLogPath);
+  if (st.size > MAX_ELECTRON_LOG_BYTES) {
+    fs.writeFileSync(electronLogPath, ''); // Truncate if > 200MB
+  }
+} catch { /* ignore */ }
+
 const electronLogStream = fs.createWriteStream(electronLogPath, { flags: 'a' });
 
 function logElectron(...args: any[]) {
