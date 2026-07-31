@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/dlp"
+	"github.com/ShieldNet-360/prompt-gate/agent/internal/logging"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/notify"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/profile"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/rules"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/stats"
 	"github.com/ShieldNet-360/prompt-gate/agent/internal/store"
+	log "github.com/sirupsen/logrus"
 )
 
 // allowedOrigins is the strict allowlist of browser origins that are
@@ -468,8 +470,30 @@ func withCORS(h http.Handler, bearerToken string) http.Handler {
 			}
 		}
 
-		h.ServeHTTP(w, r)
+		start := time.Now()
+		rec := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		h.ServeHTTP(rec, r)
+		duration := time.Since(start)
+
+		if r.URL.Path != "/api/status" || rec.statusCode != http.StatusOK {
+			logging.Log.WithFields(log.Fields{
+				"method":   r.Method,
+				"path":     r.URL.Path,
+				"status":   rec.statusCode,
+				"duration": duration.String(),
+			}).Debugf("HTTP API %s %s -> %d (%s)", r.Method, r.URL.Path, rec.statusCode, duration)
+		}
 	})
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
 }
 
 func isAllowedOrigin(origin string) bool {
