@@ -33,7 +33,7 @@ const HEALTH_INTERVAL_MS = 10_000;
 const MAX_ELECTRON_LOG_BYTES = 200 * 1024 * 1024; // 200MB limit
 const logDir = path.join(os.homedir(), '.prompt-gate');
 try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ignore */ }
-const electronLogPath = path.join(logDir, 'electron.log');
+const electronLogPath = path.join(logDir, `electron_debug_${new Date().toISOString().slice(0, 10)}.log`);
 
 try {
   const st = fs.statSync(electronLogPath);
@@ -354,11 +354,13 @@ let consecutiveUnhealthyTicks = 0;
 
 async function tickHealth() {
   const [ok, proxyOk, tamper] = await Promise.all([pingAgent(), pingProxy(), pingTamper()]);
-  updateTrayIcon(ok ? (proxyOk ? 'on' : 'off') : 'error');
+  const currentStatus = ok ? (proxyOk ? 'on' : 'off') : 'error';
+  updateTrayIcon(currentStatus);
 
   // Self-healing watchdog: only track agent API unreachability (!ok).
   // proxyOk is false whenever protection is turned OFF by the user, which is a normal state.
   if (!ok) {
+    console.log(`health tick: agent_api=false (unreachable), proxy_listen=${proxyOk}, status=${currentStatus}, unhealthy_ticks=${consecutiveUnhealthyTicks + 1}`);
     consecutiveUnhealthyTicks++;
   } else {
     consecutiveUnhealthyTicks = 0;
@@ -807,11 +809,21 @@ async function startManagedAgent(): Promise<void> {
     if (process.platform === 'darwin') {
       try { execSync(`xattr -rd com.apple.quarantine "${path.dirname(bin)}"`, { stdio: 'ignore' }); } catch { /* best-effort */ }
     }
-    agentStopping = false; // we are bringing it up; future exits are crashes
-    const logPath = path.join(app.getPath('userData'), 'agent.log');
-    const logStream = fs.openSync(logPath, 'a');
-    agentProcess = spawn(bin, ['-config', cfg], { stdio: ['ignore', logStream, logStream], detached: false });
-    agentProcess.on('exit', () => { agentProcess = null; onAgentExit(); });
+    agentProcess = spawn(bin, ['-config', cfg], { stdio: ['ignore', 'pipe', 'pipe'], detached: false });
+    console.log(`managed agent spawned: pid=${agentProcess.pid} bin="${bin}" config="${cfg}"`);
+    agentProcess.stdout?.on('data', (chunk) => {
+      const msg = chunk.toString().trim();
+      if (msg) console.log(`[agent-stdout] ${msg}`);
+    });
+    agentProcess.stderr?.on('data', (chunk) => {
+      const msg = chunk.toString().trim();
+      if (msg) console.error(`[agent-stderr] ${msg}`);
+    });
+    agentProcess.on('exit', (code, sig) => {
+      console.log(`managed agent exited: code=${code} signal=${sig}`);
+      agentProcess = null;
+      onAgentExit();
+    });
     agentProcess.on('error', (err) => { console.error('managed agent spawn error:', err); agentProcess = null; onAgentExit(); });
   } catch (err) {
     console.error('managed agent: failed to start:', err);
