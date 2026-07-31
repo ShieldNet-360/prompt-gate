@@ -125,7 +125,24 @@ endef
 VERSION    ?= $(shell cat VERSION 2>/dev/null || echo 1.1.1)
 RES_BIN    := electron/resources/bin
 RES_RULES  := electron/resources/rules
-.PHONY: macos
+.PHONY: macos macos-debug debug
+debug: macos-debug
+macos-debug: electron-deps
+	@echo "==> [1/3] Building Go agent (debug mode with verbose file logging)..."
+	@mkdir -p $(RES_BIN) $(RES_RULES)
+	cd agent && go build -tags debug -ldflags "-X main.version=$(VERSION)" -o ../$(RES_BIN)/prompt-gate-agent ./cmd/agent
+	cd agent && go build -ldflags "-X main.version=$(VERSION)" -o ../$(RES_BIN)/prompt-gate-proxy-helper ./cmd/proxy-helper
+	@cp rules/*.txt rules/*.json $(RES_RULES)/ 2>/dev/null || true
+	@echo "==> [2/3] Building Electron renderer + main..."
+	cd electron && npm run build
+	@echo "==> [3/3] Packaging macOS DMG (Debug)..."
+	cd electron && npx electron-builder --mac --publish never
+	@touch electron/release/.metadata_never_index
+	@mkdir -p $(DIST)
+	@cp electron/release/*.dmg $(DIST)/ 2>/dev/null || true
+	@echo ""
+	@echo "==> Done! Debug build created in $(DIST)/"
+
 macos: electron-deps
 	@echo "==> [1/3] Building Go agent + proxy-helper (release)..."
 	@mkdir -p $(RES_BIN) $(RES_RULES)
