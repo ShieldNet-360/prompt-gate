@@ -855,6 +855,7 @@ function onAgentExit(): void {
   const now = Date.now();
   recentCrashes = recentCrashes.filter((t) => now - t < CRASH_WINDOW_MS);
   recentCrashes.push(now);
+  console.error(`[agent-crash] UNEXPECTED AGENT CRASH DETECTED! Crash count in ${CRASH_WINDOW_MS / 1000}s: ${recentCrashes.length}`);
   updateTrayIcon('error');
 
   if (recentCrashes.length > CRASH_BURST_LIMIT) {
