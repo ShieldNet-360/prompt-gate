@@ -714,7 +714,7 @@ function killStaleAgentsOnPort(port: number, exceptPid?: number): void {
           if (err?.code === 'EPERM' && process.platform === 'darwin') {
             try {
               process.kill(p, 0); // signal 0 checks process existence
-              execSync(`osascript -e 'do shell script "kill -9 ${p}" with administrator privileges'`, { stdio: 'ignore' });
+              execSync(`osascript -e 'do shell script "kill -9 ${p}" with administrator privileges with prompt "Prompt Gate needs administrator permission to terminate a stale root agent process."'`, { stdio: 'ignore' });
             } catch { /* process already exited, no prompt needed */ }
           }
         }
@@ -747,7 +747,7 @@ function repairConfigDirPermissions(dir: string): Promise<void> {
   const user = os.userInfo().username;
   const script =
     `do shell script "chown -R ${user} '${dir}' && chmod -R u+rwX '${dir}'" ` +
-    `with administrator privileges`;
+    `with administrator privileges with prompt "Prompt Gate needs administrator permission to repair settings directory permissions."`;
   return new Promise((resolve) => {
     try {
       const p = spawn('osascript', ['-e', script], { stdio: 'ignore' });
