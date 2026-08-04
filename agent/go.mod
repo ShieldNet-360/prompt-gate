@@ -4,12 +4,12 @@ go 1.26.5
 
 require (
 	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396
-	github.com/elazarl/goproxy v1.8.4
+	github.com/elazarl/goproxy v1.8.5
 	github.com/miekg/dns v1.1.72
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/text v0.40.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.53.0
+	modernc.org/sqlite v1.55.0
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
-	modernc.org/libc v1.73.4 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
