@@ -15,7 +15,7 @@ jobs:
   dlp-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - id: pg
         uses: ShieldNet-360/prompt-gate@main   # pin to a tag (e.g. @v1.1.1) in real use
